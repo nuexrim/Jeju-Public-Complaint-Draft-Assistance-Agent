@@ -1,0 +1,42 @@
+# 수집·적재 대상 목록. 카탈로그(raw/jejudatahub/catalog_*.json)에 실제로 있는 id만 적는다.
+# 컬럼명은 받은 파일의 실제 머리글이다(추측 금지).
+#
+# hub_files: 데이터허브 FILE (로그인·키 없이 누리집 내려받기 주소로 받음)
+#   table  : DuckDB 테이블명
+#   file   : 한 데이터셋에 파일이 여럿일 때 파일명에 들어 있는 문자열
+#   period : {column, format}  format = yyyy | yyyymm | yyyymmdd | yyyy-mm-dd | year_month(columns: [연, 월])
+#   emd    : {mode: name, columns: [...]}     읍면동명이 들어 있는 컬럼
+#            {mode: address, columns: [...]}  주소 문자열에서 읍면동명을 찾음
+#   ragged : {column, int_columns}  따옴표 없이 쉼표가 들어간 컬럼이 있는 파일
+#   latlon : [위도컬럼, 경도컬럼]  행정동 경계 확보 후 공간조인에 쓴다(지금은 기록만)
+# 데이터허브 API(프로젝트 키 필요), 공공데이터포털 링크 데이터는 키·파일 확보 후 추가한다.
+hub_files:
+  - {id: 512,  complaint: 교통, table: bus_boarding_hourly, period: {column: base_date, format: yyyymmdd}}
+  - {id: 743,  complaint: 교통, table: bus_stop_usage_by_user_type, large: true, period: {column: base_date, format: yyyymmdd}, ragged: {column: station_name, int_columns: [user_count]}}
+  - {id: 1021, complaint: 교통, table: bus_yearly_passengers, period: {column: 기준 연도, format: yyyy}}
+  - {id: 1002, complaint: 교통, table: accident_elderly, period: {column: 기준 연도, format: yyyymm}}
+  - {id: 1003, complaint: 교통, table: accident_child_by_hour, period: {column: 기준 연도, format: yyyy}}
+  - {id: 1004, complaint: 교통, table: accident_child_by_road, period: {column: 기준 연도, format: yyyy}}
+  - {id: 1028, complaint: 교통, table: accident_by_intersection, period: {column: 기준 연월, format: yyyymm}}
+  - {id: 875,  complaint: 교통, table: school_blind_spot, file: "-01-", latlon: [위도, 경도]}
+  - {id: 875,  complaint: 교통, table: school_jaywalk_facility_need, file: "-02-", latlon: [위도, 경도]}
+  - {id: 875,  complaint: 교통, table: school_risk_point, file: "-03-", latlon: [위도, 경도]}
+  - {id: 875,  complaint: 교통, table: pedestrian_accident, file: "-04-", period: {column: 발생일시, format: yyyy-mm-dd}, emd: {mode: name, columns: [읍면동]}, latlon: [위도, 경도]}
+  - {id: 875,  complaint: 교통, table: school_near_miss_point, file: "-05-", latlon: [위도, 경도]}
+  - {id: 875,  complaint: 교통, table: traffic_enforcement, file: "-06-", period: {column: 연도별, format: yyyy-mm-dd}}
+  - {id: 846,  complaint: 안전·재난, table: cctv, emd: {mode: address, columns: [지번주소, 도로명주소]}, latlon: [위도, 경도]}
+  - {id: 1046, complaint: 의료 접근, table: emergency_hospital, emd: {mode: address, columns: [주소]}}
+  - {id: 843,  complaint: 의료 접근, table: otc_drug_store, emd: {mode: address, columns: [지번주소, 도로명주소]}}
+  - {id: 987,  complaint: 의료 접근, table: medical_workforce, period: {column: 기준 연도, format: yyyy}}
+  - {id: 925,  complaint: 의료 접근, table: health_center_workforce, period: {column: 기준 연도, format: yyyy}}
+  - {id: 1034, complaint: 환경·청소, table: waste_recycling, period: {column: 기준 연도, format: yyyy}}
+  - {id: 931,  complaint: 환경·청소, table: pm10_monthly, period: {column: 기준 연도, format: yyyymm}, emd: {mode: name, columns: [읍면동]}}
+  - {id: 895,  complaint: 환경·청소, table: air_station, emd: {mode: address, columns: [주소]}}
+  - {id: 850,  complaint: 환경·청소, table: river_water_quality, period: {format: year_month, columns: [연도, 월]}}
+  - {id: 963,  complaint: 안전·재난, table: weather_monthly, period: {column: 기준 연월, format: yyyymm}}
+  - {id: 1031, complaint: 생활물가, table: price_survey}
+  - {id: 830,  complaint: 공통, table: business_birth_death_emd, period: {column: 기준연도, format: yyyy}, emd: {mode: name, columns: [읍면동]}}
+  - {id: 549,  complaint: 공통, table: population_yearly, period: {column: 연도, format: yyyy}}
+  - {id: 521,  complaint: 공통, table: floating_pop_residence, period: {column: base_year_month, format: yyyymm}}
+  - {id: 523,  complaint: 공통, table: floating_pop_work, period: {column: base_year_month, format: yyyymm}}
+  - {id: 520,  complaint: 공통, table: floating_pop_visit, period: {column: base_year_month, format: yyyymm}}
