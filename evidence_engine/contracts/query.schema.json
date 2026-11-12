@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query.schema.json",
+  "title": "구조화 질의 (팀원 → 근거 패키지 엔진)",
+  "type": "object",
+  "required": ["request_id", "normalized_text", "complaint_type", "claims", "location"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": {"type": "string", "minLength": 1},
+    "raw_text": {"type": "string", "description": "원문. 개인정보 가능성이 있어 엔진은 로그에 남기지 않는다."},
+    "normalized_text": {"type": "string", "minLength": 1},
+    "dialect_confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "complaint_type": {"type": "string", "minLength": 1},
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "text": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "location": {
+      "type": "object",
+      "required": ["emd_name"],
+      "additionalProperties": false,
+      "properties": {
+        "emd_name": {"type": "string", "minLength": 1},
+        "emd_code": {"type": "string", "description": "없거나 빈 문자열이면 엔진이 emd_name으로 찾는다."}
+      }
+    },
+    "period": {
+      "type": "object",
+      "required": ["from", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "from": {"type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"},
+        "to": {"type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"}
+      }
+    },
+    "targets": {"type": "array", "items": {"type": "string"}},
+    "user_request": {"type": "string"}
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "request_id": "r-0002",
+  "normalized_text": "저녁 시간에 집으로 가는 버스가 거의 없어서 학생들이 귀가하기 어렵습니다",
+  "complaint_type": "교통",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "저녁 시간대 버스 이용이 어렵다"
+    }
+  ],
+  "location": {
+    "emd_name": "애월읍",
+    "emd_code": ""
+  },
+  "period": {
+    "from": "2024-01",
+    "to": "2026-10"
+  },
+  "targets": [
+    "버스",
+    "저녁 시간대",
+    "청소년"
+  ],
+  "user_request": "저녁 시간대 버스 증편"
+}

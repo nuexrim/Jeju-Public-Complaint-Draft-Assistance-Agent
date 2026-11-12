@@ -1,0 +1,29 @@
+{
+  "request_id": "r-0009",
+  "normalized_text": "여름 폭염 때 어르신들이 더위를 피할 대피시설이 부족합니다",
+  "complaint_type": "안전·재난",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "폭염 때 이용할 대피시설이 부족하다"
+    },
+    {
+      "id": "c2",
+      "text": "노인 인구에 비해 수용 인원이 적다"
+    }
+  ],
+  "location": {
+    "emd_name": "한림읍",
+    "emd_code": ""
+  },
+  "period": {
+    "from": "2024-01",
+    "to": "2026-10"
+  },
+  "targets": [
+    "폭염",
+    "대피시설",
+    "노인"
+  ],
+  "user_request": "무더위쉼터 확대"
+}

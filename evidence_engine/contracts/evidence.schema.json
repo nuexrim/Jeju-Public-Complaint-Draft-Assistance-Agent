@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evidence.schema.json",
+  "title": "근거 패키지 (근거 패키지 엔진 → 팀원)",
+  "type": "object",
+  "required": ["request_id", "engine", "evidence", "gaps", "meta"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": {"type": "string", "minLength": 1},
+    "engine": {
+      "enum": ["hybrid", "catalog", "mock"],
+      "description": "hybrid=온톨로지+카탈로그, catalog=use_ontology=false, mock=실제 계산 없는 가짜 응답"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim_id", "verdict", "indicator", "value", "unit", "sources", "found_by", "relation_path", "caveats"],
+        "additionalProperties": false,
+        "properties": {
+          "claim_id": {"type": "string", "minLength": 1},
+          "verdict": {"enum": ["supported", "partial", "contradicted", "unverifiable"]},
+          "indicator": {"type": "string", "minLength": 1},
+          "value": {"type": ["number", "null"]},
+          "unit": {"type": ["string", "null"]},
+          "region_compare": {"type": ["string", "null"]},
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["dataset", "publisher", "as_of"],
+              "additionalProperties": false,
+              "properties": {
+                "dataset": {"type": "string", "minLength": 1},
+                "publisher": {"type": "string", "minLength": 1},
+                "as_of": {"type": "string", "minLength": 1},
+                "url": {"type": ["string", "null"]}
+              }
+            }
+          },
+          "found_by": {"enum": ["ontology", "catalog", "both"]},
+          "relation_path": {"type": ["string", "null"]},
+          "chart": {"type": ["string", "null"]},
+          "caveats": {"type": "array", "items": {"type": "string"}}
+        },
+        "if": {"properties": {"found_by": {"const": "catalog"}}},
+        "then": {"properties": {"relation_path": {"type": "null"}}}
+      }
+    },
+    "gaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["concept", "reason", "detected_by"],
+        "additionalProperties": false,
+        "properties": {
+          "concept": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1},
+          "detected_by": {"enum": ["ontology", "catalog"]}
+        }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "required": ["use_ontology", "snapshot", "elapsed_ms"],
+      "additionalProperties": false,
+      "properties": {
+        "use_ontology": {"type": "boolean"},
+        "snapshot": {"type": ["string", "null"]},
+        "elapsed_ms": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

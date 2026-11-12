@@ -1,0 +1,32 @@
+# 대회 제공 데이터 목록·명세서 (외부 배포 금지)
+*.xlsx
+*.xls
+
+# 키·비밀값
+.env
+.env.*
+!.env.example
+
+# 원본 데이터, DB, 스냅샷, 생성물
+evidence_engine/data/ingest/raw/
+evidence_engine/data/snapshot/*
+!evidence_engine/data/snapshot/.gitkeep
+*.duckdb
+*.duckdb.wal
+*.parquet
+evidence_engine/charts/*
+!evidence_engine/charts/.gitkeep
+evidence_engine/logs/*
+!evidence_engine/logs/.gitkeep
+
+# 개발 단계 전용 외부 코드 (RIGOR)
+evidence_engine/external/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# OS
+.DS_Store

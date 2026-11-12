@@ -1,0 +1,31 @@
+{
+  "request_id": "r-0001",
+  "raw_text": "우리 동네 버스가 확 줄어부난 할망덜 병원 가기가 막 힘들어마씸",
+  "dialect_confidence": 0.86,
+  "normalized_text": "우리 동네 버스가 크게 줄어서 할머니들이 병원 가기가 매우 힘들어요",
+  "complaint_type": "교통",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "버스가 줄었다"
+    },
+    {
+      "id": "c2",
+      "text": "노인의 병원 접근이 어렵다"
+    }
+  ],
+  "location": {
+    "emd_name": "구좌읍",
+    "emd_code": ""
+  },
+  "period": {
+    "from": "2024-01",
+    "to": "2026-10"
+  },
+  "targets": [
+    "버스",
+    "병원",
+    "노인"
+  ],
+  "user_request": "버스 증차"
+}

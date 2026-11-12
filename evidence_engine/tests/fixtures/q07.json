@@ -1,0 +1,24 @@
+{
+  "request_id": "r-0007",
+  "normalized_text": "클린하우스가 항상 넘쳐서 쓰레기가 길에 쌓여 있습니다",
+  "complaint_type": "환경·청소",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "클린하우스가 인구에 비해 부족하다"
+    }
+  ],
+  "location": {
+    "emd_name": "이도2동",
+    "emd_code": ""
+  },
+  "period": {
+    "from": "2024-01",
+    "to": "2026-10"
+  },
+  "targets": [
+    "클린하우스",
+    "쓰레기"
+  ],
+  "user_request": "클린하우스 추가 설치"
+}

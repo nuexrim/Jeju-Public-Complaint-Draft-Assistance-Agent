@@ -1,0 +1,29 @@
+{
+  "request_id": "r-0006",
+  "normalized_text": "밤에 아프면 갈 수 있는 약국이나 응급실이 근처에 없습니다",
+  "complaint_type": "의료 접근",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "야간에 이용할 약국이 없다"
+    },
+    {
+      "id": "c2",
+      "text": "응급의료기관이 멀다"
+    }
+  ],
+  "location": {
+    "emd_name": "한경면",
+    "emd_code": ""
+  },
+  "period": {
+    "from": "2024-01",
+    "to": "2026-10"
+  },
+  "targets": [
+    "약국",
+    "응급의료기관",
+    "야간"
+  ],
+  "user_request": "공공심야약국 지정"
+}

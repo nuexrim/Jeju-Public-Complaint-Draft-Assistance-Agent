@@ -1,0 +1,24 @@
+{
+  "request_id": "r-0008",
+  "normalized_text": "재활용도움센터가 멀어서 재활용품을 버리기가 불편합니다",
+  "complaint_type": "환경·청소",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "재활용도움센터가 부족하다"
+    }
+  ],
+  "location": {
+    "emd_name": "대정읍",
+    "emd_code": ""
+  },
+  "period": {
+    "from": "2024-01",
+    "to": "2026-10"
+  },
+  "targets": [
+    "재활용도움센터",
+    "재활용"
+  ],
+  "user_request": "재활용도움센터 추가 설치"
+}

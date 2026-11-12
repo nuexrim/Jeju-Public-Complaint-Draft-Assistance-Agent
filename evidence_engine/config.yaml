@@ -1,0 +1,40 @@
+# 근거 패키지 엔진 설정. 키·비밀값은 여기 넣지 않는다(.env 사용).
+
+use_ontology: true          # false면 B(온톨로지) 단계를 건너뛰고 A만 실행
+
+paths:                      # evidence_engine/ 기준 상대 경로
+  duckdb: data/jeju.duckdb
+  snapshot_dir: data/snapshot
+  raw_dir: data/ingest/raw
+  emd_codes: data/spatial/emd_codes.csv
+  catalog_cards: catalog/cards.parquet
+  ontology_ttl: ontology/jeju.ttl
+  charts_dir: charts
+  usage_log: logs/usage.csv
+
+snapshot: null              # 재현용 스냅샷 기준일(YYYY-MM-DD). 적재 후 채운다.
+
+thresholds:
+  max_missing_ratio: 0.30   # 결측 30% 초과 → caveat
+  max_staleness_years: 2    # 기준일 2년 초과 → caveat
+  sql_max_rows: 1000
+  sql_timeout_sec: 10
+  ontology_max_hops: 3
+
+ranking:                    # score = 가중합 (CLAUDE.md 3장 초기값)
+  path_score: 0.4
+  search_score: 0.3
+  spatial_match: 0.2
+  freshness: 0.1
+
+llm:
+  provider: mock            # mock | anthropic | openrouter. 실제 호출은 ALLOW_PAID_CALLS=1 필요
+  model: null               # 미정 (질문 목록 참고)
+  max_tokens: 512
+
+external_apis:              # fetch_external 허용 목록. 이용조건 확인된 것만 추가한다.
+  allowed: []
+
+ontology_build:             # 개발 단계 전용. 센터 PC에는 설치하지 않는다.
+  rigor_repo: https://github.com/NadeenAhmad/RIGOR
+  rigor_dir: external/RIGOR # 온톨로지 단계(11/14~)에 clone. git에는 올리지 않는다.

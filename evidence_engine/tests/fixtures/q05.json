@@ -1,0 +1,28 @@
+{
+  "request_id": "r-0005",
+  "normalized_text": "동네에 의원이 부족해서 어르신들이 진료를 받으려면 서귀포 시내까지 나가야 합니다",
+  "complaint_type": "의료 접근",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "의원이 부족하다"
+    },
+    {
+      "id": "c2",
+      "text": "노인 인구에 비해 의료기관이 적다"
+    }
+  ],
+  "location": {
+    "emd_name": "표선면",
+    "emd_code": ""
+  },
+  "period": {
+    "from": "2024-01",
+    "to": "2026-10"
+  },
+  "targets": [
+    "의원",
+    "노인"
+  ],
+  "user_request": "의료기관 확충"
+}

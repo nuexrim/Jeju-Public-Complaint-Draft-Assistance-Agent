@@ -1,0 +1,24 @@
+{
+  "request_id": "r-0010",
+  "normalized_text": "태풍이 올 때 대피할 임시주거시설이 마을에서 너무 멉니다",
+  "complaint_type": "안전·재난",
+  "claims": [
+    {
+      "id": "c1",
+      "text": "이재민 임시주거시설이 부족하다"
+    }
+  ],
+  "location": {
+    "emd_name": "남원읍",
+    "emd_code": ""
+  },
+  "period": {
+    "from": "2024-01",
+    "to": "2026-10"
+  },
+  "targets": [
+    "태풍",
+    "이재민 임시주거시설"
+  ],
+  "user_request": "임시주거시설 추가 지정"
+}
