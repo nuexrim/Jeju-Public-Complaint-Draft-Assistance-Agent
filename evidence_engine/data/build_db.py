@@ -176,6 +176,17 @@ def main() -> None:
             stats = load_table(con, spec, FILES / str(spec["id"]) / names[0], Path(tmp))
             register(con, spec, {**meta, "hub_id": spec["id"], "source_file": names[0], "origin_url": None}, "hub_file", stats)
 
+        api_manifest_path = INGEST / "raw" / "jejudatahub" / "api" / "manifest.json"
+        api_manifest = json.loads(api_manifest_path.read_text(encoding="utf-8")) if api_manifest_path.exists() else {}
+        for spec in cfg.get("hub_apis", []):
+            meta = api_manifest.get(str(spec["id"]))
+            path = INGEST / "raw" / "jejudatahub" / "api" / f"{spec['id']}.csv"
+            if not meta or not path.exists() or not meta.get("rows"):
+                print(f"건너뜀 {spec['table']}: API 수집본 없음 (id {spec['id']})")
+                continue
+            stats = load_table(con, spec, path, Path(tmp))
+            register(con, spec, {**meta, "hub_id": spec["id"], "source_file": path.name, "origin_url": None}, "hub_api", stats)
+
         for spec in cfg.get("portal_files", []):
             path = PORTAL / spec["file"]
             row = catalog.get(spec["hub_id"])
@@ -203,7 +214,7 @@ def main() -> None:
         "FROM dataset ORDER BY source_kind DESC, hub_id, table_name"
     ).fetchall():
         emd = f"{mode} {ratio:.1%}" if mode else ("좌표만(경계 필요)" if latlon else "-")
-        print(f"{name:30} {'포털' if kind == 'datagokr_file' else '허브':6} {rows:>9}  {(p0 or '-') + '~' + (p1 or '-'):23} {emd}")
+        print(f"{name:30} { {'datagokr_file': '포털', 'hub_api': '허브API'}.get(kind, '허브'):6} {rows:>9}  {(p0 or '-') + '~' + (p1 or '-'):23} {emd}")
     total, hubs = con.execute("SELECT count(*), count(DISTINCT hub_id) FROM dataset").fetchone()
     print(f"적재: 테이블 {total}개 (데이터허브 등록 데이터명 기준 {hubs}종) → {DB}")
     con.close()
