@@ -16,7 +16,7 @@ from data.spatial.emd_match import match_emd
     (None, (None, None)),
 ])
 def test_match_emd(text, expected):
-    assert match_emd(text) == expected
+    assert match_emd(text, link_dir=None) == expected
 
 
 def test_ragged_csv_keeps_commas_inside_one_column(tmp_path):
@@ -76,3 +76,41 @@ def test_built_db_has_portal_tables_with_sources():
         "AND (dataset IS NULL OR url NOT LIKE 'https://www.data.go.kr/data/%' OR origin_url IS NULL)"
     ).fetchall()
     assert not missing
+
+
+LINK_HEADER = "시도명,시군구명,행정동명,법정동명,행정구역코드,행정동코드,법정동코드,개정일자,연결번호\n"
+
+
+def _link_file(tmp_path, rows):
+    d = tmp_path / "emd_link"
+    d.mkdir()
+    (d / "국가데이터처_법정동 연계정보_test.csv").write_text(LINK_HEADER + "".join(rows), encoding="cp949")
+    return d
+
+
+def test_legal_lookup_maps_unique_and_skips_ambiguous(tmp_path):
+    from data.spatial import emd_match
+    import csv as _csv
+    valid = [r["emd_code"] for r in _csv.DictReader(emd_match.DEFAULT_TABLE.open(encoding="utf-8"))]
+    rows = [f"제주특별자치도,제주시,x,y,{c},{c}00,0,20260101,1\n" for c in valid]          # 코드 체계 판별용
+    rows += [
+        "제주특별자치도,제주시,이도2동,도남동,50110540,5011054000,5011010600,20260101,1\n",
+        "제주특별자치도,서귀포시,서귀동,서귀동,50130510,5013051000,5013010100,20260101,1\n",
+        "제주특별자치도,서귀포시,송산동,서귀동,50130520,5013052000,5013010100,20260101,1\n",  # 서귀동은 두 행정동에 걸침
+    ]
+    link_dir = _link_file(tmp_path, rows)
+    emd_match._legal.cache_clear()
+    try:
+        assert emd_match.match_emd("제주특별자치도 제주시 도남동 1049", link_dir=link_dir) == ("50110540", "legal")
+        assert emd_match.match_emd("제주특별자치도 서귀포시 서귀동 339", link_dir=link_dir) == (None, None)
+        assert emd_match.match_emd("구좌읍", link_dir=link_dir) == ("50110256", "name")  # 이름 일치가 먼저
+    finally:
+        emd_match._legal.cache_clear()
+
+
+def test_legal_lookup_rejects_wrong_columns(tmp_path):
+    from data.spatial import emd_match
+    d = tmp_path / "x.csv"
+    d.write_text("시도명,동이름\n제주특별자치도,도남동\n", encoding="utf-8")
+    with pytest.raises(KeyError):
+        emd_match.build_legal_lookup(d)
