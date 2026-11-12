@@ -24,6 +24,7 @@ import yaml
 ENGINE_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ENGINE_ROOT))
 
+from data.spatial import boundary  # noqa: E402
 from data.spatial.emd_match import match_emd  # noqa: E402
 
 INGEST = ENGINE_ROOT / "data" / "ingest"
@@ -130,14 +131,33 @@ def load_table(con, spec: dict, source: Path, workdir: Path) -> dict:
             "NULL::VARCHAR AS emd_code, NULL::VARCHAR AS emd_method FROM _raw"
         )
 
+    latlon = spec.get("latlon")
+    point_mapped = 0
+    if latlon and boundary.default_boundaries():
+        # 이름·주소로 못 찾은 행만 좌표로 찾는다(좌표만 있는 표는 전부).
+        lat, lon = (f"CAST({q(c)} AS VARCHAR)" for c in latlon)
+        points = con.execute(f"SELECT DISTINCT {lat}, {lon} FROM {q(table)} WHERE emd_code IS NULL").fetchall()
+        found = [(a, b, code) for a, b in points if (code := boundary.point_to_emd(a, b))]
+        if found:
+            con.execute("CREATE OR REPLACE TEMP TABLE _pt (lat VARCHAR, lon VARCHAR, code VARCHAR)")
+            con.executemany("INSERT INTO _pt VALUES (?, ?, ?)", found)
+            point_mapped = con.execute(
+                f"UPDATE {q(table)} t SET emd_code = p.code, emd_method = 'point' FROM _pt p "
+                f"WHERE t.emd_code IS NULL AND {lat.replace(q(latlon[0]), 't.' + q(latlon[0]))} = p.lat "
+                f"AND {lon.replace(q(latlon[1]), 't.' + q(latlon[1]))} = p.lon"
+            ).fetchone()[0]
+
     rows, mapped, p_min, p_max = con.execute(
         f"SELECT count(*), count(emd_code), min(period), max(period) FROM {q(table)}"
     ).fetchone()
+    modes = [m for m in ((emd or {}).get("mode"), "point" if latlon and boundary.default_boundaries() else None) if m]
+    has_emd = bool(modes)
     return {
         "rows": rows,
-        "emd_mode": emd["mode"] if emd else None,
-        "emd_mapped": mapped if emd else None,
-        "emd_ratio": round(mapped / rows, 4) if emd and rows else None,
+        "emd_mode": "+".join(modes) if has_emd else None,
+        "emd_mapped": mapped if has_emd else None,
+        "emd_ratio": round(mapped / rows, 4) if has_emd and rows else None,
+        "emd_point_mapped": point_mapped,
         "period_min": p_min,
         "period_max": p_max,
         "latlon_columns": json.dumps(spec["latlon"], ensure_ascii=False) if spec.get("latlon") else None,
