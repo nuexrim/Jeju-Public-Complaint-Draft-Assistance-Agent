@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import sys
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 import duckdb
@@ -29,6 +30,7 @@ INGEST = ENGINE_ROOT / "data" / "ingest"
 FILES = INGEST / "raw" / "jejudatahub" / "files"
 DB = ENGINE_ROOT / "data" / "jeju.duckdb"
 EMD_CSV = ENGINE_ROOT / "data" / "spatial" / "emd_codes.csv"
+PORTAL = INGEST / "raw" / "datagokr"
 
 
 def q(name: str) -> str:
@@ -142,42 +144,68 @@ def load_table(con, spec: dict, source: Path, workdir: Path) -> dict:
     }
 
 
+def register(con, spec: dict, meta: dict, kind: str, stats: dict) -> None:
+    con.execute(
+        "INSERT INTO dataset VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [spec["table"], meta["dataset"], meta["publisher"], meta["hub_id"], spec.get("complaint"), meta["url"],
+         meta["source_file"], meta["period_end"], meta["updated_at"], meta["fetched_at"], stats["rows"],
+         stats["period_min"], stats["period_max"], stats["emd_mode"], stats["emd_mapped"], stats["emd_ratio"],
+         stats["latlon_columns"], kind, meta.get("origin_url")],
+    )
+
+
 def main() -> None:
-    specs = yaml.safe_load((INGEST / "datasets.yaml").read_text(encoding="utf-8"))["hub_files"]
+    cfg = yaml.safe_load((INGEST / "datasets.yaml").read_text(encoding="utf-8"))
     manifest = json.loads((FILES / "manifest.json").read_text(encoding="utf-8"))
+    catalog = {r["id"]: r for r in json.loads(sorted((INGEST / "raw" / "jejudatahub").glob("catalog_*.json"))[-1].read_text(encoding="utf-8"))}
     con = duckdb.connect(str(DB))
     con.execute(f"CREATE OR REPLACE TABLE dim_emd AS SELECT * FROM read_csv('{EMD_CSV.as_posix()}', header=true, all_varchar=true)")
     con.execute(
         "CREATE OR REPLACE TABLE dataset (table_name VARCHAR, dataset VARCHAR, publisher VARCHAR, hub_id INTEGER, "
         "complaint VARCHAR, url VARCHAR, source_file VARCHAR, period_end VARCHAR, updated_at VARCHAR, fetched_at VARCHAR, "
         "rows BIGINT, period_min VARCHAR, period_max VARCHAR, emd_mode VARCHAR, emd_mapped BIGINT, emd_ratio DOUBLE, "
-        "latlon_columns VARCHAR)"
+        "latlon_columns VARCHAR, source_kind VARCHAR, origin_url VARCHAR)"
     )
     with tempfile.TemporaryDirectory() as tmp:
-        for spec in specs:
-            if "table" not in spec:
-                continue
+        for spec in cfg["hub_files"]:
             meta = manifest.get(str(spec["id"]))
             names = [f["name"] for f in (meta or {}).get("files", []) if spec.get("file", "") in f["name"]]
             if len(names) != 1 or not (FILES / str(spec["id"]) / names[0]).exists():
                 print(f"건너뜀 {spec['table']}: 받은 파일 없음 (id {spec['id']})")
                 continue
             stats = load_table(con, spec, FILES / str(spec["id"]) / names[0], Path(tmp))
-            con.execute(
-                "INSERT INTO dataset VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [spec["table"], meta["dataset"], meta["publisher"], spec["id"], spec.get("complaint"), meta["url"],
-                 names[0], meta["period_end"], meta["updated_at"], meta["fetched_at"], stats["rows"],
-                 stats["period_min"], stats["period_max"], stats["emd_mode"], stats["emd_mapped"], stats["emd_ratio"],
-                 stats["latlon_columns"]],
-            )
-    print(f"{'테이블':34} {'행':>9}  {'기간':23} emd")
-    for name, rows, p0, p1, mode, ratio, latlon in con.execute(
-        "SELECT table_name, rows, period_min, period_max, emd_mode, emd_ratio, latlon_columns FROM dataset ORDER BY hub_id, table_name"
+            register(con, spec, {**meta, "hub_id": spec["id"], "source_file": names[0], "origin_url": None}, "hub_file", stats)
+
+        for spec in cfg.get("portal_files", []):
+            path = PORTAL / spec["file"]
+            row = catalog.get(spec["hub_id"])
+            if not path.exists() or not row:
+                print(f"건너뜀 {spec['table']}: 파일 또는 카탈로그 항목 없음 ({spec['file']})")
+                continue
+            stats = load_table(con, spec, path, Path(tmp))
+            fetched = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat(timespec="seconds")
+            meta = {
+                "dataset": row["title"].strip(),                       # 허브에 등록된 데이터명
+                "publisher": "공공데이터포털(" + (row.get("owner") or "제주특별자치도") + ")",
+                "hub_id": spec["hub_id"],
+                "url": f"https://www.data.go.kr/data/{spec['portal_id']}/fileData.do",
+                "origin_url": f"https://jejudatahub.net/data/view/data/{spec['hub_id']}",
+                "source_file": spec["file"],
+                "period_end": stats["period_max"],                     # 파일에 적힌 데이터 기준일
+                "updated_at": stats["period_max"],
+                "fetched_at": fetched,
+            }
+            register(con, spec, meta, "datagokr_file", stats)
+
+    print(f"{'테이블':30} {'출처':6} {'행':>9}  {'기간':23} emd")
+    for name, kind, rows, p0, p1, mode, ratio, latlon in con.execute(
+        "SELECT table_name, source_kind, rows, period_min, period_max, emd_mode, emd_ratio, latlon_columns "
+        "FROM dataset ORDER BY source_kind DESC, hub_id, table_name"
     ).fetchall():
         emd = f"{mode} {ratio:.1%}" if mode else ("좌표만(경계 필요)" if latlon else "-")
-        print(f"{name:34} {rows:>9}  {(p0 or '-') + '~' + (p1 or '-'):23} {emd}")
+        print(f"{name:30} {'포털' if kind == 'datagokr_file' else '허브':6} {rows:>9}  {(p0 or '-') + '~' + (p1 or '-'):23} {emd}")
     total, hubs = con.execute("SELECT count(*), count(DISTINCT hub_id) FROM dataset").fetchone()
-    print(f"적재: 테이블 {total}개 (데이터허브 데이터셋 {hubs}종) → {DB}")
+    print(f"적재: 테이블 {total}개 (데이터허브 등록 데이터명 기준 {hubs}종) → {DB}")
     con.close()
 
 

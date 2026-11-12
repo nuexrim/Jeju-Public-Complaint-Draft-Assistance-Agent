@@ -11,6 +11,7 @@ from data.spatial.emd_match import match_emd
     ("제주특별자치도 제주시 정든로 40(이도이동)", ("50110540", "alias")),   # 법정동 표기 → 이도2동
     ("제주특별자치도 제주시 도남동 1049", (None, None)),                     # 이름이 다른 법정동은 비워 둔다
     ("제주시 용담삼동 1", (None, None)),                                    # 용담3동은 없다
+    ("연 동", ("50110650", "name")),                                          # 공백이 낀 표기
     ("", (None, None)),
     (None, (None, None)),
 ])
@@ -48,3 +49,27 @@ def test_load_table_rejects_unknown_column(tmp_path):
     path.write_text("a,b\n1,2\n", encoding="utf-8")
     with pytest.raises(KeyError):
         build_db.load_table(duckdb.connect(), {"table": "t", "emd": {"mode": "name", "columns": ["없는컬럼"]}}, path, tmp_path)
+
+
+PORTAL_TABLES = {
+    "elderly_pop_emd": 43, "senior_center_all": 474, "clean_house_jeju": 1294, "night_pharmacy": 6,
+}
+
+
+def test_built_db_has_portal_tables_with_sources():
+    """build_db.py 실행 결과(data/jeju.duckdb)가 있을 때만 검사한다."""
+    from pathlib import Path
+    db = Path(build_db.DB)
+    if not db.exists():
+        pytest.skip("data/jeju.duckdb 없음 (build_db.py 먼저 실행)")
+    con = duckdb.connect(str(db), read_only=True)
+    for table, rows in PORTAL_TABLES.items():
+        assert con.execute(f"SELECT count(*) FROM {table}").fetchone()[0] == rows
+    kinds = dict(con.execute("SELECT source_kind, count(*) FROM dataset GROUP BY 1").fetchall())
+    assert kinds["datagokr_file"] == 17
+    # 포털 파일은 허브 등록 데이터명과 실제 원본 출처(포털 주소)가 모두 기록되어야 한다.
+    missing = con.execute(
+        "SELECT table_name FROM dataset WHERE source_kind = 'datagokr_file' "
+        "AND (dataset IS NULL OR url NOT LIKE 'https://www.data.go.kr/data/%' OR origin_url IS NULL)"
+    ).fetchall()
+    assert not missing

@@ -40,3 +40,27 @@ hub_files:
   - {id: 521,  complaint: 공통, table: floating_pop_residence, period: {column: base_year_month, format: yyyymm}}
   - {id: 523,  complaint: 공통, table: floating_pop_work, period: {column: base_year_month, format: yyyymm}}
   - {id: 520,  complaint: 공통, table: floating_pop_visit, period: {column: base_year_month, format: yyyymm}}
+
+# portal_files: 공공데이터포털에서 받은 파일 (raw/datagokr/). 로그인 없이 브라우저로 내려받음.
+#   hub_id : 데이터허브에 등록된 같은 데이터의 id (기획서의 "허브 등록 데이터명" 근거)
+#   portal_id : 공공데이터포털 데이터 번호 (https://www.data.go.kr/data/<portal_id>/fileData.do)
+#   file : raw/datagokr/ 안의 파일명
+# 포털 파일의 기준일은 허브 카탈로그 등록일보다 새롭다(파일명 끝의 날짜가 기준일).
+portal_files:
+  - {hub_id: 73,   portal_id: 15056374, complaint: 공통, table: elderly_pop_emd, file: 제주특별자치도_읍면동별노인인구현황_20251231.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}, emd: {mode: name, columns: [읍면동]}}
+  - {hub_id: 71,   portal_id: 15056372, complaint: 공통, table: disabled_pop_emd, file: 제주특별자치도_읍면동별장애인등록현황_20251231.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}, emd: {mode: name, columns: [읍면동]}}
+  - {hub_id: 255,  portal_id: 15056185, complaint: 공통, table: senior_center_all, file: 제주특별자치도_경로당현황_20251231.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}, emd: {mode: name, columns: [읍면동별]}}
+  - {hub_id: 198,  portal_id: 15056356, complaint: 공통, table: senior_center_jeju, file: 제주특별자치도_제주시_경로당현황_20260629.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}, emd: {mode: name, columns: [읍면동]}}
+  - {hub_id: 191,  portal_id: 3082953,  complaint: 공통, table: senior_center_seogwipo, file: 제주특별자치도 서귀포시_경로당현황_20240703.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}, emd: {mode: name, columns: [읍면동]}, latlon: [위도, 경도]}
+  - {hub_id: 227,  portal_id: 15056000, complaint: 의료 접근, table: emergency_medical_center, file: 제주특별자치도_응급의료기관현황_20251231.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}, emd: {mode: address, columns: [소재지]}}
+  - {hub_id: 216,  portal_id: 15043697, complaint: 의료 접근, table: night_pharmacy, file: 제주특별자치도_공공심야약국현황_20260905.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}, emd: {mode: name, columns: [읍면동]}}
+  - {hub_id: 231,  portal_id: 15056006, complaint: 의료 접근, table: health_center, file: 제주특별자치도_보건소및보건지소현황_20250731.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}, emd: {mode: address, columns: [주소]}}
+  - {hub_id: 1335, portal_id: 15110514, complaint: 환경·청소, table: clean_house_jeju, file: 제주특별자치도 제주시_클린하우스_20251224.csv, period: {column: 등록 일시, format: yyyy-mm-dd}, emd: {mode: name, columns: [읍면동 명]}, latlon: [위도 좌표, 경도 좌표]}
+  - {hub_id: 517,  portal_id: 15056472, complaint: 환경·청소, table: clean_house_seogwipo, file: 제주특별자치도 서귀포시_클린하우스현황_20240823.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}, emd: {mode: name, columns: [읍면동]}}
+  - {hub_id: 465,  portal_id: 15045364, complaint: 환경·청소, table: recycling_center, file: 제주특별자치도_재활용도움센터현황_20260905.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}, emd: {mode: name, columns: [읍면동]}}
+  - {hub_id: 437,  portal_id: 3082850,  complaint: 안전·재난, table: civil_defense_shelter, file: 제주특별자치도_민방위대피시설정보_20241231.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}}
+  - {hub_id: 428,  portal_id: 15056026, complaint: 안전·재난, table: refugee_facility_jeju, file: 제주특별자치도 제주시_재난대비이재민수용시설현황_20260201.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}, emd: {mode: address, columns: [위치]}}
+  - {hub_id: 424,  portal_id: 3082504,  complaint: 안전·재난, table: refugee_facility_seogwipo, file: 제주특별자치도 서귀포시_이재민임시거주시설현황_20241024.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}, emd: {mode: address, columns: [주소]}, latlon: [위도, 경도]}
+  - {hub_id: 436,  portal_id: 15056033, complaint: 안전·재난, table: steep_slope_jeju, file: 제주특별자치도 제주시_붕괴위험급경사지지정현황_20260630.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}, emd: {mode: address, columns: [위치]}}
+  - {hub_id: 66,   portal_id: 15000484, complaint: 생활물가, table: good_price_seogwipo, file: 제주특별자치도 서귀포시_착한가격업소정보_20260731.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}, emd: {mode: address, columns: [주소]}, latlon: [위도, 경도]}
+  - {hub_id: 1332, portal_id: 15051469, complaint: 생활물가, table: price_index, file: 제주특별자치도_제주지역물가지수동향_20250101.csv, period: {column: 해당연도, format: yyyy}}

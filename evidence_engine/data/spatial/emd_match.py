@@ -39,7 +39,11 @@ def match_emd(text: str | None, path: Path = DEFAULT_TABLE) -> tuple[str | None,
     if not text:
         return None, None
     table = _lookup(Path(path))
-    for token in _TOKEN.findall(text):
-        if token in table:
-            return table[token]
+    candidates = [text]
+    if len(text) <= 10 and " " in text:
+        candidates.append(re.sub(r"\s+", "", text))  # "연 동"처럼 이름 안에 공백이 들어간 표기
+    for candidate in candidates:
+        for token in _TOKEN.findall(candidate):
+            if token in table:
+                return table[token]
     return None, None
