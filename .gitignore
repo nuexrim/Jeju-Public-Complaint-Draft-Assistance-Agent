@@ -30,3 +30,6 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# Claude Code 작업 지시서 (로컬 전용)
+CLAUDE.md
