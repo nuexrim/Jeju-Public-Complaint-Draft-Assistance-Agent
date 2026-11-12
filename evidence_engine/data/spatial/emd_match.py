@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import csv
 import re
+import unicodedata
 from functools import lru_cache
 from pathlib import Path
 
@@ -90,7 +91,11 @@ def build_legal_lookup(link_csv: Path, emd_table: Path = DEFAULT_TABLE) -> dict:
 
 @lru_cache(maxsize=None)
 def _legal(link_dir: Path, emd_table: Path):
-    files = sorted(link_dir.glob("*법정동 연계정보*.csv")) if link_dir.exists() else []
+    # macOS에서 받은 파일명은 한글이 NFD로 저장될 수 있어 NFC로 맞춰 비교한다.
+    files = sorted(
+        f for f in (link_dir.glob("*.csv") if link_dir.exists() else [])
+        if "법정동 연계정보" in unicodedata.normalize("NFC", f.name)
+    )
     return build_legal_lookup(files[-1], emd_table) if files else None
 
 

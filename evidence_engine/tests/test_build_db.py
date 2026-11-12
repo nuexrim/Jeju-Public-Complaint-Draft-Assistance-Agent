@@ -36,7 +36,7 @@ def test_ragged_csv_keeps_commas_inside_one_column(tmp_path):
 
 def test_load_table_adds_common_keys(tmp_path):
     path = tmp_path / "t.csv"
-    path.write_text("기준연도,읍면동,값\n2023,구좌읍,10\n2023,도남동,5\n", encoding="cp949")
+    path.write_text("기준연도,읍면동,값\n2023,구좌읍,10\n2023,없는동,5\n", encoding="cp949")
     con = duckdb.connect()
     spec = {"table": "t", "period": {"column": "기준연도", "format": "yyyy"}, "emd": {"mode": "name", "columns": ["읍면동"]}}
     stats = build_db.load_table(con, spec, path, tmp_path)
@@ -84,7 +84,8 @@ LINK_HEADER = "시도명,시군구명,행정동명,법정동명,행정구역코�
 def _link_file(tmp_path, rows):
     d = tmp_path / "emd_link"
     d.mkdir()
-    (d / "국가데이터처_법정동 연계정보_test.csv").write_text(LINK_HEADER + "".join(rows), encoding="cp949")
+    import unicodedata
+    (d / unicodedata.normalize("NFD", "국가데이터처_법정동 연계정보_test.csv")).write_text(LINK_HEADER + "".join(rows), encoding="cp949")
     return d
 
 
