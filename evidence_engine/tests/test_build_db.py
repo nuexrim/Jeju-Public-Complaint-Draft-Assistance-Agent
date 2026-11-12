@@ -67,6 +67,9 @@ def test_built_db_has_portal_tables_with_sources():
         assert con.execute(f"SELECT count(*) FROM {table}").fetchone()[0] == rows
     kinds = dict(con.execute("SELECT source_kind, count(*) FROM dataset GROUP BY 1").fetchall())
     assert kinds["datagokr_file"] == 17
+    if "hub_api" in kinds:  # API 수집본이 있을 때만
+        assert kinds["hub_api"] == 6
+        assert con.execute("SELECT count(*) FROM bus_stop WHERE latitude IS NULL").fetchone()[0] == 0
     # 포털 파일은 허브 등록 데이터명과 실제 원본 출처(포털 주소)가 모두 기록되어야 한다.
     missing = con.execute(
         "SELECT table_name FROM dataset WHERE source_kind = 'datagokr_file' "

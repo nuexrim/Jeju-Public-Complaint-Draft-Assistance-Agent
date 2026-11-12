@@ -8,8 +8,8 @@
 - 각 API를 계정 프로젝트에 담아야 호출된다. 담지 않으면 403.
 - 과금 없음. API별 하루 쿼터 1,000건이므로 데이터셋당 1회 호출을 기본으로 한다.
 
-상태: 403 때문에 실제 응답을 아직 보지 못했다. 응답 안의 첫 번째 목록을 행으로 보고 평탄화하며,
-페이지 나눔이 있는지는 첫 실제 응답을 보고 확인한다(응답 최상위 키를 출력한다).
+응답 형식(2026-11-12 실제 호출로 확인): {"totCnt": 전체 건수, "hasMore": 다음 쪽 여부, "data": [행...]}
+쪽 나눔 변수: limit(쪽당 건수, 기본 10), number(쪽 번호, 1부터). hasMore가 false가 될 때까지 받는다.
 """
 from __future__ import annotations
 
@@ -61,8 +61,11 @@ def extract_rows(body) -> list[dict]:
     return []
 
 
-def fetch(data_key: str, project_key: str) -> object:
-    url = PROXY.format(data_key=data_key, project_key=project_key)
+PAGE_LIMIT = 100  # 2026-11-12 확인: 100은 되고 500 이상은 HTTP 500
+MAX_PAGES = 200  # 쿼터(하루 1,000건) 보호용 상한
+
+
+def _get(url: str) -> dict:
     request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     try:
         with urllib.request.urlopen(request, timeout=120) as response:
@@ -70,6 +73,26 @@ def fetch(data_key: str, project_key: str) -> object:
     except urllib.error.HTTPError as exc:
         hint = " (프로젝트에 이 API를 담았는지 확인)" if exc.code == 403 else ""
         raise RuntimeError(f"HTTP {exc.code}{hint}") from None  # 키가 들어간 URL은 남기지 않는다
+
+
+def fetch(data_key: str, project_key: str) -> dict:
+    """모든 쪽을 받아 {"totCnt", "pages", "data"}로 합친다."""
+    base = PROXY.format(data_key=data_key, project_key=project_key)
+    rows: list[dict] = []
+    total = None
+    for number in range(1, MAX_PAGES + 1):
+        body = _get(f"{base}?limit={PAGE_LIMIT}&number={number}")
+        if not isinstance(body, dict) or "data" not in body:
+            raise RuntimeError(f"예상과 다른 응답 형식: {type(body).__name__} {list(body)[:5] if isinstance(body, dict) else ''}")
+        total = body.get("totCnt", total)
+        rows.extend(body["data"])
+        if not body.get("hasMore"):
+            break
+    else:
+        raise RuntimeError(f"{MAX_PAGES}쪽을 넘어 중단 (쿼터 보호)")
+    if total is not None and total != len(rows):
+        raise RuntimeError(f"건수 불일치: totCnt={total}, 받은 행={len(rows)}")
+    return {"totCnt": total, "pages": number, "data": rows}
 
 
 def write_csv(rows: list[dict], path: Path) -> list[str]:
@@ -111,8 +134,7 @@ def main(argv: list[str] | None = None) -> int:
         (OUT / f"{spec['id']}.json").write_text(json.dumps(body, ensure_ascii=False), encoding="utf-8")
         rows = extract_rows(body)
         columns = write_csv(rows, OUT / f"{spec['id']}.csv") if rows else []
-        top = list(body) if isinstance(body, dict) else f"list[{len(body)}]"
-        print(f"받음 {spec['id']} {row['title'].strip()}: {len(rows)}행, 응답 최상위 {top}")
+        print(f"받음 {spec['id']} {row['title'].strip()}: {len(rows)}행 ({body['pages']}쪽, totCnt {body['totCnt']})")
         manifest[str(spec["id"])] = {
             "dataset": row["title"].strip(),
             "publisher": "제주데이터허브",

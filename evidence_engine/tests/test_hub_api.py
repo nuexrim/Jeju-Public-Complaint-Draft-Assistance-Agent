@@ -35,6 +35,7 @@ def test_http_error_message_never_contains_key(monkeypatch):
     monkeypatch.setattr(hub_api.urllib.request, "urlopen", boom)
     with pytest.raises(RuntimeError) as info:
         hub_api.fetch("DATAKEY", "SECRETKEY")
+    assert "SECRETKEY" not in str(info.value)
     assert "SECRETKEY" not in str(info.value) and "403" in str(info.value)
 
 
@@ -43,3 +44,43 @@ def test_write_csv_union_of_columns(tmp_path):
     cols = hub_api.write_csv([{"a": 1}, {"a": 2, "b": {"k": "v"}}], path)
     assert cols == ["a", "b"]
     assert path.read_text(encoding="utf-8").splitlines()[2] == '2,"{""k"": ""v""}"'
+
+
+class _Resp:
+    def __init__(self, body):
+        self.body = json.dumps(body).encode("utf-8")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def read(self):
+        return self.body
+
+
+def _paged(pages, total=None):
+    calls = []
+
+    def fake(request, timeout):
+        number = int(request.full_url.rsplit("number=", 1)[1])
+        calls.append(number)
+        data = pages[number - 1]
+        return _Resp({"totCnt": total if total is not None else sum(map(len, pages)), "hasMore": number < len(pages), "data": data})
+
+    return fake, calls
+
+
+def test_fetch_follows_pages_until_has_more_false(monkeypatch):
+    fake, calls = _paged([[{"a": 1}, {"a": 2}], [{"a": 3}]])
+    monkeypatch.setattr(hub_api.urllib.request, "urlopen", fake)
+    body = hub_api.fetch("D", "K")
+    assert calls == [1, 2] and body["totCnt"] == 3 and [r["a"] for r in body["data"]] == [1, 2, 3]
+
+
+def test_fetch_rejects_count_mismatch(monkeypatch):
+    fake, _ = _paged([[{"a": 1}]], total=5)
+    monkeypatch.setattr(hub_api.urllib.request, "urlopen", fake)
+    with pytest.raises(RuntimeError, match="건수 불일치"):
+        hub_api.fetch("D", "K")
