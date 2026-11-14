@@ -130,7 +130,8 @@ class Engine:
                     return drafted
             names = ", ".join(c.title for c in cands[:3]) or "없음"
             entry = {
-                "concept": gap["concept"] if gap else f"'{claim['text']}' 관련 지표",
+                # 빈칸 기록에는 민원 문장을 남기지 않는다(CLAUDE.md 5장 9항): claim id 로만 가리킨다
+                "concept": gap["concept"] if gap else f"claim {claim['id']} 관련 지표",
                 "reason": gap["reason"] if gap else f"이 주장을 계산할 지표가 아직 정의되지 않음 (검색 상위 데이터셋: {names})",
                 "detected_by": "catalog",
             }

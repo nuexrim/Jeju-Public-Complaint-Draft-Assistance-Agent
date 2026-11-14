@@ -24,6 +24,7 @@ ENGINE_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ENGINE_ROOT))
 
 from package.builder import ContractError, build_mock_package, validate_query  # noqa: E402
+from package.privacy import mask_query  # noqa: E402
 
 
 def load_config(path: Path | None = None) -> dict:
@@ -33,13 +34,14 @@ def load_config(path: Path | None = None) -> dict:
 def run(query: dict, config: dict | None = None, *, use_ontology: bool | None = None,
         mock: bool = False, engine=None) -> dict:
     """구조화 질의 dict → 근거 패키지 dict. raw_text는 읽지도 남기지도 않는다.
+    검증 직후 이름·연락처·상세주소 등을 가린 사본(package/privacy.py)만 쓴다.
 
     engine: 여러 질의를 돌릴 때 package.assemble.Engine 하나를 만들어 넘기면 DB를 한 번만 연다.
     """
     config = config or load_config()
     started = time.perf_counter()
     validate_query(query)
-    query = {k: v for k, v in query.items() if k != "raw_text"}
+    query = mask_query(query)            # raw_text 제거 + 개인정보 마스킹 (이후 모든 단계는 이 사본만 본다)
     if use_ontology is None:
         use_ontology = bool(config["use_ontology"])
     if mock:
