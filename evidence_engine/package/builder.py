@@ -1,7 +1,7 @@
 """근거 패키지 조립과 계약 검증.
 
-상태: 계약 검증, 읍면동 코드 찾기, mock 패키지만 동작한다.
-실제 근거 조립(지표 계산 결과 → 패키지)은 11/14 구현 예정이다.
+계약 검증, 읍면동 코드 찾기, mock 패키지(--mock)를 맡는다.
+실제 근거 조립(검색 → 지표 계산 → 판정 → 패키지)은 package/assemble.py.
 """
 from __future__ import annotations
 
@@ -65,9 +65,14 @@ def resolve_emd(location: dict, emd_codes_path: Path) -> tuple[str | None, str |
     ]
     if len(matches) == 1:
         return matches[0], None
-    if not matches:
-        return None, "행정동 코드표에 없는 읍면동명"
-    return None, "같은 이름의 읍면동이 여러 개라 특정할 수 없음"
+    if matches:
+        return None, "같은 이름의 읍면동이 여러 개라 특정할 수 없음"
+    # 법정동·리 이름(예: 도남동, 세화리)이면 연계표로 행정동을 찾는다. 여러 행정동에 걸치면 비워 둔다.
+    from data.spatial.emd_match import match_emd
+    code, _ = match_emd(name, Path(emd_codes_path))
+    if code:
+        return code, None
+    return None, "행정동 코드표·법정동 연계표에서 찾지 못한 읍면동명(또는 여러 행정동에 걸친 법정동)"
 
 
 def build_mock_package(query: dict, *, use_ontology: bool, emd_codes_path: Path, elapsed_ms: int = 0) -> dict:

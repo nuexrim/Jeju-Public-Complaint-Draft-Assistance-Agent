@@ -228,6 +228,10 @@ def main() -> None:
             }
             register(con, spec, meta, "datagokr_file", stats)
 
+    from data import derived
+    for name, note in derived.build(con).items():
+        print(f"파생 {name}: {note}")
+
     print(f"{'테이블':30} {'출처':6} {'행':>9}  {'기간':23} emd")
     for name, kind, rows, p0, p1, mode, ratio, latlon in con.execute(
         "SELECT table_name, source_kind, rows, period_min, period_max, emd_mode, emd_ratio, latlon_columns "

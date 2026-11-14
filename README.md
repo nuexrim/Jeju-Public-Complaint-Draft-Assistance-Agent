@@ -26,12 +26,16 @@
 | 영역 | 상태 |
 | --- | --- |
 | 입출력 계약(JSON Schema)과 검증 | 동작 |
-| 근거 패키지 엔진 CLI | 동작 (mock 응답만 반환, 실제 탐색·계산은 예정) |
+| 근거 패키지 엔진 CLI | 동작 (하이브리드 `engine: "hybrid"`, `--no-ontology`면 `"catalog"`, `--mock`이면 계산 없는 가짜 응답) |
 | 데이터 수집·DuckDB 적재 | 동작 (52개 테이블, 데이터허브 등록 데이터명 기준 47종) |
 | 읍면동 공간키 부여 | 동작 (이름·법정동 연계표·좌표 공간조인) |
-| 데이터셋 카드 | 동작 (1,330건, 개념 태그는 예정) |
-| 카탈로그 검색, 지표 계산, 판정 | 예정 |
-| 온톨로지(RIGOR) 기반 개념 확장 | 예정 |
+| 데이터셋 카드 | 동작 (1,330건) |
+| 카탈로그 검색 | 동작 (BM25 + 개념 태그 가산 + 공간·최신성 순위. bge-m3 임베딩은 예정) |
+| 지표 계산·판정·차트 | 동작 (지표 13개, 읽기 전용 SQL, 규칙 판정, 비교군 막대그래프 PNG) |
+| 온톨로지 개념 확장 | 동작 (결정적 빌드: seed 상위 개념 + RIGOR 직접 매핑, HermiT 일관성 통과, 역량 질문 14/15). RIGOR LLM 보강은 승인 대기 |
+| 카드 개념 태그 | 규칙 태그 동작(615/1,330). LLM 태그·사람 검수는 승인 대기 |
+| LLM 보조(SQL 초안 폴백) | 코드 동작, 기본 mock이라 호출 없음. 공급자·키 확정 후 사용 |
+| 재현용 스냅샷 | 동작 (`data/snapshot/2026-11-14`, 약 24MB parquet) |
 | 제주어 이해·민원 초안·UI | 대화·초안 담당 모듈에서 개발 중 (이 브랜치에는 없음) |
 
 ## 아키텍처
@@ -46,7 +50,7 @@ flowchart LR
     A --> D[근거가 붙은 민원 초안]
     B --- DB[(DuckDB<br/>공간키 emd_code·period)]
     B --- C[(데이터셋 카드)]
-    B -.예정.- O[(온톨로지 jeju.ttl)]
+    B --- O[(온톨로지 jeju.ttl)]
 ```
 
 근거 패키지 엔진의 처리 원칙은 다음과 같습니다.
@@ -71,19 +75,20 @@ flowchart LR
     │   ├── ingest/             # 수집기, datasets.yaml(수집·적재 대상 정의)
     │   ├── spatial/            # 행정동 코드표, 이름·법정동 매칭, 좌표 공간조인
     │   ├── build_db.py         # raw → DuckDB 적재
-    │   └── snapshot/           # 재현용 스냅샷 (예정)
-    ├── catalog/                # 데이터셋 카드 생성 (검색 인덱스·개념 태그는 예정)
-    ├── ontology/               # RIGOR 입력 export·경로 탐색 (예정)
-    ├── retrieval/              # 개념 확장·카탈로그 검색·병합 (예정)
-    ├── indicators/             # 지표 정의·함수 (예정)
-    ├── compute/                # 읽기 전용 SQL·차트 (예정)
-    ├── verdict/                # 판정 규칙 (예정)
-    ├── package/                # 근거 패키지 조립·계약 검증
-    ├── agent/                  # LLM 클라이언트(mock 기본, 유료 호출 차단)
+    │   ├── derived.py          # 파생 테이블: 행정동 인구·면적·정류소 이용 집계
+    │   ├── snapshot.py         # 스냅샷 내보내기·복원
+    │   └── snapshot/           # 재현용 스냅샷 (git 제외, 따로 전달)
+    ├── catalog/                # 데이터셋 카드, BM25 검색 인덱스, 개념 태그
+    ├── ontology/               # seed 개념, RIGOR 입력·빌드, jeju.ttl, 경로 탐색, 역량 질문 평가
+    ├── retrieval/              # 개념 확장(B)·카탈로그 검색(A)·병합 순위
+    ├── indicators/             # 지표 정의(registry.yaml)·계산
+    ├── compute/                # 읽기 전용 SQL, 차트
+    ├── verdict/                # 규칙 기반 판정
+    ├── package/                # 근거 패키지 조립(assemble.py)·계약 검증
+    ├── agent/                  # LLM 클라이언트(유료 호출 가드), 도구, SQL 초안 폴백 planner
     └── tests/                  # pytest, fixtures(구조화 질의 10개)
 ```
 
-"예정" 모듈은 골격만 있으며 호출하면 `NotImplementedError`를 냅니다.
 
 ## 시작하기
 
@@ -118,7 +123,10 @@ pip install -r evidence_engine/requirements.txt
 | 이름 | 용도 | 발급 |
 | --- | --- | --- |
 | `JEJUDATAHUB_PROJECT_KEY` | 제주데이터허브 Open API 호출 | 데이터허브 회원가입 → 프로젝트 생성 → 키 발급. 쓸 API마다 데이터 상세 화면에서 "프로젝트 담기"를 해야 합니다(안 하면 HTTP 403). |
-| `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` | LLM 호출 (예정) | 공급자 확정 후 안내 |
+| `ANTHROPIC_API_KEY` | Claude 호출: RIGOR 온톨로지 보강·개념 태그(`dev_llm`), SQL 초안(`llm`) | console.anthropic.com → API Keys. 월 사용 한도를 걸어 둡니다. |
+| `OPENROUTER_API_KEY` | 선택. `provider: openrouter`로 바꿀 때만(여러 모델 비교 등) | openrouter.ai → Keys |
+
+LLM 설정은 `config.yaml`의 두 곳입니다. `dev_llm`은 개발 단계 일괄 작업(Claude Sonnet 5.5 `claude-sonnet-5-5`, effort `high`), `llm`은 실행 중 SQL 초안(기본 `mock`, 호출 없음)입니다. Claude 호출은 공식 `anthropic` SDK로 하며, 최신 모델은 thinking이 항상 켜져 있어 thinking 토큰도 출력 토큰으로 과금됩니다. 안전 분류기 거절에 대비해 서버측 대체 모델(`fallbacks: "default"`)이 켜져 있습니다.
 | `ALLOW_PAID_CALLS` | 유료 LLM 호출 허용 스위치 | 사람이 직접 `1`로 설정할 때만 실제 호출이 나갑니다. |
 
 ## 데이터 준비
@@ -129,11 +137,26 @@ pip install -r evidence_engine/requirements.txt
 2. **데이터허브 FILE**: `python data/ingest/hub_files.py` (약 624MB 파일까지 받으려면 `--large`)
 3. **데이터허브 API**: `python data/ingest/hub_api.py` (`.env`의 키 필요, API별 하루 1,000건 쿼터)
 4. **공공데이터포털 파일**: `datasets.yaml`의 `portal_files`에 적힌 17개 파일을 공공데이터포털에서 내려받아 `raw/datagokr/`에 파일명 그대로 넣습니다.
-5. **법정동 연계표**: [국가데이터처_법정동 연계정보](https://www.data.go.kr/data/15136368/fileData.do) CSV를 `raw/emd_link/`에 넣습니다.
+5. **법정동 연계표·인구**: [국가데이터처_법정동 연계정보](https://www.data.go.kr/data/15136368/fileData.do) CSV와 [행정안전부_지역별(법정동) 성별 연령별 주민등록 인구수](https://www.data.go.kr/data/15099158/fileData.do) CSV를 `raw/emd_link/`에 넣습니다.
 6. **행정동 경계**: [vuski/admdongkor](https://github.com/vuski/admdongkor)의 `HangJeongDong_ver<날짜>.geojson`을 `raw/boundary/`에 넣습니다.
 7. **빅데이터센터 데이터 명세서**: 센터에서 받은 명세서 xlsx를 `raw/center/`에 넣습니다(카드 생성용, 외부 공개 금지).
-8. **적재**: `python data/build_db.py` → `data/jeju.duckdb` 생성 (약 15초)
-9. **카드 생성**: `python catalog/build_cards.py` → `catalog/cards.parquet` 생성
+8. **적재**: `python data/build_db.py` → `data/jeju.duckdb` 생성 (약 20초). 끝에 파생 테이블(`pop_emd`, `emd_geo`, `bus_usage_monthly`)도 만듭니다. 파생 테이블만 다시 만들 때는 `python data/derived.py`
+9. **카드 생성**: `python catalog/build_cards.py` → `catalog/cards.parquet` 생성, 이어서 `python catalog/tag_concepts.py --rules`(규칙 개념 태그)
+
+raw 없이 설치할 때(센터 PC)는 전달받은 스냅샷 폴더를 `data/snapshot/<날짜>/`에 두고 `python data/snapshot.py --restore <날짜>`로 DB를 만듭니다.
+
+### 온톨로지 (개발 단계 전용)
+
+센터 PC에는 확정본 `ontology/jeju.ttl`만 들어가고 아래 단계는 돌리지 않습니다.
+
+1. RIGOR clone: `git clone https://github.com/NadeenAhmad/RIGOR external/RIGOR`
+2. 전용 가상환경 `external/.venv-rigor` (rdflib, sentence-transformers, faiss-cpu, openai, owlready2). HermiT 검사에 Java가 필요합니다. RIGOR 저장소의 `jars/HermiT.jar`는 빈 파일이라 owlready2에 들어 있는 HermiT를 씁니다.
+3. 입력 만들기: `python ontology/export_schema.py` (스키마 JSON, 한글 컬럼 영문 식별자, RAG 문서)
+4. 빌드: `external/.venv-rigor/bin/python ontology/build_ontology.py` → `ontology/build/jeju_candidate.ttl`, HermiT 검사
+   - 기본은 결정적 빌드(LLM 호출 없음): `seed_core.ttl` 상위 개념 + RIGOR 직접 매핑 + `table_concepts.yaml` 연결 + 한글 라벨
+   - `--paid --max-calls N`: RIGOR Gen/Judge LLM 보강. 승인 후 `ALLOW_PAID_CALLS=1`일 때만 돕니다. RIGOR 원래의 OpenRouter 호출 대신 모든 호출이 `agent/llm_client.py`를 거치며, 공급자·모델은 `dev_llm`(기본 Claude API)을 따릅니다.
+5. 검수 후 확정: `... build_ontology.py --accept` → `ontology/jeju.ttl`
+6. 평가: `python ontology/evaluate_cq.py` (역량 질문 15개, 10개 이상이면 `use_ontology=true` 유지)
 
 적재 결과의 출처·기준일·행 수·읍면동 매핑률은 DuckDB의 `dataset` 테이블에 기록됩니다.
 
@@ -143,9 +166,18 @@ pip install -r evidence_engine/requirements.txt
 cd evidence_engine
 python run_engine.py --query tests/fixtures/q01.json
 python run_engine.py --query tests/fixtures/q01.json --out out.json --no-ontology
+python run_engine.py --query tests/fixtures/q01.json --mock    # DB 없이 형식만 확인
 ```
 
-종료 코드는 성공 0, 입력 계약 위반 또는 파일 오류 2입니다. 현재 출력은 `engine: "mock"`이며 수치는 실제 계산값이 아닙니다.
+종료 코드는 성공 0, 입력 계약 위반 또는 파일 오류 2입니다.
+
+- `use_ontology: true`(기본)이고 `ontology/jeju.ttl`이 있으면 `engine: "hybrid"`, `--no-ontology`면 `"catalog"`입니다.
+- 처리 순서: 읍면동 코드 → (B) claim 낱말 → 온톨로지 개념 → 3-hop 경로로 데이터 후보·`relation_path` → (A) 카탈로그 검색(확장 개념 추가, 개념 태그 가산) → 병합·순위 → `indicators/registry.yaml`에서 지표 선택 → 읽기 전용 SQL 계산 → 같은 유형(읍·면끼리, 동끼리) 비교 → 규칙 판정 → 차트 → 계약 검증.
+- 지표가 온톨로지 경로로 찾은 테이블을 쓰면 `found_by`가 `ontology` 또는 `both`이고 `relation_path`에 경로가 들어갑니다(예: `병·의원 —하위개념→ 병·의원 정보`).
+- `chart`에는 비교군 막대그래프 경로(`charts/<request_id>_<claim_id>.png`)가 들어갑니다(비교형 지표만).
+- LLM은 기본 `mock`이라 호출하지 않습니다. 공급자를 설정하면 지표가 없는 claim에만 SQL 초안을 받아 읽기 전용으로 실행하고, 그 결과에는 검토 전이라는 caveat가 붙습니다. LLM이 실패하면 지표와 규칙만으로 결과를 냅니다.
+- 맞는 지표나 데이터가 없으면 값을 만들지 않고 `unverifiable`과 `gaps`로 돌려줍니다(예: 무더위쉼터는 온톨로지가 `detected_by: "ontology"`로 검출).
+- 서귀포시 7개 동(송산·정방·중앙·천지·영천·동홍·서홍)은 법정동이 여러 행정동에 걸쳐 인구를 확정할 수 없어 인구 기준 지표에서 빠집니다.
 
 ## 테스트
 
@@ -156,7 +188,7 @@ python -m pytest
 
 - 기본 실행은 네트워크·유료 호출 없이 끝납니다.
 - 실제 유료 API를 쓰는 테스트는 `@pytest.mark.paid`로 표시되어 있고, `ALLOW_PAID_CALLS=1`이 없으면 건너뜁니다.
-- `data/jeju.duckdb`가 있으면 적재 결과 검사도 함께 돌고, 없으면 그 테스트만 건너뜁니다.
+- `data/jeju.duckdb`와 `catalog/cards.parquet`가 있으면 적재 결과 검사, fixtures 10개 실제 계산·검색 상위 5개(`test_engine.py`), 하이브리드·역량 질문(`test_hybrid.py`)도 함께 돌고, 없으면 그 테스트만 건너뜁니다.
 
 ## 모듈 간 인터페이스
 
@@ -231,6 +263,7 @@ python -m pytest
 | 데이터허브 FILE·API 30종 | [제주데이터허브](https://jejudatahub.net) | 대회 필수 데이터 |
 | 공공데이터포털 파일 17종 | [공공데이터포털](https://www.data.go.kr) (데이터허브에 등록된 데이터의 원본) | 데이터별 이용허락범위 확인 |
 | 법정동 연계정보 | [국가데이터처](https://www.data.go.kr/data/15136368/fileData.do) | 공공누리 제3유형 (출처표시, 변경금지) |
+| 법정동별 주민등록 인구 | [행정안전부](https://www.data.go.kr/data/15099158/fileData.do) (외부 공공데이터, 인구 분모용) | 이용허락범위 제한 없음 (포털 표기, 2026-11-14 확인) |
 | 행정동 경계 | 통계청 SGIS(공공누리 제1유형)를 [vuski/admdongkor](https://github.com/vuski/admdongkor)가 가공 | CC BY 4.0 |
 
 행정동 경계 출처 표기: 본 데이터는 통계청 통계지리정보서비스(SGIS, https://sgis.kostat.go.kr)에서 공공누리 제1유형으로 개방한 행정동 경계를 가공한 것이며(가공: vuski/admdongkor, https://github.com/vuski/admdongkor), CC BY 4.0으로 배포됩니다.

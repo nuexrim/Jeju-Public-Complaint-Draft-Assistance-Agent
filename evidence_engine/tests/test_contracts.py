@@ -1,3 +1,4 @@
+"""계약 테스트. DB 없이 돌도록 mock 패키지(--mock)로 형식만 검증한다. 실제 계산 경로는 test_engine.py."""
 import copy
 import json
 import subprocess
@@ -33,7 +34,7 @@ def test_fixture_runs_to_valid_mock_package(path):
     validate_query(query)
     assert not query["location"].get("emd_code"), "fixtures는 emd_code를 비워 둔다"
 
-    package = run_engine.run(query)
+    package = run_engine.run(query, mock=True)
     validate_package(package)
     assert package["request_id"] == query["request_id"]
     assert package["engine"] == "mock"
@@ -43,7 +44,7 @@ def test_fixture_runs_to_valid_mock_package(path):
 
 
 def test_no_ontology_mode_has_no_relation_path():
-    package = run_engine.run(load(FIXTURES[0]), use_ontology=False)
+    package = run_engine.run(load(FIXTURES[0]), use_ontology=False, mock=True)
     assert package["meta"]["use_ontology"] is False
     assert all(e["found_by"] == "catalog" and e["relation_path"] is None for e in package["evidence"])
 
@@ -51,14 +52,14 @@ def test_no_ontology_mode_has_no_relation_path():
 def test_unknown_emd_goes_to_gaps():
     query = load(FIXTURES[0])
     query["location"] = {"emd_name": "없는동"}
-    package = run_engine.run(query)
+    package = run_engine.run(query, mock=True)
     assert any(g["concept"] == "읍면동 코드(없는동)" for g in package["gaps"])
 
 
 def test_raw_text_never_reaches_package():
     query = load(FIXTURES[0])
     assert query.get("raw_text")
-    assert query["raw_text"] not in json.dumps(run_engine.run(query), ensure_ascii=False)
+    assert query["raw_text"] not in json.dumps(run_engine.run(query, mock=True), ensure_ascii=False)
 
 
 @pytest.mark.parametrize("mutate", [
@@ -74,7 +75,7 @@ def test_invalid_query_is_rejected(mutate):
     query = copy.deepcopy(load(FIXTURES[0]))
     mutate(query)
     with pytest.raises(ContractError):
-        run_engine.run(query)
+        run_engine.run(query, mock=True)
 
 
 @pytest.mark.parametrize("mutate", [
@@ -85,7 +86,7 @@ def test_invalid_query_is_rejected(mutate):
     lambda p: p.pop("meta"),
 ], ids=["bad_verdict", "path_without_ontology", "string_value", "bad_detected_by", "no_meta"])
 def test_invalid_package_is_rejected(mutate):
-    package = run_engine.run(load(FIXTURES[0]))
+    package = run_engine.run(load(FIXTURES[0]), mock=True)
     mutate(package)
     with pytest.raises(ContractError):
         validate_package(package)
@@ -93,7 +94,7 @@ def test_invalid_package_is_rejected(mutate):
 
 def test_cli_roundtrip(tmp_path):
     out = tmp_path / "pkg.json"
-    cmd = [sys.executable, str(ROOT / "run_engine.py"), "--query", str(FIXTURES[0]), "--out", str(out)]
+    cmd = [sys.executable, str(ROOT / "run_engine.py"), "--query", str(FIXTURES[0]), "--out", str(out), "--mock"]
     assert subprocess.run(cmd, capture_output=True).returncode == 0
     validate_package(load(out))
 

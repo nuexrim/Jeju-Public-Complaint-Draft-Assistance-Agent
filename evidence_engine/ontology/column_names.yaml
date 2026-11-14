@@ -1,0 +1,238 @@
+# RIGOR 입력용 컬럼 영문 식별자. RIGOR는 IRI에 ASCII만 남기므로(한글 → "_") 한글 컬럼명을 그대로 넘기면 서로 뭉개진다.
+# 한글 원래 이름은 rdfs:label@ko 와 RAG 문서로 함께 넘긴다. 여기 없는 한글 컬럼은 내보내지 않는다(목록 출력됨).
+# 공통
+데이터기준일자: data_reference_date
+데이터기준일: data_reference_date
+데이터 기준일: data_reference_date
+데이터갱신일시: data_updated_at
+등록 일시: registered_at
+위도: latitude
+경도: longitude
+위도 좌표: latitude
+경도 좌표: longitude
+주소: address
+소재지: address
+도로명주소: road_address
+도로명 주소: road_address
+지번주소: lot_address
+인근주소: nearby_address
+위치: location_desc
+상세위치: location_detail
+전화번호: phone
+대표전화: phone
+연락처: phone
+팩스번호: fax
+구분: category
+행정시: city
+시: city
+시군구: city
+시구분: city
+읍면동: emd_name
+읍면동 명: emd_name
+읍면동별: emd_name
+지역명: area_name
+지역 구분: area_name
+기준 연도: base_year
+기준연도: base_year
+연도: base_year
+연도별: base_year
+해당연도: base_year
+기준 연월: base_year_month
+월: month
+분기: quarter
+시간대: time_slot
+요일: day_of_week
+계절: season
+성별: sex
+비고: note
+# 교통사고
+교차로형태대분류: intersection_type_major
+교차로형태소분류: intersection_type_minor
+사고 건수: accident_count
+부상자 수: injured_count
+사망자 수: death_count
+사망자수: death_count
+중상자수: serious_injury_count
+경상자수: minor_injury_count
+부상신고자: injury_report_count
+도로 종류: road_type
+사고번호: accident_id
+발생일시: occurred_at
+발생시간: occurred_hour
+발생요일: occurred_weekday
+사고내용: accident_severity
+사고유형: accident_type
+법규위반: violation_type
+노면상태: road_surface
+기상상태: weather_condition
+도로형태: road_form
+가해운전자: offender_vehicle
+가해운전_성별: offender_sex
+가해운전_나이: offender_age
+가해운전_부상: offender_injury
+피해운전자: victim_vehicle
+피해운전_성별: victim_sex
+피해운전_나이: victim_age
+피해운전_부상: victim_injury
+피해연령: victim_age_detail
+피해연령대: victim_age_group
+법정동코드: legal_dong_code
+도로명: road_name
+음주운전: drunk_driving
+무면허: unlicensed_driving
+신호위반: signal_violation
+과속: speeding
+안전띠: seatbelt_violation
+중앙선침범: centerline_violation
+기타: other
+# 통학로 안전
+학교명: school_name
+위험요소 준경험 선택건수_초등학교 전체: near_miss_votes_elementary
+위험지역선택건수_초등학교 전체: risk_area_votes_elementary
+위험지역선택건수_전연령: risk_area_votes_all_ages
+사각지대분석지정점수: blind_spot_score
+필요시설물: needed_facility
+요청사항: request_detail
+분석아이디: analysis_id
+위험요소 준경험 내용: near_miss_detail
+기타 상세 내용: other_detail
+위험지역 사유: risk_reason
+기타 상세 사유: other_reason
+행위 구분: behavior_type
+# 대기·수질·기상
+설치연도: installed_year
+측정소명: station_name
+측정항목: measured_items
+측정 구분: measurement_type
+대기오염도(μg/m³): pm10_ugm3
+하천: river_name
+수온(℃): water_temp_c
+DO(㎎/L): dissolved_oxygen_mgl
+BOD(㎎/L): bod_mgl
+COD(㎎/L): cod_mgl
+SS(㎎/L): suspended_solids_mgl
+TN(㎎/L): total_nitrogen_mgl
+TP(㎎/L): total_phosphorus_mgl
+평균기온(℃): avg_temp_c
+강수량(mm): precipitation_mm
+평균상대습도(%): avg_humidity_pct
+평균해면기압(hPa): avg_sea_level_pressure_hpa
+이슬점온도(℃): dew_point_c
+평균운량(1/10): avg_cloud_cover
+일조시간(hr): sunshine_hours
+최심신적설(cm): max_new_snow_cm
+평균풍속(m/s): avg_wind_speed_ms
+# 버스·인구
+수송 인원(명): passengers
+인구: population
+내/외국인 구분: nationality_type
+65세 이상 인구: pop_65_plus
+80세 이상 인구: pop_80_plus
+85세 이상 인구: pop_85_plus
+100세 이상 인구: pop_100_plus
+남성 장애인 인구: disabled_male
+여성 장애인 인구: disabled_female
+심한장애: severe_disability
+심하지 않은 장애: mild_disability
+# 사업체·물가
+사업체구분: business_type
+생멸구분: birth_death_type
+사업체수: business_count
+소비자물가: consumer_price_index
+생활물가: living_price_index
+신선식품: fresh_food_index
+상품 대분류: product_category_major
+상품 소분류: product_category_minor
+상품명: product_name
+제조 업체명: manufacturer
+판매 업체 종류: seller_type
+판매 업체명: seller_name
+총 중량: total_weight
+단위 중량: unit_weight
+단위 가격: unit_price
+판매 가격: sale_price
+업종: business_category
+업소명: business_name
+# CCTV
+관리기관명: managing_agency
+설치목적: install_purpose
+카메라대수: camera_count
+카메라화소수: camera_resolution
+촬영방면정보: camera_direction
+보관일수: retention_days
+설치연월: installed_month
+# 대피·재난
+수용가능인원: capacity
+소요면적: required_area
+확보량개소: secured_sites
+확보면적: secured_area
+확보율: secured_ratio
+공공용 지정시설 개소: public_designated_sites
+공공용 지정시설 규모: public_designated_area
+건물명: building_name
+관리책임자: manager
+시설명: facility_name
+면적(제곱미터): area_m2
+내진설계: seismic_design
+등급: grade
+지정면적(미터제곱): designated_area_m2
+붕괴위험지역 지정고시일: designated_date
+추진상황: progress_status
+사업비(백만원): budget_million_krw
+담당부서: department
+# 클린하우스·재활용
+단지 명: complex_name
+종량제 수거함 수: general_waste_bins
+재활용 수거함 수: recycling_bins
+유리병 수거함 수: glass_bins
+스티로폼 수거함 수: styrofoam_bins
+폐기 건전지 수거함 수: battery_bins
+폐기 형광등 수거함 수: fluorescent_lamp_bins
+음식물 수거함 수: food_waste_bins
+음식물 계량 수거함 수: food_waste_metered_bins
+CCTV 설치 수: cctv_count
+연번: serial_no
+명칭: name
+운영시작시간: open_time
+운영종료시간: close_time
+소형폐가전무상배출: small_appliance_free_disposal
+캔_페트_폐건전지_종이팩보상: can_pet_battery_carton_reward
+가정용폐의약품무상배출: household_medicine_disposal
+가정용폐식용유무상배출: household_cooking_oil_disposal
+빈병 (소주_맥주병) 보증금 환불제: bottle_deposit_refund
+폐농약(원액)안심처리: pesticide_disposal
+폐기물 구분: waste_type
+발생량(톤/일): generated_tons_per_day
+재활용(톤/일): recycled_tons_per_day
+# 의료
+병원명: hospital_name
+병원 유형: hospital_type
+월요일 진료 시간: monday_hours
+화~금 진료 시간: tue_fri_hours
+토요일 진료 시간: saturday_hours
+일요일 진료 시간: sunday_hours
+공휴일 진료 시간: holiday_hours
+의료기관: medical_institution
+보건소명: health_center_name
+구분대분류: category_major
+구분소분류: category_minor
+인력 수(명): workforce_count
+의료인력대분류: workforce_category_major
+의료인력소분류: workforce_category_minor
+약국명: pharmacy_name
+운영요일: open_days
+사업장명: business_name
+업종구분대분류: business_category_major
+인허가일자: license_date
+인허가취소일자: license_cancel_date
+영업상태명: business_status
+폐업일자: close_date
+휴업시작일자: suspension_start_date
+휴업종료일자: suspension_end_date
+재개업일자: reopen_date
+소재지면적: floor_area
+도로명우편번호: road_postcode
+# 경로당
+경로당: senior_center_name
+경로당명: senior_center_name
+회원수: member_count

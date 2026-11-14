@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import unicodedata
 from functools import lru_cache
 from pathlib import Path
@@ -65,6 +66,46 @@ def default_boundaries():
         if unicodedata.normalize("NFC", f.name).startswith("HangJeongDong_")
     )
     return load_boundaries(files[-1]) if files else None
+
+
+def _ring_area_centroid(ring: list, lat0: float) -> tuple[float, float, float]:
+    """등장방형 근사로 고리 면적(km²)과 무게중심(경도, 위도). 시계 방향이면 면적이 음수."""
+    kx, ky = 111.320 * math.cos(math.radians(lat0)), 110.574
+    a = cx = cy = 0.0
+    for (x1, y1), (x2, y2) in zip(ring, ring[1:] + ring[:1]):
+        cross = x1 * y2 - x2 * y1
+        a += cross
+        cx += (x1 + x2) * cross
+        cy += (y1 + y2) * cross
+    if a == 0:
+        return 0.0, ring[0][0], ring[0][1]
+    return a / 2 * kx * ky, cx / (3 * a), cy / (3 * a)
+
+
+def emd_geometry(boundaries=None) -> dict[str, tuple[float, float, float]]:
+    """emd_code → (면적 km², 중심 위도, 중심 경도). 섬이 여러 개면 면적 가중 중심."""
+    boundaries = boundaries if boundaries is not None else default_boundaries()
+    out = {}
+    for code, (minx, miny, maxx, maxy), polygons in boundaries or []:
+        lat0 = (miny + maxy) / 2
+        total = sx = sy = 0.0
+        for poly in polygons:
+            for k, ring in enumerate(poly):
+                area, cx, cy = _ring_area_centroid([p[:2] for p in ring], lat0)
+                area = abs(area) * (1 if k == 0 else -1)   # 구멍은 뺀다
+                total += area
+                sx += cx * area
+                sy += cy * area
+        out[code] = (total, sy / total, sx / total)
+    return out
+
+
+def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    r = 6371.0088
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp, dl = p2 - p1, math.radians(lon2 - lon1)
+    h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(h))
 
 
 def point_to_emd(lat, lon, boundaries=None) -> str | None:

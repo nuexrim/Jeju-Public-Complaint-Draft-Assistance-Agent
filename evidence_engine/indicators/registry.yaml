@@ -1,3 +1,247 @@
-# 지표 정의: 이름, 단위, 필요 테이블, SQL 템플릿
-# 실제 테이블·컬럼이 DuckDB에 적재된 뒤(11/12~14) 채운다. 지금은 비어 있다.
-indicators: []
+# 지표 정의. 숫자는 여기 SQL만 만든다(LLM은 값을 만들지 않는다).
+#
+# 고르는 방법 (indicators/library.py select_indicator)
+#   keywords : claim 문장에 들어 있으면 점수 (가장 많이 맞은 지표 하나를 쓴다)
+#   requires : 이 중 하나가 claim 문장에 반드시 있어야 후보가 된다
+#   excludes : claim·민원 본문·targets 어디에든 있으면 후보에서 뺀다 (예: 폭염 대피 ≠ 이재민 시설)
+#   bonus    : claim 문장에 있으면 가산점 (예: '노인'이 있으면 노인 인구 기준 지표를 우선)
+#
+# 계산 결과 형태
+#   scope: emd  → SQL이 (emd_code, value) 를 43개 행정동 모두에 대해 돌려준다. 대상 읍면동 값과 비교군을 함께 본다.
+#   scope: jeju → SQL이 value 한 개를 돌려준다(제주 전체). 읍면동 비교가 불가능하므로 판정은 unverifiable.
+#
+# 판정 규칙 (verdict/rules.py)
+#   rank   : 같은 유형(읍·면끼리 / 동끼리) 안에서 대상이 얼마나 불리한지 → 상위 1/3 supported, 하위 1/3 contradicted
+#   trend  : 증감률(%) → threshold 이하 supported, 0 초과 contradicted, 사이는 partial
+#   zero   : 값이 0이면 supported, 1 이상이면 contradicted
+#   context: 제주 전체 참고값, 판정하지 않음(unverifiable)
+# worse: high = 값이 클수록 불리, low = 값이 작을수록 불리
+
+indicators:
+  - id: clinic_per_1k_pop
+    name: 인구 1천 명당 의원 수
+    unit: 곳/인구 1천 명
+    tables: [hospital, pop_emd]
+    keywords: [의원, 병원, 의료기관, 진료, 의료]
+    scope: emd
+    rule: rank
+    worse: low
+    caveats: ["영업/정상 상태인 의원만 셈(폐업·휴업 제외)"]
+    sql: |
+      SELECT p.emd_code, 1000.0 * count(h.companyName) / p.total_pop AS value
+      FROM pop_emd p
+      LEFT JOIN hospital h ON h.emd_code = p.emd_code AND h.bizLargeType = '의원' AND h.openStatus = '영업/정상'
+      WHERE p.total_pop IS NOT NULL
+      GROUP BY p.emd_code, p.total_pop
+
+  - id: clinic_per_1k_elderly
+    name: 노인(65세 이상) 1천 명당 의원 수
+    unit: 곳/노인 1천 명
+    tables: [hospital, elderly_pop_emd]
+    keywords: [의원, 병원, 의료기관, 진료, 의료]
+    requires: [노인, 어르신, 고령, 할머니, 할아버지]
+    bonus: [노인, 어르신, 고령]
+    scope: emd
+    rule: rank
+    worse: low
+    caveats: ["영업/정상 상태인 의원만 셈(폐업·휴업 제외)"]
+    sql: |
+      SELECT e.emd_code, 1000.0 * count(h.companyName) / e."65세 이상 인구" AS value
+      FROM elderly_pop_emd e
+      LEFT JOIN hospital h ON h.emd_code = e.emd_code AND h.bizLargeType = '의원' AND h.openStatus = '영업/정상'
+      GROUP BY e.emd_code, e."65세 이상 인구"
+
+  - id: night_pharmacy_count
+    name: 공공심야약국 수
+    unit: 곳
+    tables: [night_pharmacy]
+    keywords: [약국, 야간, 심야, 밤]
+    requires: [약국]
+    scope: emd
+    rule: zero
+    worse: low
+    sql: |
+      SELECT d.emd_code, count(n.약국명) AS value
+      FROM dim_emd d LEFT JOIN night_pharmacy n ON n.emd_code = d.emd_code
+      GROUP BY d.emd_code
+
+  - id: emergency_distance_km
+    name: 가장 가까운 응급의료기관까지 거리
+    unit: km
+    tables: [emergency_medical_center, emd_geo]
+    keywords: [응급, 응급실, 응급의료, 멀다, 거리, 멀어]
+    requires: [응급]
+    scope: emd
+    rule: rank
+    worse: high
+    caveats: ["읍면동 중심점에서 응급의료기관이 있는 읍면동 중심점까지 직선거리(도로 거리 아님)"]
+    sql: |
+      WITH er AS (
+        SELECT DISTINCT g.lat, g.lon FROM emergency_medical_center m JOIN emd_geo g ON g.emd_code = m.emd_code
+      )
+      SELECT g.emd_code,
+             min(2 * 6371.0088 * asin(sqrt(pow(sin(radians(er.lat - g.lat) / 2), 2)
+                 + cos(radians(g.lat)) * cos(radians(er.lat)) * pow(sin(radians(er.lon - g.lon) / 2), 2)))) AS value
+      FROM emd_geo g CROSS JOIN er
+      GROUP BY g.emd_code
+
+  - id: bus_stop_per_1k_pop
+    name: 인구 1천 명당 버스 정류소 수
+    unit: 곳/인구 1천 명
+    tables: [bus_stop, pop_emd]
+    keywords: [정류소, 정류장, 버스]
+    requires: [정류소, 정류장]
+    scope: emd
+    rule: rank
+    worse: low
+    caveats: ["방향이 다른 같은 이름 정류소도 각각 셈"]
+    sql: |
+      SELECT p.emd_code, 1000.0 * count(b.stationId) / p.total_pop AS value
+      FROM pop_emd p LEFT JOIN bus_stop b ON b.emd_code = p.emd_code
+      WHERE p.total_pop IS NOT NULL
+      GROUP BY p.emd_code, p.total_pop
+
+  - id: bus_usage_change_pct
+    name: 버스 정류소 이용 인원 증감률(최근 12개월 vs 직전 12개월)
+    unit: "%"
+    tables: [bus_usage_monthly]
+    keywords: [버스, 줄었, 줄어, 감소, 줄, 감편, 끊]
+    requires: [버스]
+    scope: emd
+    rule: trend
+    worse: low
+    caveats: ["운행 횟수가 아니라 정류소 이용 인원으로 본 대리 지표",
+              "이용 실적의 정류소 이름이 한 행정동에만 있는 정류소만 집계(전체 이용 인원의 약 74%)"]
+    window: last_24_full_months
+    window_source: bus_stop_usage_by_user_type
+    sql: |
+      SELECT emd_code,
+             100.0 * (sum(users) FILTER (WHERE month > $mid) / nullif(sum(users) FILTER (WHERE month <= $mid), 0) - 1) AS value
+      FROM bus_usage_monthly
+      WHERE month > $start AND month <= $end
+      GROUP BY emd_code
+
+  - id: elderly_bus_use_per_capita
+    name: 노인 1인당 연간 경로 승차 인원(최근 12개월)
+    unit: 회/노인 1명
+    tables: [bus_usage_monthly, elderly_pop_emd]
+    keywords: [버스, 이용, 타기, 승차]
+    requires: [노인, 어르신, 고령, 할머니, 할아버지]
+    bonus: [노인, 어르신]
+    scope: emd
+    rule: rank
+    worse: low
+    caveats: ["이용 실적의 정류소 이름이 한 행정동에만 있는 정류소만 집계(전체 이용 인원의 약 74%)",
+              "다른 읍면동 주민의 승차도 그 정류소가 있는 읍면동에 잡힘"]
+    window: last_24_full_months
+    window_source: bus_stop_usage_by_user_type
+    sql: |
+      SELECT e.emd_code, coalesce(sum(u.users), 0) / e."65세 이상 인구" AS value
+      FROM elderly_pop_emd e
+      LEFT JOIN bus_usage_monthly u ON u.emd_code = e.emd_code AND u.user_type = '경로' AND u.month > $mid AND u.month <= $end
+      GROUP BY e.emd_code, e."65세 이상 인구"
+
+  - id: evening_bus_share_jeju
+    name: 제주 전체 버스 승차 중 19시 이후 비중(최근 12개월)
+    unit: "%"
+    tables: [bus_boarding_hourly]
+    keywords: [저녁, 야간, 밤, 시간대, 귀가, 막차]
+    requires: [버스]
+    scope: jeju
+    rule: context
+    caveats: ["시간대별 승차 자료가 제주 전체 합계뿐이라 읍면동별 비교 불가"]
+    window: last_24_full_months
+    window_source: bus_boarding_hourly
+    sql: |
+      SELECT 100.0 * sum(user_count) FILTER (WHERE base_hour IN ('19시-21시', '22시-24시')) / sum(user_count) AS value
+      FROM bus_boarding_hourly
+      WHERE substr(period, 1, 7) > $mid AND substr(period, 1, 7) <= $end
+
+  - id: accident_hotspot_occurrences
+    name: 교통사고 다발지역 사고 건수
+    unit: 건
+    tables: [accident_hotspot]
+    keywords: [교통사고, 사고, 위험]
+    requires: [사고]
+    scope: emd
+    rule: rank
+    worse: high
+    caveats: ["다발지역으로 지정된 지점의 사고만 셈(전체 교통사고 수 아님)"]
+    sql: |
+      SELECT d.emd_code, coalesce(sum(a.occurrenceCount), 0) AS value
+      FROM dim_emd d LEFT JOIN accident_hotspot a ON a.emd_code = d.emd_code
+      GROUP BY d.emd_code
+
+  - id: school_risk_points
+    name: 초등학교 통학로 위험 지점 수
+    unit: 곳
+    tables: [school_risk_point]
+    keywords: [어린이, 통학, 학교, 스쿨존, 초등, 위험, 사고]
+    requires: [어린이, 통학, 학교, 스쿨존, 초등]
+    scope: emd
+    rule: rank
+    worse: high
+    sql: |
+      SELECT d.emd_code, count(s.emd_code) AS value
+      FROM dim_emd d LEFT JOIN school_risk_point s ON s.emd_code = d.emd_code
+      GROUP BY d.emd_code
+
+  - id: clean_house_pop_per_site
+    name: 클린하우스 1곳당 인구
+    unit: 명/곳
+    tables: [clean_house_jeju, clean_house_seogwipo, pop_emd]
+    keywords: [클린하우스, 쓰레기, 분리배출, 넘쳐]
+    requires: [클린하우스, 쓰레기]
+    scope: emd
+    rule: rank
+    worse: high
+    sql: |
+      WITH c AS (
+        SELECT emd_code FROM clean_house_jeju UNION ALL SELECT emd_code FROM clean_house_seogwipo
+      )
+      SELECT p.emd_code, p.total_pop / nullif(count(c.emd_code), 0) AS value
+      FROM pop_emd p LEFT JOIN c ON c.emd_code = p.emd_code
+      WHERE p.total_pop IS NOT NULL
+      GROUP BY p.emd_code, p.total_pop
+
+  # 시설이 0곳인 읍면동(예: 한경면)도 비교에 넣으려고 '1곳당 인구'가 아니라 '인구당 시설 수'로 계산한다.
+  - id: recycling_center_per_10k_pop
+    name: 인구 1만 명당 재활용도움센터 수
+    unit: 곳/인구 1만 명
+    tables: [recycling_center, pop_emd]
+    keywords: [재활용도움센터, 재활용, 도움센터]
+    requires: [재활용]
+    scope: emd
+    rule: rank
+    worse: low
+    sql: |
+      SELECT p.emd_code, 10000.0 * count(r.emd_code) / p.total_pop AS value
+      FROM pop_emd p LEFT JOIN recycling_center r ON r.emd_code = p.emd_code
+      WHERE p.total_pop IS NOT NULL
+      GROUP BY p.emd_code, p.total_pop
+
+  - id: refugee_facility_per_10k_pop
+    name: 인구 1만 명당 이재민 수용·임시주거시설 수
+    unit: 곳/인구 1만 명
+    tables: [refugee_facility_jeju, refugee_facility_seogwipo, pop_emd]
+    keywords: [이재민, 임시주거, 수용시설, 대피, 태풍, 재난]
+    requires: [이재민, 임시주거, 수용시설]
+    excludes: [폭염, 더위, 무더위]
+    scope: emd
+    rule: rank
+    worse: low
+    caveats: ["제주시는 수용시설, 서귀포시는 임시주거시설 목록으로 시설 정의가 조금 다름"]
+    sql: |
+      WITH f AS (
+        SELECT emd_code FROM refugee_facility_jeju UNION ALL SELECT emd_code FROM refugee_facility_seogwipo
+      )
+      SELECT p.emd_code, 10000.0 * count(f.emd_code) / p.total_pop AS value
+      FROM pop_emd p LEFT JOIN f ON f.emd_code = p.emd_code
+      WHERE p.total_pop IS NOT NULL
+      GROUP BY p.emd_code, p.total_pop
+
+# 확보하지 못한 데이터. claim 또는 민원 본문에 이 말이 있고 맞는 지표가 없으면 이 사유로 빈칸을 남긴다.
+known_gaps:
+  - keywords: [폭염, 무더위, 더위, 쉼터]
+    concept: 무더위쉼터(폭염 대피시설)
+    reason: 제주데이터허브 카탈로그와 적재 DB에 무더위쉼터 현황 데이터가 없음

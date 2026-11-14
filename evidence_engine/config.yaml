@@ -12,7 +12,7 @@ paths:                      # evidence_engine/ 기준 상대 경로
   charts_dir: charts
   usage_log: logs/usage.csv
 
-snapshot: null              # 재현용 스냅샷 기준일(YYYY-MM-DD). 적재 후 채운다.
+snapshot: "2026-11-14"      # 재현용 스냅샷(data/snapshot/<날짜>). 최신성 판단 기준일도 이 날짜로 고정
 
 thresholds:
   max_missing_ratio: 0.30   # 결측 30% 초과 → caveat
@@ -21,20 +21,34 @@ thresholds:
   sql_timeout_sec: 10
   ontology_max_hops: 3
 
+verdict:                    # verdict/rules.py 판정 기준 (claim은 '문제가 있다'는 주장으로 본다)
+  supported_share: 0.667    # 비교군 중 이 비율 이상이 대상보다 나으면 supported
+  contradicted_share: 0.333 # 이 비율 이하만 대상보다 나으면 contradicted, 사이는 partial
+  trend_supported_pct: -5.0 # 증감률이 이 값 이하면 supported(감소 주장)
+  trend_contradicted_pct: 2.0
+
 ranking:                    # score = 가중합 (CLAUDE.md 3장 초기값)
   path_score: 0.4
   search_score: 0.3
   spatial_match: 0.2
   freshness: 0.1
 
-llm:
+charts:
+  enabled: true             # rank 지표에 비교군 막대그래프 PNG (charts/<request_id>_<claim_id>.png)
+
+llm:                        # 실행 중(엔진) LLM: 지표가 없는 claim의 SQL 초안에만 쓴다
   provider: mock            # mock | anthropic | openrouter. 실제 호출은 ALLOW_PAID_CALLS=1 필요
-  model: null               # 미정 (질문 목록 참고)
+  model: null               # 예: claude-sonnet-5-5 (provider: anthropic 일 때)
   max_tokens: 512
+
+dev_llm:                    # 개발 단계 일괄 작업 LLM: RIGOR 온톨로지 보강, 카드 개념 태그
+  provider: anthropic       # anthropic(ANTHROPIC_API_KEY) | openrouter(OPENROUTER_API_KEY)
+  model: claude-sonnet-5-5  # Claude Sonnet 5.5 (2026-11-14 결정). 실제 호출은 승인 + ALLOW_PAID_CALLS=1 때만
+  effort: high              # Sonnet 5.5 기본값도 high(명시). 온톨로지 생성은 판단이 중요해 high, 비용을 줄이려면 medium
 
 external_apis:              # fetch_external 허용 목록. 이용조건 확인된 것만 추가한다.
   allowed: []
 
 ontology_build:             # 개발 단계 전용. 센터 PC에는 설치하지 않는다.
   rigor_repo: https://github.com/NadeenAhmad/RIGOR
-  rigor_dir: external/RIGOR # 온톨로지 단계(11/14~)에 clone. git에는 올리지 않는다.
+  rigor_dir: external/RIGOR # clone 위치. git에는 올리지 않는다. 전용 가상환경: external/.venv-rigor

@@ -1,0 +1,122 @@
+@prefix : <http://example.org/ontology#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+
+# 사람이 작성한 상위 개념 씨앗(seed core). RIGOR의 core_owl_path 입력으로 쓰고,
+# 데이터 테이블 클래스는 table_concepts.yaml 로 이 개념들 아래에 붙는다.
+# skos:altLabel 은 질의 낱말 → 개념 연결(concept_index)과 카드 개념 태그 규칙에 쓴다.
+
+<http://example.org/ontology> a owl:Ontology ;
+    rdfs:comment "Jeju civil-complaint evidence ontology: human-authored seed core"@en .
+
+:SeedCore a prov:Entity ; rdfs:label "사람이 작성한 상위 개념 씨앗"@ko .
+
+# ---------- 관계 ----------
+:concernsDomain a owl:ObjectProperty ; rdfs:domain owl:Thing ; rdfs:range :ComplaintDomain ; rdfs:label "관련 분야"@ko , "concerns domain"@en ;
+    rdfs:comment "시설·현상·이용실적이 어떤 민원 분야와 관련되는지"@ko .
+:servesPopulation a owl:ObjectProperty ; rdfs:domain owl:Thing ; rdfs:range :PopulationGroup ; rdfs:label "이용 대상"@ko , "serves population"@en .
+:locatedIn a owl:ObjectProperty ; rdfs:domain owl:Thing ; rdfs:range :AdministrativeArea ; rdfs:label "소재 행정구역"@ko , "located in"@en .
+:measuresUsageOf a owl:ObjectProperty ; rdfs:domain :ServiceUsage ; rdfs:range :Facility ; rdfs:label "이용 실적 대상"@ko , "measures usage of"@en .
+:occursAt a owl:ObjectProperty ; rdfs:domain :Incident ; rdfs:range :AdministrativeArea ; rdfs:label "발생 장소"@ko , "occurs at"@en .
+:mitigates a owl:ObjectProperty ; rdfs:domain :Facility ; rdfs:range :Incident ; rdfs:label "대응 위험"@ko , "mitigates"@en .
+
+# ---------- 민원 분야 ----------
+:ComplaintDomain a owl:Class ; rdfs:label "민원 분야"@ko , "complaint domain"@en ; prov:wasDerivedFrom :SeedCore .
+:Transportation a owl:Class ; rdfs:subClassOf :ComplaintDomain ; rdfs:label "교통"@ko , "transportation"@en ;
+    skos:altLabel "대중교통"@ko , "버스"@ko , "교통편"@ko ; prov:wasDerivedFrom :SeedCore .
+:HealthcareAccess a owl:Class ; rdfs:subClassOf :ComplaintDomain ; rdfs:label "의료 접근"@ko , "healthcare access"@en ;
+    skos:altLabel "의료"@ko , "진료"@ko , "병원 가기"@ko ; prov:wasDerivedFrom :SeedCore .
+:EnvironmentSanitation a owl:Class ; rdfs:subClassOf :ComplaintDomain ; rdfs:label "환경·청소"@ko , "environment and sanitation"@en ;
+    skos:altLabel "환경"@ko , "청소"@ko , "쓰레기"@ko , "분리배출"@ko ; prov:wasDerivedFrom :SeedCore .
+:SafetyDisaster a owl:Class ; rdfs:subClassOf :ComplaintDomain ; rdfs:label "안전·재난"@ko , "safety and disaster"@en ;
+    skos:altLabel "안전"@ko , "재난"@ko , "위험"@ko ; prov:wasDerivedFrom :SeedCore .
+:CostOfLiving a owl:Class ; rdfs:subClassOf :ComplaintDomain ; rdfs:label "생활물가"@ko , "cost of living"@en ;
+    skos:altLabel "물가"@ko , "가격"@ko ; prov:wasDerivedFrom :SeedCore .
+
+# ---------- 행정구역·인구 ----------
+:AdministrativeArea a owl:Class ; rdfs:label "행정구역"@ko , "administrative area"@en ;
+    skos:altLabel "읍면동"@ko , "동네"@ko , "마을"@ko ; prov:wasDerivedFrom :SeedCore .
+:PopulationGroup a owl:Class ; rdfs:label "인구 집단"@ko , "population group"@en ; prov:wasDerivedFrom :SeedCore .
+:ResidentPopulation a owl:Class ; rdfs:subClassOf :PopulationGroup ; rdfs:label "주민 인구"@ko , "resident population"@en ;
+    skos:altLabel "인구"@ko , "주민"@ko ; prov:wasDerivedFrom :SeedCore .
+:ElderlyPopulation a owl:Class ; rdfs:subClassOf :PopulationGroup ; rdfs:label "노인 인구"@ko , "elderly population"@en ;
+    skos:altLabel "노인"@ko , "어르신"@ko , "고령자"@ko , "할머니"@ko , "할아버지"@ko , "경로"@ko ; prov:wasDerivedFrom :SeedCore .
+:DisabledPopulation a owl:Class ; rdfs:subClassOf :PopulationGroup ; rdfs:label "장애인 인구"@ko , "disabled population"@en ;
+    skos:altLabel "장애인"@ko ; prov:wasDerivedFrom :SeedCore .
+:Children a owl:Class ; rdfs:subClassOf :PopulationGroup ; rdfs:label "어린이"@ko , "children"@en ;
+    skos:altLabel "아이"@ko , "학생"@ko , "초등학생"@ko , "청소년"@ko ; prov:wasDerivedFrom :SeedCore .
+:Visitors a owl:Class ; rdfs:subClassOf :PopulationGroup ; rdfs:label "방문·유동 인구"@ko , "visitors and floating population"@en ;
+    skos:altLabel "유동인구"@ko , "관광객"@ko ; prov:wasDerivedFrom :SeedCore .
+
+# ---------- 시설 ----------
+:Facility a owl:Class ; rdfs:label "시설"@ko , "facility"@en ; prov:wasDerivedFrom :SeedCore .
+:TransportFacility a owl:Class ; rdfs:subClassOf :Facility ,
+        [ a owl:Restriction ; owl:onProperty :concernsDomain ; owl:someValuesFrom :Transportation ] ;
+    rdfs:label "교통 시설"@ko , "transport facility"@en ; skos:altLabel "정류소"@ko , "정류장"@ko , "노선"@ko ; prov:wasDerivedFrom :SeedCore .
+:HealthcareFacility a owl:Class ; rdfs:subClassOf :Facility ,
+        [ a owl:Restriction ; owl:onProperty :concernsDomain ; owl:someValuesFrom :HealthcareAccess ] ;
+    rdfs:label "의료 시설"@ko , "healthcare facility"@en ; skos:altLabel "의료기관"@ko , "병원"@ko ; prov:wasDerivedFrom :SeedCore .
+:Clinic a owl:Class ; rdfs:subClassOf :HealthcareFacility ; rdfs:label "병·의원"@ko , "clinic"@en ;
+    skos:altLabel "의원"@ko , "병원"@ko ; prov:wasDerivedFrom :SeedCore .
+:PharmacyFacility a owl:Class ; rdfs:subClassOf :HealthcareFacility ; rdfs:label "약국"@ko , "pharmacy"@en ;
+    skos:altLabel "심야약국"@ko , "상비약"@ko ; prov:wasDerivedFrom :SeedCore .
+:EmergencyMedicalFacility a owl:Class ; rdfs:subClassOf :HealthcareFacility ; rdfs:label "응급의료기관"@ko , "emergency medical facility"@en ;
+    skos:altLabel "응급실"@ko , "응급"@ko ; prov:wasDerivedFrom :SeedCore .
+:PublicHealthCenter a owl:Class ; rdfs:subClassOf :HealthcareFacility ; rdfs:label "보건소"@ko , "public health center"@en ;
+    skos:altLabel "보건지소"@ko ; prov:wasDerivedFrom :SeedCore .
+:SanitationFacility a owl:Class ; rdfs:subClassOf :Facility ,
+        [ a owl:Restriction ; owl:onProperty :concernsDomain ; owl:someValuesFrom :EnvironmentSanitation ] ;
+    rdfs:label "청소 시설"@ko , "sanitation facility"@en ; prov:wasDerivedFrom :SeedCore .
+:CleanHouse a owl:Class ; rdfs:subClassOf :SanitationFacility ; rdfs:label "클린하우스"@ko , "clean house waste station"@en ;
+    skos:altLabel "쓰레기 배출장"@ko ; prov:wasDerivedFrom :SeedCore .
+:RecyclingFacility a owl:Class ; rdfs:subClassOf :SanitationFacility ; rdfs:label "재활용도움센터"@ko , "recycling center"@en ;
+    skos:altLabel "재활용"@ko ; prov:wasDerivedFrom :SeedCore .
+:ShelterFacility a owl:Class ; rdfs:subClassOf :Facility ,
+        [ a owl:Restriction ; owl:onProperty :concernsDomain ; owl:someValuesFrom :SafetyDisaster ] ;
+    rdfs:label "대피 시설"@ko , "shelter facility"@en ; skos:altLabel "대피소"@ko , "대피시설"@ko , "수용시설"@ko ; prov:wasDerivedFrom :SeedCore .
+:CivilDefenseShelterFacility a owl:Class ; rdfs:subClassOf :ShelterFacility ; rdfs:label "민방위 대피시설"@ko , "civil defense shelter"@en ;
+    prov:wasDerivedFrom :SeedCore .
+:DisasterReliefShelter a owl:Class ; rdfs:subClassOf :ShelterFacility ; rdfs:label "이재민 수용·임시주거시설"@ko , "disaster relief shelter"@en ;
+    skos:altLabel "이재민"@ko , "임시주거"@ko , "태풍"@ko ; prov:wasDerivedFrom :SeedCore .
+:HeatShelter a owl:Class ; rdfs:subClassOf :ShelterFacility ; rdfs:label "무더위쉼터"@ko , "heat shelter"@en ;
+    skos:altLabel "폭염"@ko , "더위"@ko , "쉼터"@ko ;
+    rdfs:comment "제주데이터허브에 현황 데이터가 없음(빈칸 검출용 개념)"@ko ; prov:wasDerivedFrom :SeedCore .
+:WelfareFacility a owl:Class ; rdfs:subClassOf :Facility ; rdfs:label "복지 시설"@ko , "welfare facility"@en ; prov:wasDerivedFrom :SeedCore .
+:SeniorCenter a owl:Class ; rdfs:subClassOf :WelfareFacility ,
+        [ a owl:Restriction ; owl:onProperty :servesPopulation ; owl:someValuesFrom :ElderlyPopulation ] ;
+    rdfs:label "경로당"@ko , "senior center"@en ; prov:wasDerivedFrom :SeedCore .
+:SafetyFacility a owl:Class ; rdfs:subClassOf :Facility ,
+        [ a owl:Restriction ; owl:onProperty :concernsDomain ; owl:someValuesFrom :SafetyDisaster ] ;
+    rdfs:label "안전 시설"@ko , "safety facility"@en ; skos:altLabel "CCTV"@ko , "방범"@ko ; prov:wasDerivedFrom :SeedCore .
+:Business a owl:Class ; rdfs:label "업소·사업체"@ko , "business"@en ; skos:altLabel "가게"@ko , "업소"@ko ; prov:wasDerivedFrom :SeedCore .
+
+# ---------- 이용 실적·현상 ----------
+:ServiceUsage a owl:Class ; rdfs:label "이용 실적"@ko , "service usage"@en ; skos:altLabel "이용객"@ko , "승차"@ko ;
+    prov:wasDerivedFrom :SeedCore .
+:BusRidership a owl:Class ; rdfs:subClassOf :ServiceUsage ,
+        [ a owl:Restriction ; owl:onProperty :measuresUsageOf ; owl:someValuesFrom :TransportFacility ] ;
+    rdfs:label "버스 이용 실적"@ko , "bus ridership"@en ; skos:altLabel "버스"@ko , "버스 승차"@ko , "운행"@ko , "배차"@ko , "막차"@ko , "증편"@ko ;
+    prov:wasDerivedFrom :SeedCore .
+:Incident a owl:Class ; rdfs:label "사고·위험 사건"@ko , "incident"@en ; prov:wasDerivedFrom :SeedCore .
+:TrafficAccident a owl:Class ; rdfs:subClassOf :Incident ,
+        [ a owl:Restriction ; owl:onProperty :concernsDomain ; owl:someValuesFrom :Transportation ] ,
+        [ a owl:Restriction ; owl:onProperty :concernsDomain ; owl:someValuesFrom :SafetyDisaster ] ;
+    rdfs:label "교통사고"@ko , "traffic accident"@en ; skos:altLabel "사고"@ko , "다발지역"@ko , "교통안전"@ko ; prov:wasDerivedFrom :SeedCore .
+:SchoolRouteRisk a owl:Class ; rdfs:subClassOf :Incident ,
+        [ a owl:Restriction ; owl:onProperty :occursAt ; owl:someValuesFrom :AdministrativeArea ] ;
+    rdfs:label "통학로 위험"@ko , "school route risk"@en ; skos:altLabel "통학로"@ko , "스쿨존"@ko , "학교 앞"@ko ;
+    prov:wasDerivedFrom :SeedCore .
+:Hazard a owl:Class ; rdfs:subClassOf :Incident ; rdfs:label "재해 위험"@ko , "natural hazard"@en ;
+    skos:altLabel "급경사지"@ko , "붕괴"@ko ; prov:wasDerivedFrom :SeedCore .
+:EnvironmentalQuality a owl:Class ;
+    rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :concernsDomain ; owl:someValuesFrom :EnvironmentSanitation ] ;
+    rdfs:label "환경 질"@ko , "environmental quality"@en ; skos:altLabel "미세먼지"@ko , "대기"@ko , "수질"@ko , "하천"@ko ;
+    prov:wasDerivedFrom :SeedCore .
+:WeatherCondition a owl:Class ; rdfs:label "기상"@ko , "weather"@en ; skos:altLabel "날씨"@ko , "기온"@ko , "강수"@ko ;
+    prov:wasDerivedFrom :SeedCore .
+:PriceLevel a owl:Class ;
+    rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :concernsDomain ; owl:someValuesFrom :CostOfLiving ] ;
+    rdfs:label "물가 수준"@ko , "price level"@en ; skos:altLabel "물가지수"@ko , "착한가격"@ko ; prov:wasDerivedFrom :SeedCore .
+:Workforce a owl:Class ; rdfs:label "인력"@ko , "workforce"@en ; skos:altLabel "의료인력"@ko , "의사"@ko ; prov:wasDerivedFrom :SeedCore .

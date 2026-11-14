@@ -22,6 +22,11 @@ evidence_engine/logs/*
 # 개발 단계 전용 외부 코드 (RIGOR)
 evidence_engine/external/
 
+# 온톨로지·태그 빌드 중간물 (다시 만들 수 있음). 확정본 ontology/jeju.ttl 은 커밋한다.
+evidence_engine/ontology/build/
+evidence_engine/ontology/rag_docs/generated/
+evidence_engine/catalog/.llm_cache/
+
 # Python
 .venv/
 __pycache__/

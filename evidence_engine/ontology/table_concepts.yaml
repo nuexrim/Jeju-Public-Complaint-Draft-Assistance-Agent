@@ -1,0 +1,72 @@
+# 적재 테이블 → 상위 개념(seed_core.ttl). 결정적 빌드에서 <테이블 클래스> rdfs:subClassOf <개념> 로 넣는다.
+# 사람이 검수하는 연결표다. RIGOR LLM 보강을 돌리면 여기에 없는 하위 관계가 더 붙을 수 있다.
+# 값 하나 = subClassOf, 여러 개 = 모두.  relations: 추가 존재 제약 (속성: 개념)
+tables:
+  dim_emd: [AdministrativeArea]
+  pop_emd: [ResidentPopulation, ElderlyPopulation]
+  emd_geo: [AdministrativeArea]
+  elderly_pop_emd: [ElderlyPopulation]
+  disabled_pop_emd: [DisabledPopulation]
+  population_yearly: [ResidentPopulation]
+  floating_pop_residence: [Visitors]
+  floating_pop_visit: [Visitors]
+  floating_pop_work: [Visitors]
+  bus_stop: [TransportFacility]
+  bus_route: [TransportFacility]
+  bus_stop_usage_by_user_type: [BusRidership]
+  bus_usage_monthly: [BusRidership]
+  bus_boarding_hourly: [BusRidership]
+  bus_yearly_passengers: [BusRidership]
+  hospital: [Clinic]
+  pharmacy: [PharmacyFacility]
+  night_pharmacy: [PharmacyFacility]
+  otc_drug_store: [PharmacyFacility]
+  emergency_hospital: [EmergencyMedicalFacility]
+  emergency_medical_center: [EmergencyMedicalFacility]
+  health_center: [PublicHealthCenter]
+  health_center_workforce: [Workforce]
+  medical_workforce: [Workforce]
+  clean_house_jeju: [CleanHouse]
+  clean_house_seogwipo: [CleanHouse]
+  recycling_center: [RecyclingFacility]
+  waste_recycling: [EnvironmentalQuality]
+  pm10_monthly: [EnvironmentalQuality]
+  air_station: [EnvironmentalQuality]
+  river_water_quality: [EnvironmentalQuality]
+  weather_monthly: [WeatherCondition]
+  weather_station: [WeatherCondition]
+  civil_defense_shelter: [CivilDefenseShelterFacility]
+  refugee_facility_jeju: [DisasterReliefShelter]
+  refugee_facility_seogwipo: [DisasterReliefShelter]
+  steep_slope_jeju: [Hazard]
+  cctv: [SafetyFacility]
+  accident_hotspot: [TrafficAccident]
+  accident_by_intersection: [TrafficAccident]
+  accident_child_by_hour: [TrafficAccident]
+  accident_child_by_road: [TrafficAccident]
+  accident_elderly: [TrafficAccident]
+  pedestrian_accident: [TrafficAccident]
+  traffic_enforcement: [TrafficAccident]
+  school_blind_spot: [SchoolRouteRisk]
+  school_jaywalk_facility_need: [SchoolRouteRisk]
+  school_near_miss_point: [SchoolRouteRisk]
+  school_risk_point: [SchoolRouteRisk]
+  senior_center_all: [SeniorCenter]
+  senior_center_jeju: [SeniorCenter]
+  senior_center_seogwipo: [SeniorCenter]
+  business_birth_death_emd: [Business]
+  good_price_seogwipo: [Business, PriceLevel]
+  price_index: [PriceLevel]
+  price_survey: [PriceLevel]
+
+relations:            # 테이블 클래스에 붙일 추가 관계 (seed 개념 간 관계를 테이블 수준에서 보강)
+  accident_child_by_hour: {servesPopulation: Children}
+  accident_child_by_road: {servesPopulation: Children}
+  accident_elderly: {servesPopulation: ElderlyPopulation}
+  school_risk_point: {servesPopulation: Children}
+  school_near_miss_point: {servesPopulation: Children}
+  school_blind_spot: {servesPopulation: Children}
+  school_jaywalk_facility_need: {servesPopulation: Children}
+  bus_usage_monthly: {measuresUsageOf: TransportFacility}
+  bus_stop_usage_by_user_type: {measuresUsageOf: TransportFacility}
+  night_pharmacy: {concernsDomain: HealthcareAccess}

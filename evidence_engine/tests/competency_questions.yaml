@@ -1,2 +1,67 @@
-# 온톨로지 역량 질문 15개 (11/14~16 작성 예정). 지금은 비어 있다.
-questions: []
+# 온톨로지 역량 질문 15개 (B 채택 판단용, CLAUDE.md 6장 11/16).
+# 질문 문장만 넣고 개념 확장(retrieval/ontology_expand.py)을 돌려 아래를 확인한다.
+#   expect_any : 이 테이블 중 하나 이상이 3-hop 안의 경로(relation_path)로 닿아야 통과
+#   expect_gap : 이 개념이 '데이터 없음'으로 검출되어야 통과
+#   why        : 카탈로그 낱말 검색만으로는 어려운 이유 (온톨로지가 더하는 값)
+# 10개 이상 통과 → use_ontology=true 유지, 미달 → false.  실행: python ontology/evaluate_cq.py
+questions:
+  - id: cq01
+    question: 어르신들이 병원 가기 힘든 동네는 어디인가
+    expect_any: [hospital, elderly_pop_emd]
+    why: "'병원 가기'는 의료 접근 개념, '어르신'은 노인 인구 개념으로 이어져야 함"
+  - id: cq02
+    question: 밤에 아프면 갈 곳이 있는가
+    expect_any: [night_pharmacy, emergency_medical_center, emergency_hospital]
+    why: "'아프면 갈 곳'에는 약국·응급실 낱말이 없음 → 진료·의료 개념 확장 필요"
+  - id: cq03
+    question: 응급실까지 너무 멀다
+    expect_any: [emergency_medical_center, emergency_hospital]
+    why: "'응급실' 별칭 → 응급의료기관 개념 → 두 데이터셋"
+  - id: cq04
+    question: 버스 배차가 줄어서 불편하다
+    expect_any: [bus_stop_usage_by_user_type, bus_usage_monthly, bus_boarding_hourly, bus_route]
+    why: "'배차'는 데이터명에 없는 말 → 버스 이용 실적 개념"
+  - id: cq05
+    question: 막차가 너무 일찍 끊긴다
+    expect_any: [bus_boarding_hourly, bus_route, bus_usage_monthly]
+    why: "'막차' → 버스 이용 실적 → 시간대별 승차"
+  - id: cq06
+    question: 정류장이 집에서 멀다
+    expect_any: [bus_stop]
+    why: "'정류장'(데이터명은 '정류소') 별칭 처리"
+  - id: cq07
+    question: 아이들 통학로가 위험하다
+    expect_any: [school_risk_point, school_near_miss_point, school_blind_spot]
+    why: "'통학로' → 통학로 위험 개념 → 초등학교 교통안전 데이터"
+  - id: cq08
+    question: 교차로에서 사고가 자주 난다
+    expect_any: [accident_hotspot, accident_by_intersection]
+    why: "교통사고 개념 아래 데이터셋 묶음"
+  - id: cq09
+    question: 쓰레기 배출장이 부족하다
+    expect_any: [clean_house_jeju, clean_house_seogwipo]
+    why: "'쓰레기 배출장' 별칭 → 클린하우스(데이터명에 '쓰레기' 없음)"
+  - id: cq10
+    question: 재활용품 버릴 곳이 없다
+    expect_any: [recycling_center]
+    why: "재활용 → 재활용도움센터 개념"
+  - id: cq11
+    question: 태풍 오면 대피할 곳이 있나
+    expect_any: [refugee_facility_jeju, refugee_facility_seogwipo, civil_defense_shelter]
+    why: "'태풍' → 이재민 시설, '대피' → 대피 시설 개념 아래 세 데이터셋"
+  - id: cq12
+    question: 여름 폭염에 노인들이 쉴 곳이 없다
+    expect_gap: 무더위쉼터
+    why: "무더위쉼터 데이터가 없다는 사실을 빈칸으로 검출해야 함"
+  - id: cq13
+    question: 경로당이 부족하다
+    expect_any: [senior_center_all, senior_center_jeju, senior_center_seogwipo]
+    why: "경로당 개념 아래 세 데이터셋"
+  - id: cq14
+    question: 미세먼지가 심하다
+    expect_any: [pm10_monthly, air_station]
+    why: "'미세먼지' 별칭 → 환경 질 개념"
+  - id: cq15
+    question: 물가가 너무 올랐다
+    expect_any: [price_index, price_survey]
+    why: "'물가' → 생활물가·물가 수준 개념"
