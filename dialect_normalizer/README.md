@@ -108,7 +108,7 @@ python3 evaluate.py                # 전체: 평가셋 2개(일상대화·어르
 python3 evaluate.py --report       # API 호출 없이 저장된 결과로 점수만 다시 계산
 ```
 - 결과는 `results/`에 저장되며, 중간에 끊겨도 다시 실행하면 이어서 진행합니다.
-- 지표: 방언 어절 정답률(메인), 과잉 수정률, 문장 완전 일치율, chrF, 문장당 추정 변경·질문 수
+- 지표: ERR(메인), 재현율, FPR, 단어 정확도, LAI 정확도, CER, BLEU, chrF 등 — 계산식과 근거는 아래 [평가 지표](#평가-지표) 참고
 - `results/examples_*.md`: A는 틀리고 B는 맞힌 문장 사례 (발표·기획서용)
 
 ### 6. 구조화
@@ -139,6 +139,75 @@ result = normalize("고냉이 허고 강생이들 왕 막 파불민")
 - **비식별화 오류**: 중·노년층 데이터에서 방언 어절만 `#이름#`으로 가려지고 표준어는 남은 경우,
   어절 단위로 표준어 쪽도 함께 가려 문장을 살림 (제외 비율 25% → 1.3%)
 
+## 평가 지표
+
+### 원칙
+- **무엇을 재는가**(지표 이름·계산식)는 선행 연구의 정의를 그대로 따른다.
+- **우리 데이터에서 어떻게 세는가**(적용 규칙)는 아래 "적용 규칙"에 모두 공개한다.
+
+### 어절 단위 지표
+선행 연구의 어휘 정규화 평가(MultiLexNorm)와 같이, 입력 어절 하나를 아래 네 칸 중 하나로 분류한다.
+
+| 분류 | 정의 (van der Goot et al., 2021) |
+|---|---|
+| TP | 작업자가 바꾼 어절을 시스템도 올바른 표준형으로 바꿈 |
+| FN | 작업자가 바꾼 어절을 시스템이 올바르게 바꾸지 못함 (틀린 표준형으로 바꾼 경우 포함) |
+| FP | 작업자가 바꾸지 않은 어절을 시스템이 바꿈 |
+| TN | 작업자도 시스템도 바꾸지 않음 |
+
+"작업자가 바꾼 어절"은 AI Hub 라벨의 `eojeolList`에서 `isDialect = true`이고 표준형이 다른 어절이다.
+
+| 지표 | 계산식 | 뜻 | 근거 |
+|---|---|---|---|
+| **ERR (메인)** | (TP − FP) / (TP + FN) | 바꿔야 할 어절 대비, 맞게 바꾼 수에서 잘못 바꾼 수를 뺀 비율. 아무것도 안 바꾸면 0, 음수 가능 | van der Goot (2019), MultiLexNorm (2021) 공식 지표 |
+| 재현율 | TP / (TP + FN) | 바꿔야 할 방언 어절 중 맞게 바꾼 비율 | 분류 평가 표준 정의. W-NUT 2015는 토큰 단위 정밀도·재현율·F1로 평가 |
+| FPR | FP / (FP + TN) | 원래 표준어인 어절을 잘못 바꾼 비율 (낮을수록 좋음) | 분류 평가 표준 정의 (위 논문들이 직접 보고한 지표는 아님. 과잉 수정을 따로 보이기 위해 추가) |
+| 단어 정확도 | (TP + TN) / 전체 어절 | 전체 어절 중 올바른 상태인 비율 | Kuparinen et al. (2023) |
+| LAI 정확도 | (FP + TN) / 전체 어절 | 아무것도 안 바꿨을 때의 단어 정확도 (기준선) | Kuparinen et al. (2023), MultiLexNorm (2021) |
+
+단어 정확도만 보면 원래 표준어인 어절이 많은 데이터에서 점수가 높게 나온다. 그래서 바꿔야 할 어절 수로 보정한 ERR을 메인으로 쓰고, LAI 정확도를 함께 적는다.
+
+### 문장 단위 지표
+
+| 지표 | 계산식 | 근거 |
+|---|---|---|
+| CER (공백 포함) | 글자 편집 거리 합 / 정답 문장 글자 수 합 (연속 공백은 하나로) | Kuparinen et al. (2023) |
+| CER (공백 제외) | 위와 같되 모든 공백을 지우고 계산. 띄어쓰기 차이의 영향을 따로 보기 위해 함께 보고 | 위의 적용 변형 |
+| BLEU | sacrebleu `corpus_bleu` 기본 설정 (13a 토크나이저, 어절 단위) | 한국어 방언 번역 연구(임상범 외, 2021·2022)에서 사용 |
+| chrF | sacrebleu `corpus_chrf` 기본 설정 | 기계번역 평가 표준 지표 |
+| 문장 완전 일치율 | 띄어쓰기·문장부호를 지운 뒤 정답 문장과 같은 비율 | 보조 지표 |
+
+시스템 동작 지표로 문장당 **추정 변경 수**(사전 근거 없는 변경)와 **질문 수**도 함께 보고한다.
+
+### 적용 규칙 (우리 데이터에 맞춰 정한 것)
+
+| 항목 | 규칙 | 이유 |
+|---|---|---|
+| 단위 | AI Hub 라벨의 **어절** | 정답 라벨이 어절 단위로 제공됨 |
+| 정답 라벨 연결 | 입력 문장을 띄어쓰기로 나눈 어절과 `eojeolList`의 방언 어절을 앞에서부터 순서대로 맞춤. 맞추지 못한 정답 쌍 수는 "미매칭"으로 함께 출력 | 문장과 어절 목록의 표기가 드물게 다름 |
+| 입력·출력 정렬 | 선행 연구는 입력과 출력이 1:1로 짝지어진 데이터를 쓰지만, LLM 출력은 짝이 없음. 그래서 입력·출력 어절을 **편집 거리(difflib)로 정렬**한 뒤 분류 | 정렬 없는 출력에 같은 정의를 적용하기 위한 근사 |
+| 바뀐 구간 | 어절 수가 같으면 1:1로, 다르면(쪼개짐·합쳐짐) 구간 전체를 붙여 비교. 예: `죽어부난 → 죽어 버려서` | 한 어절이 여러 어절로 바뀌는 경우가 흔함 |
+| 비교 방식 | 띄어쓰기·문장부호는 무시. 정답 표준형이 출력 구간 안에 들어 있으면 TP, 원래 어절이 출력 구간 안에 남아 있으면 TN | `고양이 하고` / `고양이하고` 같은 띄어쓰기 차이는 오류로 보지 않음 |
+| 조사가 붙은 경우 | `냄새 → 냄새가`처럼 원래 어절이 그대로 포함되면 TN | 뜻이 바뀌지 않은 변화. 단, 이 때문에 일부 변경이 TN으로 관대하게 세어질 수 있음 |
+| 새로 생긴 어절 | 어절 단위 지표에서는 세지 않고 CER에 반영 | 네 칸 분류는 입력 어절 기준 |
+| 가명 어절 `○○` | 제외 | 원래 단어를 알 수 없음 |
+| 틀린 표준형 | FN으로만 셈 (FP 아님) | MultiLexNorm 정의와 동일 |
+
+### 한계
+- ERR은 FP와 FN을 구분하지 못한다. 정답 데이터가 방언 표시를 빠뜨린 어절을 시스템이 올바르게 바꿔도 FP로 감점된다.
+- 정답 표준형과 뜻은 같지만 표현이 다르면(`먹여서` / `먹이고`) FN으로 센다. 그래서 실제 품질보다 낮게 나올 수 있다.
+- 편집 거리 정렬은 근사이므로, 출력이 입력과 크게 다르면 분류가 부정확할 수 있다.
+- `--limit 20`처럼 표본이 작으면 오차 범위가 크다. 최종 수치는 평가셋 전체(500문장씩)로 낸다.
+
+### 참고문헌
+- Rob van der Goot. 2019. *Normalization and Parsing Algorithms for Uncertain Input.* PhD thesis, University of Groningen. (5장: 정규화 평가와 ERR)
+- Rob van der Goot, Alan Ramponi, Arkaitz Zubiaga, Barbara Plank, Benjamin Muller, Iñaki San Vicente Roncal, Nikola Ljubešić, Özlem Çetinoğlu, et al. 2021. MultiLexNorm: A Shared Task on Multilingual Lexical Normalization. *Proceedings of the Seventh Workshop on Noisy User-generated Text (W-NUT 2021)*, pp. 493–509. https://aclanthology.org/2021.wnut-1.55
+- Timothy Baldwin, Marie Catherine de Marneffe, Bo Han, Young-Bum Kim, Alan Ritter, Wei Xu. 2015. Shared Tasks of the 2015 Workshop on Noisy User-generated Text: Twitter Lexical Normalization and Named Entity Recognition. *Proceedings of the ACL 2015 Workshop on Noisy User-generated Text*, pp. 126–135.
+- Olli Kuparinen, Aleksandra Miletić, Yves Scherrer. 2023. Dialect-to-Standard Normalization: A Large-Scale Multilingual Evaluation. *Findings of EMNLP 2023*, pp. 13814–13828. https://aclanthology.org/2023.findings-emnlp.923
+- 임상범, 박찬준, 조재춘, 양영욱. 2021. 딥러닝 기반 한국어 방언 기계번역 연구. *제33회 한글 및 한국어 정보처리 학술대회 논문집.*
+- 임상범, 박찬준, 양영욱. 2022. 언어적 특성과 서비스를 고려한 딥러닝 기반 한국어 방언 기계번역 연구.
+- Matt Post. 2018. A Call for Clarity in Reporting BLEU Scores. *WMT 2018.* (sacrebleu)
+
 ## 알려진 한계
 
 - 일상대화 데이터 기반이라 민원 상황 어휘(배수로, 가로등 등)는 적을 수 있음
@@ -147,6 +216,7 @@ result = normalize("고냉이 허고 강생이들 왕 막 파불민")
 
 ## 변경 이력
 
+- v3.3: 평가 지표를 선행 연구 정의로 교체 — ERR(메인)·재현율·FPR·단어 정확도·LAI 정확도(어절 편집 거리 정렬 후 TP/FN/FP/TN 분류), CER(공백 포함·제외)·BLEU 추가, README에 계산식·근거·적용 규칙 정리
 - v3.2: 일상대화 데이터의 이중 전사 표기 "(방언)/(표준어)"와 '#' 기호 정리(학습 문장 2.9%, 일상대화 평가 문장 21%에 남아 있었음), 문장에 읍면동이 직접 있으면 확인 질문 생략
 - v3.1: 문장 속 읍면동 우선, 말하지 않은 요구사항은 확인 질문으로, 지명 질문 제거, claims에 장소명 제외
 - v3.0: OpenAI → Claude API 전환(`llm.py`), 구조화 모듈(`structure.py`) 추가, pytest 추가, 의존성 버전 고정, 평가 결과를 모델별 폴더에 저장
