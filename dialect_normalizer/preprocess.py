@@ -1,5 +1,5 @@
 """
-제주 방언 라벨 JSON 전처리 스크립트 (v2.3: 방언 비율 추가)
+제주 방언 라벨 JSON 전처리 스크립트 (v2.4: 이중 전사 표기 정리)
 
 사용법:  python3 preprocess.py
         python3 preprocess.py --daily ./label --senior ./label_senior --output ./processed
@@ -34,13 +34,17 @@ SENIOR_MIN_COUNT = 2    # 어르신 데이터에서 2번 이상 나온 쌍은 �
 SEED = 42
 
 TAG_RE = re.compile(r"\{[^}]*\}")
+DUAL_RE = re.compile(r"\(([^()]*)\)/\(([^()]*)\)")   # 원본의 "(방언)/(표준어)" 이중 전사 표기
 MASK_RE = re.compile(r"&[a-zA-Z]+\d*&|@\S+?\d+|#[^#\s]+#")  # &name1&, @이름1, #이름#
 PUNCT = "?.,!~…\"'“”‘’"
 
 
-def clean(text) -> str:
-    text = TAG_RE.sub(" ", text or "")
+def clean(text, side="dialect") -> str:
+    """side='dialect'면 이중 표기의 앞(방언), 'standard'면 뒤(표준어)를 남김."""
+    text = DUAL_RE.sub(lambda m: m.group(1) if side == "dialect" else m.group(2), text or "")
+    text = TAG_RE.sub(" ", text)
     text = MASK_RE.sub("○○", text)
+    text = text.replace("#", "")                             # 가명 표시가 아닌 남은 '#' 기호 제거
     return re.sub(r"\s+", " ", text).strip()
 
 
@@ -54,7 +58,7 @@ def held_out(key: str) -> bool:
 
 
 def eojeol_pair(d, s):
-    d, s = clean(d).strip(PUNCT), clean(s).strip(PUNCT)
+    d, s = clean(d).strip(PUNCT), clean(s, "standard").strip(PUNCT)
     if "○○" in d or "○○" in s:      # 가림 처리된 어절은 원래 단어를 알 수 없음 → 사전에서 제외
         return None
     return [d, s] if d and s and d != s else None
@@ -76,7 +80,7 @@ def read_daily(doc, fp):
             "utt_id": u.get("id"),
             "age": ages.get(u.get("speaker_id"), ""),
             "dialect": clean(u.get("dialect_form") or u.get("form")),
-            "standard": clean(u.get("standard_form")),
+            "standard": clean(u.get("standard_form"), "standard"),
             "dialect_eojeols": pairs,
         }
 
@@ -120,7 +124,7 @@ def read_senior(doc, fp):
         "domain": script.get("domain", ""),
         "speech_type": script.get("speechType", ""),
         "dialect": clean(" ".join(dialect_words)),
-        "standard": clean(" ".join(standard_words)),
+        "standard": clean(" ".join(standard_words), "standard"),
         "dialect_eojeols": pairs,
     }
 

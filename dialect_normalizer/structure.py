@@ -215,7 +215,7 @@ def drop_place_questions(norm: dict | None) -> dict | None:
 
 
 def _questions(query: dict, mention: str, emd_from_llm: str, norm: dict | None,
-               suggested_request: str = "") -> list[dict]:
+               suggested_request: str = "", emd_in_text: bool = False) -> list[dict]:
     qs = []
     if norm:
         for q in norm.get("ask_user", []):
@@ -224,7 +224,7 @@ def _questions(query: dict, mention: str, emd_from_llm: str, norm: dict | None,
     if not emd:
         where = f"말씀하신 '{mention}'은(는) " if mention else ""
         qs.append({"field": "emd_name", "question": f"{where}어느 읍·면·동인가요? (예: 구좌읍, 노형동)"})
-    elif mention and emd_from_llm and re.sub(r"\s", "", mention) not in (emd, emd[:-1]) \
+    elif not emd_in_text and mention and emd_from_llm and re.sub(r"\s", "", mention) not in (emd, emd[:-1]) \
             and emd[:-1] not in mention:
         qs.append({"field": "emd_name", "question": f"말씀하신 '{mention}'은(는) '{emd}'이(가) 맞나요?",
                    "confirm": True})
@@ -308,7 +308,8 @@ def structure(text: str, *, use_normalize: bool = True, include_raw: bool = Fals
     out = llm.call_json(RULES, build_prompt(normalized, exclude_example_id), SCHEMA,
                         purpose="structure")                           # ③
 
-    emd = find_emd_in_text(normalized) \
+    text_emd = find_emd_in_text(normalized)
+    emd = text_emd \
         or (out["emd_name"] if out["emd_name"] in EMD_NAMES else "") \
         or guess_emd(out["location_mention"])                         # ④
     claims = [c["text"].strip() for c in out["claims"] if c["text"].strip()][:MAX_CLAIMS]
@@ -337,7 +338,8 @@ def structure(text: str, *, use_normalize: bool = True, include_raw: bool = Fals
     if not query["user_request"]:
         query.pop("user_request")
 
-    questions = _questions(query, out["location_mention"], out["emd_name"], norm, suggested)
+    questions = _questions(query, out["location_mention"], out["emd_name"], norm, suggested,
+                           emd_in_text=bool(text_emd))   # 문장에 읍면동이 직접 있으면 확인 질문 생략
     result = {
         "status": "",
         "query": query,

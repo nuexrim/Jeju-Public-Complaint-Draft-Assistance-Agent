@@ -116,3 +116,14 @@ def test_grounded_request_kept(run):
 def test_place_name_question_dropped():
     norm = {"standard": "x", "changes": [], "ask_user": ["'구좌읍'은 어떤 뜻인가요?", "'파불민'은 무슨 뜻인가요?"]}
     assert S.drop_place_questions(norm)["ask_user"] == ["'파불민'은 무슨 뜻인가요?"]
+
+
+def test_no_confirm_when_emd_written_in_text(run):
+    r = run({**BASE_OUT, "location_mention": "우리 동네", "emd_name": "구좌읍"},
+            text="우리 동네 버스가 줄었어요 구좌읍")
+    assert not any(x["field"] == "emd_name" for x in r["questions"])
+
+
+def test_confirm_when_emd_inferred_from_village(run):
+    r = run({**BASE_OUT, "location_mention": "세화리", "emd_name": "구좌읍"}, text="세화리 버스가 줄었어요")
+    assert any(x["field"] == "emd_name" and x.get("confirm") for x in r["questions"])
