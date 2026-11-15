@@ -58,7 +58,7 @@ def test_missing_location_asks_then_update(run):
 
 
 def test_short_emd_mention_is_resolved(run):
-    r = run({**BASE_OUT, "location_mention": "노형", "emd_name": ""})
+    r = run({**BASE_OUT, "location_mention": "노형", "emd_name": ""}, text="노형 쪽 버스가 줄었어요")
     assert r["query"]["location"]["emd_name"] == "노형동"
 
 
@@ -92,3 +92,27 @@ def test_dialect_confidence():
 def test_fixtures_valid_against_contract():
     for fp in sorted(S.FIXTURES.glob("q*.json")):
         assert S.validate(json.loads(fp.read_text(encoding="utf-8"))) == [], fp.name
+
+
+def test_emd_in_text_overrides_llm(run):
+    r = run({**BASE_OUT, "location_mention": "", "emd_name": "연동"}, text="노형동 학교 앞 교차로에서 사고가 자주 나요")
+    assert r["query"]["location"]["emd_name"] == "노형동"
+
+
+def test_ungrounded_request_becomes_suggestion(run):
+    r = run({**BASE_OUT, "user_request": "버스 증차"}, text="구좌읍 버스가 줄어서 병원 가기 힘들어요")
+    assert "user_request" not in r["query"]
+    q = [x for x in r["questions"] if x["field"] == "user_request"][0]
+    assert q["suggestion"] == "버스 증차" and q.get("optional")
+    r2 = S.update(r, user_request="버스 증차")
+    assert r2["query"]["user_request"] == "버스 증차"
+
+
+def test_grounded_request_kept(run):
+    r = run({**BASE_OUT, "user_request": "버스 늘려"}, text="구좌읍 버스가 줄었어요 버스 좀 늘려 주세요")
+    assert r["query"]["user_request"] == "버스 늘려"
+
+
+def test_place_name_question_dropped():
+    norm = {"standard": "x", "changes": [], "ask_user": ["'구좌읍'은 어떤 뜻인가요?", "'파불민'은 무슨 뜻인가요?"]}
+    assert S.drop_place_questions(norm)["ask_user"] == ["'파불민'은 무슨 뜻인가요?"]

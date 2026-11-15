@@ -120,9 +120,10 @@ RULES = """너는 제주 도민의 민원 문장을 근거 확인 엔진에 넘�
 - emd_name: 제주 행정 읍면동 중 하나. 문장에 읍면동이 나오거나, 리·마을 이름으로 읍면동을 확실히 알 수 있을 때만 쓴다.
   확실하지 않으면 "". "제주시", "서귀포시"만으로는 정하지 않는다.
 - claims: 데이터로 확인할 수 있는 짧은 평서문 1~3개. "~다"로 끝낸다. 하나의 주장에는 한 가지 측면만 담는다.
-  요구사항(무엇을 해달라)은 claims에 넣지 않는다. 숫자를 만들지 않는다.
+  장소 이름(읍면동·마을)은 location에 있으므로 claims에 넣지 않는다. 요구사항(무엇을 해달라)은 claims에 넣지 않는다.
+  숫자를 만들지 않는다. 사용자가 말한 측면(줄었다, 부족하다, 멀다, 자주 발생한다 등)을 바꾸지 않는다.
 - targets: 주장에 나오는 핵심 대상 명사 (시설, 교통수단, 인구 집단, 시간대 등).
-- user_request: 사용자가 원하는 조치. 사용자가 말하지 않았으면 "" (추측하지 않는다).
+- user_request: 사용자가 원하는 조치를 사용자가 쓴 말 그대로. 사용자가 말하지 않았으면 "" (추측하지 않는다).
 - period_from, period_to: 사용자가 기간을 말했을 때만 YYYY-MM 형식. 오늘 날짜를 기준으로 계산한다. 말하지 않았으면 둘 다 ""."""
 
 
@@ -160,11 +161,16 @@ def _load_examples(exclude_id: str | None = None, k: int = 4) -> list[dict]:
 
 def build_prompt(text: str, exclude_id: str | None = None) -> str:
     lines = [f"오늘 날짜: {date.today().isoformat()}", "", "[예시]"]
-    for q in _load_examples(exclude_id):
+    flat = re.sub(r"\s", "", text)
+    for q in _load_examples(exclude_id, k=5):
+        if re.sub(r"\s", "", q["normalized_text"]) in flat:   # 입력과 같은 문장의 예시는 답을 베끼게 되므로 제외
+            continue
         out = {"complaint_type": q["complaint_type"],
                "emd_name": q.get("location", {}).get("emd_name", ""),
                "claims": [c["text"] for c in q["claims"]],
-               "targets": q.get("targets", []), "user_request": q.get("user_request", "")}
+               "targets": q.get("targets", []),
+               "user_request": q["user_request"] if is_grounded(q.get("user_request", ""),
+                                                                q["normalized_text"]) else ""}
         lines.append(f"문장: {q['normalized_text']}\n결과: {json.dumps(out, ensure_ascii=False)}")
     lines += ["", "[민원 문장]", text]
     return "\n".join(lines)
@@ -174,6 +180,12 @@ def build_prompt(text: str, exclude_id: str | None = None) -> str:
 # ④ 검사 + 질문 만들기
 # =====================================================================
 _YM = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+
+
+def find_emd_in_text(text: str) -> str:
+    """문장에 읍면동 이름이 그대로 들어 있으면 그것을 씀 (하나일 때만). LLM 판단보다 우선."""
+    found = {e for e in EMD_NAMES if re.search(rf"(?<![가-힣]){e}", text)}
+    return found.pop() if len(found) == 1 else ""
 
 
 def guess_emd(mention: str) -> str:
@@ -187,7 +199,23 @@ def guess_emd(mention: str) -> str:
     return cands[0] if len(cands) == 1 else ""
 
 
-def _questions(query: dict, mention: str, emd_from_llm: str, norm: dict | None) -> list[dict]:
+def drop_place_questions(norm: dict | None) -> dict | None:
+    """'구좌읍'은 어떤 뜻인가요? 같은 지명 질문은 뺌 (지명은 방언이 아님)."""
+    if not norm:
+        return norm
+    norm = copy.deepcopy(norm)
+    keep = []
+    for q in norm["ask_user"]:
+        m = re.search(r"'([^']+)'", q)
+        if m and guess_emd(m.group(1).strip()):
+            continue
+        keep.append(q)
+    norm["ask_user"] = keep
+    return norm
+
+
+def _questions(query: dict, mention: str, emd_from_llm: str, norm: dict | None,
+               suggested_request: str = "") -> list[dict]:
     qs = []
     if norm:
         for q in norm.get("ask_user", []):
@@ -203,8 +231,12 @@ def _questions(query: dict, mention: str, emd_from_llm: str, norm: dict | None) 
     if not query.get("claims"):
         qs.append({"field": "claims", "question": "어떤 점이 불편하신지 조금 더 자세히 말씀해 주시겠어요?"})
     if not query.get("user_request"):
-        qs.append({"field": "user_request", "question": "어떻게 바뀌었으면 하시나요? (예: 버스 증차, 시설 설치)",
-                   "optional": True})
+        if suggested_request:
+            qs.append({"field": "user_request", "optional": True, "suggestion": suggested_request,
+                       "question": f"'{suggested_request}'을(를) 요청하시는 게 맞나요? 아니면 원하시는 조치를 말씀해 주세요."})
+        else:
+            qs.append({"field": "user_request", "question": "어떻게 바뀌었으면 하시나요? (예: 버스 증차, 시설 설치)",
+                       "optional": True})
     if query.get("complaint_type") == "기타":
         qs.append({"field": "complaint_type",
                    "question": "현재 근거 확인은 교통, 의료 접근, 환경·청소, 안전·재난, 생활물가 민원만 가능해요. "
@@ -236,6 +268,13 @@ def validate(query: dict) -> list[str]:
     return errors
 
 
+def is_grounded(phrase: str, text: str) -> bool:
+    """요구사항의 단어(2글자 이상)가 모두 사용자 문장에 나오는지. 아니면 LLM이 짐작한 것."""
+    words = [w for w in re.findall(r"[가-힣A-Za-z0-9]+", phrase) if len(w) >= 2]
+    flat = re.sub(r"\s", "", text)
+    return bool(words) and all(w[:2] in flat for w in words)
+
+
 def dialect_confidence(norm: dict | None) -> float:
     """바꾼 단어 + 모르는 단어 중 사전 근거가 있는 비율. 바꾼 것도 모르는 것도 없으면 1.0."""
     if not norm:
@@ -263,15 +302,15 @@ def structure(text: str, *, use_normalize: bool = True, include_raw: bool = Fals
     normalized = masked
     if use_normalize:                                                  # ②
         from normalize import normalize
-        norm = normalize(masked)
+        norm = drop_place_questions(normalize(masked))
         normalized = norm["standard"]
 
     out = llm.call_json(RULES, build_prompt(normalized, exclude_example_id), SCHEMA,
                         purpose="structure")                           # ③
 
-    emd = out["emd_name"] if out["emd_name"] in EMD_NAMES else ""      # ④
-    if not emd:
-        emd = guess_emd(out["location_mention"])
+    emd = find_emd_in_text(normalized) \
+        or (out["emd_name"] if out["emd_name"] in EMD_NAMES else "") \
+        or guess_emd(out["location_mention"])                         # ④
     claims = [c["text"].strip() for c in out["claims"] if c["text"].strip()][:MAX_CLAIMS]
 
     query = {
@@ -282,8 +321,14 @@ def structure(text: str, *, use_normalize: bool = True, include_raw: bool = Fals
         "claims": [{"id": f"c{i}", "text": t} for i, t in enumerate(claims, 1)],
         "location": {"emd_name": emd, "emd_code": ""},
         "targets": [t for t in out["targets"] if t.strip()],
-        "user_request": out["user_request"].strip(),
+        "user_request": "",
     }
+    req = out["user_request"].strip()
+    suggested = ""
+    if req and is_grounded(req, normalized):
+        query["user_request"] = req
+    elif req:
+        suggested = req                       # 사용자가 말하지 않은 요구사항 → 질의에 넣지 않고 확인 질문
     if _YM.match(out["period_from"]) and _YM.match(out["period_to"]) \
             and out["period_from"] <= out["period_to"]:
         query["period"] = {"from": out["period_from"], "to": out["period_to"]}
@@ -292,7 +337,7 @@ def structure(text: str, *, use_normalize: bool = True, include_raw: bool = Fals
     if not query["user_request"]:
         query.pop("user_request")
 
-    questions = _questions(query, out["location_mention"], out["emd_name"], norm)
+    questions = _questions(query, out["location_mention"], out["emd_name"], norm, suggested)
     result = {
         "status": "",
         "query": query,
