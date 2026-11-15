@@ -9,6 +9,8 @@ pop_emd  : 행정동별 주민등록 총인구·65세 이상 인구
            행정안전부 통·반 단위 인구(data/ingest/portal_api.py, data.go.kr 15108071)를 행정동코드로 더해 채운다
            (status=tongban, 총인구만 있고 65세 이상은 NULL). 통·반 파일이 없거나 기준월이 다르면 NULL(status=ambiguous).
 pop_tongban : 위 통·반 원자료 (출처 표기용)
+pop_emd_monthly : 행정동별 월 총인구 이력 (인구 증감 지표용). 원자료 = 같은 API 의 법정동(리) 총인구
+           (raw/emd_link/법정동인구_<YYYYMM>.json) + 통·반 인구. 같은 방식으로 묶는다.
 bus_usage_monthly : 정류소 이용 실적(이름만 있음)을 정류소 이름으로 행정동에 연결한 월별 집계.
            이름은 공백·쉼표를 지우고 맞추고, 안 맞으면 괄호 안 설명까지 지우고 다시 맞춘다.
            같은 이름의 정류소가 여러 행정동에 있으면 어느 동의 승차인지 알 수 없어 연결하지 않는다.
@@ -157,6 +159,70 @@ def build_bus_usage(con) -> str:
     return f"이용 인원의 {matched / total:.1%}를 행정동에 연결"
 
 
+def emd_totals_from_api(legal_rows: list[dict], tongban_rows: list[dict], link_csv: Path,
+                        emd_csv: Path = EMD_CSV) -> dict[str, int]:
+    """행정안전부 API 법정동(리) 총인구 + 통·반 인구 → {행정동 코드: 총인구}. 행정동을 못 채우면 그 코드는 없다.
+
+    법정동이 한 행정동에만 속하면 그대로 더하고, 여러 행정동에 걸치면 통·반 인구(행정동코드 있음)로 채운다.
+    """
+    with emd_csv.open(encoding="utf-8", newline="") as f:
+        emd_rows = list(csv.DictReader(f))
+    valid = {r["emd_code"] for r in emd_rows}
+    eupmyeon = {(r["sigungu_name"], r["emd_name"]): r["emd_code"] for r in emd_rows
+                if r["emd_name"].endswith(("읍", "면"))}
+    legal_to_adm: dict[str, set[str]] = defaultdict(set)
+    for r in _read_csv(link_csv):
+        if r["시도명"].startswith("제주") and r["행정동코드"][:8] in valid:
+            legal_to_adm[r["법정동코드"]].add(r["행정동코드"][:8])
+    total, split = Counter(), set()
+    for r in legal_rows:
+        adm = legal_to_adm.get(r["stdgCd"])
+        if not adm:
+            code = eupmyeon.get((r.get("sggNm", ""), r.get("stdgNm", "")))
+            adm = {code} if code else None
+        if not adm:
+            continue
+        if len(adm) > 1:
+            split |= adm
+            continue
+        total[next(iter(adm))] += int(r["totNmprCnt"])
+    tb = Counter()
+    for r in tongban_rows:
+        if r.get("admmCd") and r.get("totNmprCnt"):
+            tb[r["admmCd"][:8]] += int(r["totNmprCnt"])
+    out = {c: v for c, v in total.items() if c not in split}
+    out.update({c: tb[c] for c in split if tb.get(c)})
+    return out
+
+
+def build_pop_monthly(con, link_csv: Path) -> str:
+    """pop_emd_monthly(emd_code, month, total_pop): API 법정동인구_<월>.json 이 있는 달마다 43개 행정동 총인구."""
+    import json
+    con.execute("CREATE OR REPLACE TABLE pop_emd_monthly (emd_code VARCHAR, month VARCHAR, total_pop INTEGER)")
+    months = []
+    for path in sorted(LINK_DIR.glob("*.json")):
+        name = unicodedata.normalize("NFC", path.name)
+        if not name.startswith("법정동인구_"):
+            continue
+        ym = name.split("_")[1][:6]
+        tb_path = LINK_DIR / f"행정동_통반인구_{ym}.json"
+        tongban = json.loads(tb_path.read_text(encoding="utf-8"))["rows"] if tb_path.exists() else []
+        legal = json.loads(path.read_text(encoding="utf-8"))["rows"]
+        totals = emd_totals_from_api(legal, tongban, link_csv)
+        month = f"{ym[:4]}-{ym[4:]}"
+        con.executemany("INSERT INTO pop_emd_monthly VALUES (?, ?, ?)", [(c, month, v) for c, v in sorted(totals.items())])
+        months.append(f"{month} {len(totals)}곳")
+    con.execute("DELETE FROM dataset WHERE table_name = 'pop_emd_monthly'")
+    if months:
+        lo, hi, n = con.execute("SELECT min(month), max(month), count(*) FROM pop_emd_monthly").fetchone()
+        con.execute(
+            "INSERT INTO dataset VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'aggregate', ?, 1.0, NULL, 'external_api', NULL)",
+            ["pop_emd_monthly", TONGBAN_DATASET, "공공데이터포털(행정안전부)", TONGBAN_URL, "법정동인구_<YYYYMM>.json",
+             hi, hi, datetime.now(timezone.utc).isoformat(timespec="seconds"), n, lo, hi, n],
+        )
+    return ", ".join(months) if months else "건너뜀: raw/emd_link 에 법정동인구_<월>.json 없음"
+
+
 def build(con) -> dict:
     stats = {}
     pop_csv, link_csv = _find("인구수"), _find("법정동 연계정보")
@@ -199,6 +265,9 @@ def build(con) -> dict:
                             + (f", 그중 {filled}곳은 통·반 인구로 채움)" if filled else ")"))
     else:
         stats["pop_emd"] = "건너뜀: raw/emd_link 에 인구수 파일 또는 연계정보 파일 없음"
+
+    if link_csv:
+        stats["pop_emd_monthly"] = build_pop_monthly(con, link_csv)
 
     tables = {r[0] for r in con.execute("SELECT table_name FROM information_schema.tables").fetchall()}
     if {"bus_stop", "bus_stop_usage_by_user_type"} <= tables:

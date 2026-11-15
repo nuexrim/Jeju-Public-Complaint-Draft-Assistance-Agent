@@ -36,6 +36,7 @@ indicators:
     scope: emd
     rule: rank
     worse: low
+    related: [elderly_share_pct]
     caveats: ["영업/정상 상태인 의원만 셈(폐업·휴업 제외)"]
     sql: |
       SELECT p.emd_code, 1000.0 * count(h.companyName) / p.total_pop AS value
@@ -117,6 +118,7 @@ indicators:
     scope: emd
     rule: rank
     worse: low
+    related: [pop_density]
     caveats: ["방향이 다른 같은 이름 정류소도 각각 셈"]
     sql: |
       SELECT p.emd_code, 1000.0 * count(b.stationId) / p.total_pop AS value
@@ -136,6 +138,7 @@ indicators:
     scope: emd
     rule: trend
     worse: low
+    related: [pop_change_pct]
     caveats: ["운행 횟수가 아니라 정류소 이용 인원으로 본 대리 지표",
               "이용 실적의 정류소 이름이 한 행정동에만 있는 정류소만 집계(전체 이용 인원의 약 74%)"]
     window: last_24_full_months
@@ -161,6 +164,7 @@ indicators:
     scope: emd
     rule: rank
     worse: low
+    related: [elderly_share_pct]
     caveats: ["이용 실적의 정류소 이름이 한 행정동에만 있는 정류소만 집계(전체 이용 인원의 약 74%)",
               "다른 읍면동 주민의 승차도 그 정류소가 있는 읍면동에 잡힘"]
     window: last_24_full_months
@@ -202,6 +206,7 @@ indicators:
     scope: emd
     rule: rank
     worse: high
+    related: [pop_density]
     caveats: ["다발지역으로 지정된 지점의 사고만 셈(전체 교통사고 수 아님)"]
     sql: |
       SELECT d.emd_code, coalesce(sum(a.occurrenceCount), 0) AS value
@@ -237,6 +242,7 @@ indicators:
     scope: emd
     rule: rank
     worse: high
+    related: [pop_density]
     sql: |
       WITH c AS (
         SELECT emd_code FROM clean_house_jeju UNION ALL SELECT emd_code FROM clean_house_seogwipo
@@ -288,6 +294,136 @@ indicators:
       WHERE p.total_pop IS NOT NULL
       GROUP BY p.emd_code, p.total_pop
 
+  # ---- 2026-11-15 추가: 이미 적재한 자료로 만든 지표 ----
+  - id: senior_center_per_1k_elderly
+    name: 노인(65세 이상) 1천 명당 경로당 수
+    topic: elderly_welfare
+    measures: supply
+    ask: "{emd} 어르신 수에 비해 경로당이 적다"
+    unit: 곳/노인 1천 명
+    tables: [senior_center_all, elderly_pop_emd]
+    keywords: [경로당, 노인정, 노인 쉼터, 어르신 쉼터]
+    requires: [경로당, 노인정, 쉼터]
+    excludes: [폭염, 더위, 무더위]
+    scope: emd
+    rule: rank
+    worse: low
+    related: [elderly_share_pct]
+    sql: |
+      SELECT e.emd_code, 1000.0 * count(s.emd_code) / e."65세 이상 인구" AS value
+      FROM elderly_pop_emd e LEFT JOIN senior_center_all s ON s.emd_code = e.emd_code
+      WHERE e."65세 이상 인구" > 0
+      GROUP BY e.emd_code, e."65세 이상 인구"
+
+  - id: otc_store_per_10k_pop
+    name: 인구 1만 명당 안전상비의약품 판매업소 수
+    topic: medical
+    measures: supply
+    ask: "{emd} 인구에 비해 상비약을 살 수 있는 곳(편의점 등)이 적다"
+    unit: 곳/인구 1만 명
+    tables: [otc_drug_store, pop_emd]
+    keywords: [상비약, 상비의약품, 편의점, 약 살, 감기약, 해열제]
+    requires: [상비약, 상비의약품, 편의점, 약 살, 감기약, 해열제]
+    scope: emd
+    rule: rank
+    worse: low
+    caveats: ["영업 중인 안전상비의약품 판매업소(주로 편의점)만 셈. 약국은 따로 셈하지 않음"]
+    sql: |
+      SELECT p.emd_code, 10000.0 * count(o.emd_code) / p.total_pop AS value
+      FROM pop_emd p
+      LEFT JOIN otc_drug_store o ON o.emd_code = p.emd_code AND o."영업상태명" = '영업/정상'
+      WHERE p.total_pop IS NOT NULL
+      GROUP BY p.emd_code, p.total_pop
+
+  - id: pedestrian_accident_per_10k_pop
+    name: 인구 1만 명당 보행자 교통사고 건수(2018~2019)
+    topic: traffic_safety
+    measures: risk
+    ask: "{emd}에서 길을 걷거나 건너다 차에 치이는 사고가 많다"
+    unit: 건/인구 1만 명
+    tables: [pedestrian_accident, pop_emd]
+    keywords: [보행자, 보행, 횡단, 건너, 걷다, 걸어, 인도]
+    requires: [보행, 횡단, 건너, 걷, 걸어, 인도]
+    scope: emd
+    rule: rank
+    worse: high
+    related: [pop_density]
+    caveats: ["2018~2019년 보행자 교통사고만 있음(최근 자료 아님)", "주민 수 기준이라 관광객 등 유동인구가 많은 곳은 높게 나올 수 있음"]
+    sql: |
+      SELECT p.emd_code, 10000.0 * count(a.emd_code) / p.total_pop AS value
+      FROM pop_emd p LEFT JOIN pedestrian_accident a ON a.emd_code = p.emd_code
+      WHERE p.total_pop IS NOT NULL
+      GROUP BY p.emd_code, p.total_pop
+
+  # 공개된 CCTV 목록은 교통단속·어린이보호 목적이 대부분이라 동네 방범 CCTV 전체가 아니다 → 약한 근거(판정 상한 partial)
+  - id: cctv_cameras_per_10k_pop
+    name: 인구 1만 명당 공공 CCTV 카메라 대수(공개 목록 기준)
+    topic: safety
+    measures: supply
+    ask: "{emd} 인구에 비해 CCTV가 적다"
+    unit: 대/인구 1만 명
+    tables: [cctv, pop_emd]
+    keywords: [CCTV, cctv, 씨씨티비, 감시카메라, 방범카메라]
+    requires: [CCTV, cctv, 씨씨티비, 감시카메라, 방범카메라]
+    scope: emd
+    rule: rank
+    worse: low
+    weak_evidence: "공개 CCTV 목록은 교통단속·어린이보호 목적이 대부분(생활방범 8곳)이라 동네 CCTV 전체가 아님"
+    sql: |
+      SELECT p.emd_code, 10000.0 * coalesce(sum(c."카메라대수"), 0) / p.total_pop AS value
+      FROM pop_emd p LEFT JOIN cctv c ON c.emd_code = p.emd_code
+      WHERE p.total_pop IS NOT NULL
+      GROUP BY p.emd_code, p.total_pop
+
+  # ---- 맥락 지표 (role: context) ----
+  # 주장을 직접 판정하지 않는다. 판정한 지표 옆에 '교차 확인'으로 붙여 다른 설명 가능성을 보여 준다.
+  # 해석 선택지와 지표 자동 선택에는 나오지 않는다. 다른 지표의 related 또는 근거 탐색 에이전트가 고른다.
+  - id: pop_change_pct
+    role: context
+    name: 1년 인구 증감률
+    why: 이용·수요 변화가 인구 변화 때문인지
+    unit: "%"
+    tables: [pop_emd_monthly]
+    scope: emd
+    rule: rank
+    worse: low
+    sql: |
+      WITH m AS (SELECT max(month) AS e FROM pop_emd_monthly),
+           b AS (SELECT strftime(strptime(e || '-01', '%Y-%m-%d') - INTERVAL 12 MONTH, '%Y-%m') AS s, e FROM m)
+      SELECT a.emd_code, 100.0 * (a.total_pop - p.total_pop) / p.total_pop AS value
+      FROM b
+      JOIN pop_emd_monthly a ON a.month = b.e
+      JOIN pop_emd_monthly p ON p.month = b.s AND p.emd_code = a.emd_code
+
+  - id: elderly_share_pct
+    role: context
+    name: 65세 이상 인구 비율
+    why: 어르신 수요가 많은 곳인지
+    unit: "%"
+    tables: [elderly_pop_emd, pop_emd]
+    scope: emd
+    rule: rank
+    worse: high
+    caveats: ["65세 이상 인구는 2025-12-31, 총인구는 2026-10 기준"]
+    sql: |
+      SELECT p.emd_code, 100.0 * e."65세 이상 인구" / p.total_pop AS value
+      FROM pop_emd p JOIN elderly_pop_emd e ON e.emd_code = p.emd_code
+      WHERE p.total_pop IS NOT NULL
+
+  - id: pop_density
+    role: context
+    name: 인구 밀도
+    why: 사람이 몰려 사는 곳이라 시설·사고가 많거나 붐비는지
+    unit: 명/km²
+    tables: [pop_emd, emd_geo]
+    scope: emd
+    rule: rank
+    worse: high
+    sql: |
+      SELECT p.emd_code, p.total_pop / g.area_km2 AS value
+      FROM pop_emd p JOIN emd_geo g ON g.emd_code = p.emd_code
+      WHERE p.total_pop IS NOT NULL AND g.area_km2 > 0
+
 # 주장이 말하는 측면. 위에서부터 차례로 보고 처음 걸린 것을 쓴다(아무것도 안 걸리면 판단 보류).
 aspects:
   - id: usage
@@ -311,13 +447,17 @@ topics:
   - id: bus
     cues: [버스, 정류소, 정류장, 노선, 배차, 막차, 승차, 대중교통]
   - id: medical
-    cues: [병원, 의원, 진료, 의료, 약국, 응급, 아프]
+    cues: [병원, 의원, 진료, 의료, 약국, 응급, 아프, 상비약, 상비의약품, 감기약, 해열제]
   - id: waste
     cues: [쓰레기, 클린하우스, 재활용, 분리배출]
   - id: traffic_safety
     cues: [교통사고, 사고, 통학, 스쿨존, 횡단보도]
   - id: disaster
-    cues: [대피, 이재민, 재난, 태풍, 폭염, 더위, 쉼터, 임시주거]
+    cues: [대피, 이재민, 재난, 태풍, 폭염, 더위, 무더위쉼터, 임시주거]
+  - id: safety
+    cues: [CCTV, cctv, 씨씨티비, 감시카메라, 방범, 치안, 범죄, 가로등, 보안등, 어둡, 어두워]
+  - id: elderly_welfare
+    cues: [경로당, 노인정, 어르신 쉼터, 노인 쉼터]
 
 # 확보하지 못한 데이터. claim 또는 민원 본문에 이 말이 있고 맞는 지표가 없으면 이 사유로 빈칸을 남긴다.
 # id·topic·aspect·ask 가 있으면 해석 선택지에도 '지금 자료로는 확인할 수 없음' 항목으로 나온다(indicator_id = gap:<id>).
@@ -336,6 +476,13 @@ known_gaps:
     keywords: [배차, 운행 횟수, 감편]
     concept: 버스 운행 횟수·배차 간격
     reason: 운행 횟수·배차는 읍면 지선 노선의 현재 값(2025-12-31, bus_branch_route)만 있고 간선·급행 노선과 과거 값이 없어, 줄었는지나 다른 지역보다 적은지 판정할 수 없음
+  - id: streetlight
+    topic: safety
+    aspect: supply
+    ask: "밤길을 밝힐 가로등·보안등이 부족하다"
+    keywords: [가로등, 보안등, 어둡, 어두워, 밤길]
+    concept: 가로등·보안등
+    reason: 제주데이터허브 카탈로그와 적재 DB에 가로등·보안등 위치 자료가 없음
   - id: night_clinic
     topic: medical
     aspect: access

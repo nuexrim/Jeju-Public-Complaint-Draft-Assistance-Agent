@@ -41,6 +41,12 @@ llm:                        # 실행 중(엔진) LLM: 지표가 없는 claim의 
   model: null               # 예: claude-sonnet-5-5 (provider: anthropic 일 때)
   max_tokens: 512
 
+evidence_agent:             # 근거 탐색 에이전트(agent/evidence_agent.py). 위 llm 공급자를 쓴다. mock 이면 registry related 로 대신함
+  enabled: true
+  max_steps: 4              # 질의 주장 하나당 최대 API 호출 수
+  max_tokens: 2000
+  max_calls: 60             # 엔진 한 번 실행(프로세스)에서 이 에이전트의 최대 유료 호출 수
+
 dev_llm:                    # 개발 단계 일괄 작업 LLM: RIGOR 온톨로지 보강, 카드 개념 태그
   provider: anthropic       # anthropic(ANTHROPIC_API_KEY) | openrouter(OPENROUTER_API_KEY)
   model: claude-sonnet-5-5  # Claude Sonnet 5.5 (2026-11-14 결정). 실제 호출은 승인 + ALLOW_PAID_CALLS=1 때만

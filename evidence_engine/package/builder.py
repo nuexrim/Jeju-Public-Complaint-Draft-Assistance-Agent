@@ -47,6 +47,8 @@ def validate_query(doc: dict) -> None:
         ok = gap_by_id(chosen[4:]) if chosen.startswith("gap:") else indicator_by_id(chosen)
         if not ok:
             raise ContractError(f"query 계약 위반:\n  claims/{c['id']}/indicator_id: 등록되지 않은 값 '{chosen}'")
+        if not chosen.startswith("gap:") and ok.get("role") == "context":
+            raise ContractError(f"query 계약 위반:\n  claims/{c['id']}/indicator_id: 맥락 지표 '{chosen}'는 주장 판정에 고를 수 없음")
 
 
 def validate_package(doc: dict) -> None:

@@ -4,7 +4,7 @@ search_catalog, describe_table, compute_indicator, run_sql, compare_region,
 fetch_external, make_chart, log_gap, expand_concepts
 
 숫자를 만드는 도구(compute_indicator·run_sql·compare_region)는 DuckDB 읽기 전용 결과만 돌려준다.
-TOOL_SPECS 는 LLM 도구 호출용 설명(JSON Schema)이다. planner.py 가 쓴다.
+LLM 이 직접 고르는 도구는 agent/evidence_agent.py 에 따로 있다(등록 지표 계산·끝내기 두 개뿐).
 """
 from __future__ import annotations
 
@@ -89,31 +89,3 @@ class Tools:
         if gap not in self.gaps:
             self.gaps.append(gap)
         return gap
-
-
-def _obj(props: dict, required: list[str]) -> dict:
-    return {"type": "object", "properties": props, "required": required, "additionalProperties": False}
-
-
-TOOL_SPECS = [
-    {"name": "search_catalog", "description": "데이터셋 카드 검색(BM25)",
-     "input_schema": _obj({"text": {"type": "string"}, "top_k": {"type": "integer"}}, ["text"])},
-    {"name": "describe_table", "description": "적재 테이블의 컬럼·출처·기준일",
-     "input_schema": _obj({"table": {"type": "string"}}, ["table"])},
-    {"name": "compute_indicator", "description": "registry.yaml 지표 계산",
-     "input_schema": _obj({"indicator_id": {"type": "string"}, "emd_code": {"type": ["string", "null"]}}, ["indicator_id"])},
-    {"name": "compare_region", "description": "같은 유형 읍면동끼리 지표 비교",
-     "input_schema": _obj({"indicator_id": {"type": "string"}, "emd_code": {"type": "string"}}, ["indicator_id", "emd_code"])},
-    {"name": "run_sql", "description": "읽기 전용 SELECT (1,000행·10초 제한). 지표로 안 될 때만",
-     "input_schema": _obj({"sql": {"type": "string"}}, ["sql"])},
-    {"name": "expand_concepts", "description": "온톨로지 개념 확장(3-hop 경로)",
-     "input_schema": _obj({"text": {"type": "string"}}, ["text"])},
-    {"name": "fetch_external", "description": "허용 목록의 외부 API 조회",
-     "input_schema": _obj({"name": {"type": "string"}, "params": {"type": "object"}}, ["name"])},
-    {"name": "make_chart", "description": "비교군 막대그래프 PNG",
-     "input_schema": _obj({"values": {"type": "object"}, "target": {"type": "string"}, "title": {"type": "string"},
-                           "unit": {"type": "string"}, "file_stem": {"type": "string"}},
-                          ["values", "target", "title", "unit", "file_stem"])},
-    {"name": "log_gap", "description": "데이터가 없어 판정할 수 없는 개념 기록",
-     "input_schema": _obj({"concept": {"type": "string"}, "reason": {"type": "string"}}, ["concept", "reason"])},
-]

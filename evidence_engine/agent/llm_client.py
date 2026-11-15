@@ -152,6 +152,71 @@ class LLMClient:
         self._log_usage(response, purpose)
         return response
 
+    def tool_loop(self, prompt: str, *, system: str, tools: list[dict], run_tool, max_steps: int = 4,
+                  purpose: str = "", max_tokens: int | None = None, stop_tool: str = "finish") -> list[dict]:
+        """Anthropic 도구 사용 루프. 모델이 고른 도구 호출 기록 [{name, input, result}] 을 돌려준다.
+
+        - run_tool(name, input) -> dict 는 호출한 쪽(엔진)이 실행한다. 숫자는 여기서만 나온다.
+        - 모델이 stop_tool 을 부르거나, 도구 없이 답하거나, max_steps 에 닿으면 멈춘다.
+        - mock 이면 호출 없이 [] (호출한 쪽이 결정적 기본 경로를 쓴다).
+        - 같은 입력은 고른 도구 순서를 캐시해 두고 다시 실행만 한다(재과금 없음).
+        """
+        if self.provider == "mock":
+            return []
+        if self.provider != "anthropic":
+            raise LLMCallFailed("도구 사용 루프는 provider=anthropic 만 지원")
+        max_tokens = max_tokens or self.max_tokens
+        key = hashlib.sha256("\x1f".join([
+            "tool_loop", str(self.model), str(max_tokens), str(self.effort), system, prompt,
+            json.dumps(tools, ensure_ascii=False, sort_keys=True), str(max_steps)]).encode("utf-8")).hexdigest()
+        disk = self.cache_dir / f"{key}.json" if self.cache_dir else None
+        cached = self._cache.get(key) or (json.loads(disk.read_text(encoding="utf-8")) if disk and disk.exists() else None)
+        if cached is not None:
+            self._cache[key] = cached
+            return [{"name": c["name"], "input": c["input"], "result": run_tool(c["name"], c["input"])} for c in cached]
+
+        messages: list = [{"role": "user", "content": prompt}]
+        trace: list[dict] = []
+        for _ in range(max_steps):
+            if not paid_calls_allowed():
+                raise PaidCallNotAllowed("유료 호출 차단: 승인 후 사람이 ALLOW_PAID_CALLS=1 을 설정해야 한다.")
+            if self.max_calls is not None and self.calls >= self.max_calls:
+                raise CallBudgetExceeded(f"승인된 최대 호출 수 {self.max_calls}회에 도달해 멈춤")
+            if not self.model:
+                raise LLMCallFailed("model 이 정해지지 않았다 (config.yaml llm.model)")
+            self.calls += 1
+            params: dict = {"model": self.model, "max_tokens": max_tokens, "system": system, "tools": tools,
+                            "tool_choice": {"type": "auto"}, "messages": messages}
+            if self.effort:
+                params["output_config"] = {"effort": self.effort}
+            if self.fallbacks:
+                params["betas"] = [FALLBACK_BETA]
+                params["fallbacks"] = "default"
+            resp = self._anthropic_create(params)
+            self._log_usage(LLMResponse("", resp.model, resp.usage.input_tokens or 0, resp.usage.output_tokens or 0), purpose)
+            if resp.stop_reason == "refusal":
+                raise LLMCallFailed("모델이 요청을 거절함")
+            uses = [b for b in resp.content if b.type == "tool_use"]
+            if not uses or resp.stop_reason == "max_tokens":
+                break
+            messages.append({"role": "assistant", "content": resp.content})   # thinking 블록 포함 그대로 돌려준다
+            results, done = [], False
+            for u in uses:
+                out = run_tool(u.name, dict(u.input))
+                trace.append({"name": u.name, "input": dict(u.input), "result": out})
+                results.append({"type": "tool_result", "tool_use_id": u.id,
+                                "content": json.dumps(out, ensure_ascii=False)})
+                done = done or u.name == stop_tool
+            messages.append({"role": "user", "content": results})
+            if done:
+                break
+        record = [{"name": t["name"], "input": t["input"]} for t in trace]
+        self._cache[key] = record
+        if disk:
+            disk.parent.mkdir(parents=True, exist_ok=True)
+            disk.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
+        return trace
+
     def _mock(self, prompt: str, system: str) -> LLMResponse:
         digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:8]
         text = f"[MOCK LLM {digest}] 실제 모델 응답이 아닙니다."

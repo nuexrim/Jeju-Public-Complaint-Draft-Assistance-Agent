@@ -46,7 +46,7 @@ def claim_options(claim: dict, query: dict, tables: set[str], emd_label: str | N
     scored = []
     measured = set()
     for ind in registry["indicators"]:
-        if ind.get("topic") not in topics or not ind.get("ask"):
+        if ind.get("role") == "context" or ind.get("topic") not in topics or not ind.get("ask"):
             continue
         if not set(ind["tables"]) <= tables:
             continue
@@ -67,9 +67,10 @@ def claim_options(claim: dict, query: dict, tables: set[str], emd_label: str | N
     for gap in registry.get("known_gaps", []):
         if gap.get("topic") not in topics or not gap.get("ask"):
             continue
-        # 같은 측면을 재는 지표가 없을 때만(그 뜻을 말할 길이 이것뿐일 때만) 측면 가산
+        # 같은 측면을 재는 지표가 없을 때만(그 뜻을 말할 길이 이것뿐일 때만) 측면 가산.
+        # 주장 문장에 빈칸 낱말이 직접 있으면(예: '가로등') 그 뜻이 가장 가깝다 → +3
         score = (3 if aspect and gap.get("aspect") == aspect and aspect not in measured else 0) \
-            + min(1, len(_has(text + " " + context, gap["keywords"])))
+            + (3 if _has(text, gap["keywords"]) else min(1, len(_has(context, gap["keywords"]))))
         scored.append((score, 0, {
             "text": _fill(gap["ask"], emd_label), "kind": "no_data", "indicator_id": f"gap:{gap['id']}",
             "measures": aspect_name(gap.get("aspect"), registry), "note": NO_DATA_NOTE,

@@ -58,8 +58,15 @@ def test_indicator_needs_its_tables_loaded():
 
 
 def test_every_indicator_is_well_formed():
-    for ind in load_registry()["indicators"]:
-        assert {"id", "name", "unit", "tables", "keywords", "scope", "rule", "sql"} <= ind.keys(), ind["id"]
+    reg = load_registry()
+    ids = {i["id"] for i in reg["indicators"]}
+    for ind in reg["indicators"]:
+        if ind.get("role") == "context":    # 맥락 지표: 고르는 낱말 대신 '확인 이유'가 있다
+            assert {"id", "name", "unit", "tables", "scope", "rule", "sql", "why"} <= ind.keys(), ind["id"]
+        else:
+            assert {"id", "name", "unit", "tables", "keywords", "scope", "rule", "sql"} <= ind.keys(), ind["id"]
+        for rid in ind.get("related", []):  # 교차 확인은 맥락 지표만 가리킨다
+            assert rid in ids and next(i for i in reg["indicators"] if i["id"] == rid).get("role") == "context", rid
         assert ind["rule"] in {"rank", "trend", "zero", "context"}
         if ind["rule"] in {"rank", "zero", "trend"}:
             assert ind.get("worse") in {"high", "low"}, ind["id"]

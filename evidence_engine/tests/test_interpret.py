@@ -23,6 +23,8 @@ def test_registry_meaning_fields_are_consistent():
     aspects = {a["id"] for a in REG["aspects"]}
     topics = {t["id"] for t in REG["topics"]}
     for ind in REG["indicators"]:
+        if ind.get("role") == "context":
+            continue
         assert ind["topic"] in topics and ind["measures"] in aspects and ind["ask"], ind["id"]
     for g in REG["known_gaps"]:
         assert g["id"] and g["topic"] in topics and g["aspect"] in aspects and g["ask"]
@@ -157,3 +159,58 @@ def test_chosen_no_data_meaning_is_unverifiable_with_gap(engine):
 def test_engine_interpret_matches_schema(engine):
     for name in ("q01", "q04", "q09"):
         validate_interpretation(run_engine.interpret(q(name), engine=engine))
+
+
+# ---- 2026-11-15: 적재 자료 지표 · 맥락 지표(교차 확인) · 약한 근거 ----
+def _one(claim: str, emd: str = "구좌읍") -> dict:
+    query = q("q01")
+    query["claims"] = [{"id": "c1", "text": claim}]
+    query["normalized_text"], query["location"] = claim, {"emd_name": emd}
+    query.pop("targets", None)
+    return query
+
+
+def test_context_indicators_are_never_selected_or_offered():
+    from indicators.library import select_indicator
+    tables = {t for i in REG["indicators"] for t in i["tables"]}
+    ind, others = select_indicator("인구가 줄었다", "", tables)
+    assert (ind is None or ind.get("role") != "context") and "pop_change_pct" not in others
+    opts = run_engine.interpret(_one("어르신이 많은데 경로당이 부족하다"), mock=True)["claims"][0]["options"]
+    assert all(o["indicator_id"] not in {"pop_change_pct", "elderly_share_pct", "pop_density"} for o in opts)
+
+
+def test_context_indicator_cannot_be_chosen_by_user():
+    query = _one("버스가 줄었다")
+    query["claims"][0]["indicator_id"] = "pop_change_pct"
+    with pytest.raises(ContractError):
+        run_engine.run(query, mock=True)
+
+
+def test_streetlight_claim_offers_no_data_meaning_first():
+    opts = run_engine.interpret(_one("밤에 가로등이 없어 길이 어둡다"), mock=True)["claims"][0]["options"]
+    assert opts[0]["indicator_id"] == "gap:streetlight"
+
+
+@needs_db
+def test_weak_evidence_indicator_is_capped_at_partial(engine):
+    e = run_engine.run(_one("CCTV가 부족하다"), engine=engine)["evidence"][0]
+    assert e["indicator"].startswith("인구 1만 명당 공공 CCTV") and e["verdict"] in ("partial", "unverifiable")
+    assert e["verdict"] == "unverifiable" or any(c.startswith("약한 근거") for c in e["caveats"]) \
+        or "중간 수준" in " ".join(e["caveats"])
+
+
+@needs_db
+def test_related_context_is_attached_as_cross_check(engine):
+    e = run_engine.run(q("q01"), engine=engine)["evidence"][0]
+    checks = [c for c in e["caveats"] if c.startswith("교차 확인 · 1년 인구 증감률")]
+    assert len(checks) == 1 and "구좌읍" in checks[0] and "확인 이유" in checks[0]
+    assert e["verdict"] == "partial"          # 교차 확인은 판정을 바꾸지 않는다
+
+
+@needs_db
+def test_new_indicators_compute_for_all_43_emd(engine):
+    from indicators.library import compute
+    for iid in ("senior_center_per_1k_elderly", "otc_store_per_10k_pop", "pedestrian_accident_per_10k_pop",
+                "cctv_cameras_per_10k_pop", "pop_change_pct", "elderly_share_pct", "pop_density"):
+        r = compute(indicator_by_id(iid), "50110256", engine.runner)
+        assert len(r.values) == 43 and r.value is not None, iid

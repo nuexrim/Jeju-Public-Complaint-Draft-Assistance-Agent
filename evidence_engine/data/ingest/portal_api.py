@@ -1,6 +1,6 @@
 """공공데이터포털 Open API 수집기: 행정동 인구 (통·반 단위).
 
-    python data/ingest/portal_api.py --month 2026-10
+    python data/ingest/portal_api.py --month 2025-10 --month 2026-10
 
 왜 필요한가
   pop_emd 는 법정동 인구를 연계표로 행정동에 묶는다. 한 법정동이 여러 행정동에 걸치면(서귀포 서귀동·동홍동 등)
@@ -10,6 +10,7 @@
 원자료  행정안전부_법정동별(행정동 통반단위) 주민등록 인구 및 세대현황 (data.go.kr 15108071, 이용허락 제한 없음)
 대상    연계표에서 두 개 이상의 행정동에 걸치는 제주 법정동만 (그 법정동들의 통·반 전체)
 저장    raw/emd_link/행정동_통반인구_<YYYYMM>.json  (응답 행 그대로 + 출처·수집 시각. 키는 저장하지 않는다)
+        raw/emd_link/법정동인구_<YYYYMM>.json      (제주시·서귀포시 법정동(리) 총인구. 인구 증감 지표용 월별 이력)
 키      .env 의 DATA_GO_KR_SERVICE_KEY (일반 인증키 Decoding 값). 과금 없음.
 """
 from __future__ import annotations
@@ -98,25 +99,52 @@ def fetch_tongban(legal_codes: list[str], ym: str, key: str) -> list[dict]:
     return rows
 
 
+CITIES = ("5011000000", "5013000000")   # 제주시, 서귀포시 (도 코드로는 조회되지 않는다)
+
+
+def fetch_legal_totals(ym: str, key: str) -> list[dict]:
+    """법정동(읍·면은 리) 단위 총인구. 연계표로 행정동에 묶는 원자료."""
+    rows = []
+    for code in CITIES:
+        page = 1
+        while True:
+            resp = _get({"stdgCd": code, "srchFrYm": ym, "srchToYm": ym, "lv": "3", "regSeCd": "1",
+                         "type": "JSON", "numOfRows": "100", "pageNo": str(page)}, key)
+            items = (resp.get("items") or {}).get("item") or []
+            items = [items] if isinstance(items, dict) else items
+            rows += [{k: it.get(k) for k in ("sggNm", "stdgCd", "stdgNm", "totNmprCnt", "statsYm")} for it in items]
+            if page * 100 >= int(resp["head"]["totalCount"]):
+                break
+            page += 1
+    return rows
+
+
+def _save(path: Path, ym: str, rows: list[dict], **extra) -> None:
+    path.write_text(json.dumps({
+        "dataset": DATASET, "source_url": SOURCE_URL, "month": f"{ym[:4]}-{ym[4:]}",
+        "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), **extra, "rows": rows,
+    }, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"저장: {path.relative_to(ENGINE_ROOT)} ({len(rows)}행)")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--month", required=True, help="기준 연월 YYYY-MM (pop_emd 인구 파일과 같은 달)")
+    ap.add_argument("--month", required=True, action="append",
+                    help="기준 연월 YYYY-MM. 여러 번 줄 수 있다 (예: --month 2025-10 --month 2026-10)")
     args = ap.parse_args(argv)
-    ym = args.month.replace("-", "")
     link_csv = _find("법정동 연계정보")
     if not link_csv:
         print("raw/emd_link 에 법정동 연계정보 파일이 없다.", file=sys.stderr)
         return 2
     legal = split_legal_dongs(link_csv)
-    print(f"대상 법정동 {len(legal)}개 (행정동 {len(set().union(*legal.values()))}개에 걸침)")
-    rows = fetch_tongban(sorted(legal), ym, load_key())
-    out = LINK_DIR / f"행정동_통반인구_{ym}.json"
-    out.write_text(json.dumps({
-        "dataset": DATASET, "source_url": SOURCE_URL, "month": f"{ym[:4]}-{ym[4:]}",
-        "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "legal_dongs": sorted(legal), "rows": rows,
-    }, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(f"저장: {out.relative_to(ENGINE_ROOT)} ({len(rows)}행)")
+    key = load_key()
+    for month in args.month:
+        ym = month.replace("-", "")
+        print(f"[{month}] 통·반: 대상 법정동 {len(legal)}개 (행정동 {len(set().union(*legal.values()))}개에 걸침)")
+        _save(LINK_DIR / f"행정동_통반인구_{ym}.json", ym, fetch_tongban(sorted(legal), ym, key),
+              legal_dongs=sorted(legal))
+        print(f"[{month}] 법정동 총인구")
+        _save(LINK_DIR / f"법정동인구_{ym}.json", ym, fetch_legal_totals(ym, key))
     return 0
 
 

@@ -32,6 +32,8 @@ def select_indicator(claim_text: str, context_text: str, available_tables: set[s
     registry = registry or load_registry()
     scored = []
     for ind in registry["indicators"]:
+        if ind.get("role") == "context":          # 맥락 지표는 주장을 직접 판정하지 않는다
+            continue
         if ind.get("requires") and not _has(claim_text, ind["requires"]):
             continue
         if _has(claim_text + " " + context_text, ind.get("excludes")):

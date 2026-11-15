@@ -40,6 +40,7 @@ BOUNDARY_SOURCE = {
     "url": "https://github.com/vuski/admdongkor",
 }
 SKIP_TABLES = {"dim_emd"}
+_VERDICT_KO = {"supported": "지지", "contradicted": "반박", "partial": "부분 지지", "unverifiable": "확인 불가"}
 EVIDENCE_ORDER = ["claim_id", "verdict", "indicator", "value", "unit", "region_compare", "sources",
                   "found_by", "relation_path", "chart", "caveats"]
 
@@ -68,6 +69,13 @@ class Engine:
         self.tools = Tools(self)
         self.planner = Planner(client_from_config("llm", config, usage_log=ENGINE_ROOT / config["paths"]["usage_log"]),
                                self.tools)
+        from agent.evidence_agent import EvidenceAgent
+        ag = config.get("evidence_agent") or {}
+        self.agent = EvidenceAgent(
+            client_from_config("llm", config, usage_log=ENGINE_ROOT / config["paths"]["usage_log"],
+                               max_calls=ag.get("max_calls"), cache_dir=ENGINE_ROOT / "logs" / ".agent_cache")
+            if ag.get("enabled", True) else client_from_config("llm", {"llm": {"provider": "mock"}}),
+            max_steps=ag.get("max_steps", 4), max_tokens=ag.get("max_tokens", 2000))
 
     def close(self) -> None:
         self.runner.close()
@@ -189,6 +197,11 @@ class Engine:
             caveats.append("사용자가 해석 선택지에서 고른 뜻으로 계산")
         else:
             verdict = self._proxy_check(claim["text"], indicator, verdict, caveats, gaps)
+        weak = indicator.get("weak_evidence")
+        if weak and verdict in ("supported", "contradicted"):
+            caveats.append(f"약한 근거: {weak} → '{_VERDICT_KO[verdict]}'을(를) '부분 지지'로 낮춤")
+            verdict = "partial"
+        caveats += self._cross_checks_by_agent(claim, indicator, verdict, region_compare, emd_code, emd_label)
         found_by, relation_path = self._found_by(indicator, catalog_top, exp)
         if found_by == "catalog" and not self._main_card(indicator) in catalog_top:
             caveats.append("카탈로그 검색 상위 5개 밖의 데이터셋을 지표 정의로 사용")
@@ -205,6 +218,48 @@ class Engine:
             "sources": sources if result.value is not None else [],
             "caveats": caveats,
         }
+
+    def _cross_checks_by_agent(self, claim: dict, indicator: dict, verdict: str, region_compare: str | None,
+                               emd_code: str | None, emd_label: str) -> list[str]:
+        """근거 탐색 에이전트(LLM 이 켜져 있을 때)가 고른 교차 확인, 아니면 registry 의 related."""
+        if not emd_code or indicator["scope"] != "emd":
+            return []
+
+        def check(iid: str) -> dict:
+            lines = self._cross_checks(indicator, emd_code, emd_label, [iid])
+            return {"result": lines[0]} if lines else {"result": "값 없음"}
+
+        res = self.agent.choose(claim["text"], indicator, verdict, region_compare, emd_label, self.tables, check)
+        out = self._cross_checks(indicator, emd_code, emd_label, res.keep)
+        if res.used_llm and out:
+            out.append(f"교차 확인 항목은 근거 탐색 에이전트가 고름 (확인 {len(res.checked)}개 중 {len(res.keep)}개)")
+        if res.note:
+            out.append(res.note)
+        return out
+
+    def _cross_checks(self, indicator: dict, emd_code: str | None, emd_label: str,
+                      context_ids: list[str] | None = None) -> list[str]:
+        """판정한 지표 옆에 맥락 지표 값을 붙인다(교차 확인). 판정은 바꾸지 않는다.
+
+        context_ids 가 없으면 registry 의 related 를 쓴다(근거 탐색 에이전트가 고르면 그 목록).
+        """
+        if not emd_code or indicator["scope"] != "emd":
+            return []
+        out = []
+        for cid in context_ids if context_ids is not None else indicator.get("related", []):
+            ctx = indicator_by_id(cid)
+            if not ctx or not set(ctx["tables"]) <= self.tables:
+                continue
+            r = compute(ctx, emd_code, self.runner)
+            if r.value is None:
+                continue
+            label, group = comparison_group(emd_code, self.emd_names)
+            vals = sorted((r.values[c] for c in group if c in r.values), reverse=True)
+            pos = vals.index(r.value) + 1
+            why = ctx.get("why") or f"같은 주제의 다른 측면({aspect_name(ctx.get('measures')) or '-'})"
+            out.append(f"교차 확인 · {ctx['name']}: {emd_label} {describe(r.value)}{ctx['unit']} "
+                       f"({label} {len(vals)}곳(이곳 포함) 중 높은 쪽 {pos}번째). 확인 이유: {why}")
+        return out
 
     @staticmethod
     def _proxy_check(claim_text: str, indicator: dict, verdict: str, caveats: list, gaps: list) -> str:
