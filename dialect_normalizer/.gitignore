@@ -1,0 +1,25 @@
+# API 키
+.env
+
+# AI Hub 원본 데이터 (재배포 금지, 용량 큼)
+label/
+label_senior/
+senior_zip/
+*.zip
+*.zip.part*
+aihubshell
+
+# 전처리 결과 (preprocess.py로 다시 만들 수 있음)
+processed/
+
+# Python
+__pycache__/
+*.pyc
+.DS_Store
+
+# 평가 결과 중 AI Hub 문장이 들어간 파일 (summary.json만 공유)
+results/pred_*.jsonl
+results/examples_*.md
+
+# LLM 사용량 기록
+logs/
