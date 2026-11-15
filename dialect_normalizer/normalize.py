@@ -1,20 +1,20 @@
 """
-제주 방언 → 표준어 변환 모듈 (OpenAI API)
+제주 방언 → 표준어 변환 모듈 (Claude API)
 
 흐름: ① 어절 나누기 → ② 사전 찾기 → ③ 비슷한 예문 찾기 → ④ LLM 변환 → ⑤ 근거 검사(감시)
 
 준비
-  pip install openai python-dotenv scikit-learn numpy
-  .env 파일에:
-    OPENAI_API_KEY=sk-...
-    OPENAI_MODEL=사용할_모델_이름        (python3 normalize.py --list-models 로 확인)
+  pip install -r requirements.txt
+  .env 파일에 (.env.example 참고):
+    ANTHROPIC_API_KEY=sk-ant-...
+    CLAUDE_MODEL=claude-haiku-5-5
+    ALLOW_PAID_CALLS=1               ← 사람이 직접 적어야 실제 호출됨 (팀 규칙)
 
 사용법
   python3 normalize.py --build-index           예문 검색 색인 만들기 (처음 한 번, 1~3분)
   python3 normalize.py "고냉이가 막 울엄수다"      한 문장 변환
   python3 normalize.py --zero-shot "..."        사전·예문 없이 LLM만 (비교용 A방법)
   python3 normalize.py                          대화형 모드 (여러 문장 연속 입력)
-  python3 normalize.py --list-models            내 키로 쓸 수 있는 모델 목록
 
 다른 코드에서 쓰기
   from normalize import normalize
@@ -23,12 +23,13 @@
 import argparse
 import difflib
 import json
-import os
 import pickle
 import random
 import sys
 from collections import defaultdict
 from pathlib import Path
+
+import llm
 
 BASE = Path(__file__).resolve().parent
 PROC = BASE / "processed"
@@ -37,7 +38,6 @@ PAIRS_PATH = PROC / "pairs_train.jsonl"
 INDEX_PATH = PROC / "example_index.pkl"
 
 # ---------- 설정값 ----------
-DEFAULT_MODEL = "gpt-4o-mini"   # .env의 OPENAI_MODEL이 있으면 그걸 씀
 INDEX_DAILY_MAX = 150_000        # 예문 색인에 넣을 일상대화 문장 수 (어르신 문장은 전부 넣음)
 EXAMPLE_MAX_LEN = 200            # 이보다 긴 문장은 예문에서 제외 (프롬프트가 너무 길어지지 않게)
 TOP_K_EXAMPLES = 5               # LLM에게 보여줄 예문 수
@@ -213,21 +213,8 @@ def build_prompt(text, hits, examples):
     return "\n".join(lines)
 
 
-_client = None
-
-
 def call_llm(system, user):
-    global _client
-    from openai import OpenAI
-    if _client is None:
-        _client = OpenAI()          # OPENAI_API_KEY 환경변수를 자동으로 읽음
-    resp = _client.responses.create(
-        model=os.getenv("OPENAI_MODEL", DEFAULT_MODEL),
-        input=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-        text={"format": {"type": "json_schema", "name": "dialect_conversion",
-                         "schema": SCHEMA, "strict": True}},
-    )
-    return json.loads(resp.output_text)
+    return llm.call_json(system, user, SCHEMA, purpose="normalize")
 
 
 # =====================================================================
@@ -335,7 +322,7 @@ def normalize(text, use_rag=True):
                        "ratio": h["ratio"], "cands": h["cands"]} for h in hits],
         "examples": examples,
         "mode": "rag" if use_rag else "zero_shot",
-        "model": os.getenv("OPENAI_MODEL", DEFAULT_MODEL),
+        "model": llm.model_name(),
     }
 
 
@@ -358,26 +345,16 @@ def pretty(r):
 
 
 def main():
-    try:
-        from dotenv import load_dotenv
-        load_dotenv(BASE / ".env")
-    except ImportError:
-        pass
+    llm.load_env()
     ap = argparse.ArgumentParser()
     ap.add_argument("text", nargs="?")
     ap.add_argument("--zero-shot", action="store_true", help="사전·예문 없이 LLM만 (비교용)")
     ap.add_argument("--build-index", action="store_true")
-    ap.add_argument("--list-models", action="store_true")
     ap.add_argument("--json", action="store_true", help="결과를 JSON 그대로 출력")
     args = ap.parse_args()
 
     if args.build_index:
         ExampleIndex.build()
-        return
-    if args.list_models:
-        from openai import OpenAI
-        for m in sorted(x.id for x in OpenAI().models.list()):
-            print(m)
         return
 
     def run(t):

@@ -8,7 +8,7 @@ A/B 평가: A(LLM만, zero-shot) vs B(사전+예문+LLM, RAG)
   python3 evaluate.py --report                   API 호출 없이 저장된 결과로 점수만 다시 계산
 
 특징
-  - 결과를 results/ 폴더에 한 줄씩 저장 → 중간에 끊겨도 다시 실행하면 이어서 진행
+  - 결과를 results/<모델 이름>/ 폴더에 한 줄씩 저장 → 중간에 끊겨도 다시 실행하면 이어서 진행
   - 같은 모델·같은 문장으로 A와 B를 비교하므로, 점수 차이 = 우리 데이터(사전·예문)의 효과
 
 지표
@@ -169,7 +169,8 @@ def report(sets, modes):
     (RESULTS / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2),
                                           encoding="utf-8")
     keys = list(next(iter(summary.values())).keys())
-    print(f"\n===== 평가 결과 (모델: {os.getenv('OPENAI_MODEL', '?')}) =====")
+    import llm
+    print(f"\n===== 평가 결과 (모델: {llm.model_name()}) =====")
     print("| 평가셋 | 방법 | " + " | ".join(keys) + " |")
     print("|---|---|" + "---|" * len(keys))
     for k, v in summary.items():
@@ -179,18 +180,17 @@ def report(sets, modes):
 
 
 def main():
-    try:
-        from dotenv import load_dotenv
-        load_dotenv(BASE / ".env")
-    except ImportError:
-        pass
+    import llm
+    llm.load_env()
     ap = argparse.ArgumentParser()
     ap.add_argument("--sets", nargs="+", default=["daily", "senior"], choices=["daily", "senior"])
     ap.add_argument("--modes", nargs="+", default=["zero_shot", "rag"], choices=["zero_shot", "rag"])
     ap.add_argument("--limit", type=int, default=0, help="평가셋마다 앞에서 N문장만")
     ap.add_argument("--report", action="store_true", help="API 호출 없이 점수만 다시 계산")
     args = ap.parse_args()
-    RESULTS.mkdir(exist_ok=True)
+    global RESULTS
+    RESULTS = BASE / "results" / llm.model_name()     # 모델별로 폴더를 나눠 결과가 섞이지 않게
+    RESULTS.mkdir(parents=True, exist_ok=True)
 
     if not args.report:
         import normalize

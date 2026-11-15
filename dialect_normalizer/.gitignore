@@ -20,3 +20,6 @@ __pycache__/
 # 평가 결과 중 AI Hub 문장이 들어간 파일 (summary.json만 공유)
 results/pred_*.jsonl
 results/examples_*.md
+
+# LLM 사용량 기록
+logs/

@@ -1,5 +1,8 @@
-openai>=1.40
-python-dotenv
-scikit-learn
-numpy
-sacrebleu
+# Python 3.11 기준 (센터 PC). 버전 고정.
+anthropic==2.8.0
+python-dotenv==1.2.4
+scikit-learn==1.9.1
+numpy==2.4.4
+sacrebleu==2.6.0
+jsonschema==4.23.0
+pytest==8.3.4
