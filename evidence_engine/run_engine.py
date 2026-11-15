@@ -3,6 +3,7 @@
     python run_engine.py --query tests/fixtures/q01.json
     python run_engine.py --query tests/fixtures/q01.json --out out.json --no-ontology
     python run_engine.py --query tests/fixtures/q01.json --mock      # 계산 없이 형식만 맞춘 가짜 응답
+    python run_engine.py --query tests/fixtures/q01.json --interpret # 주장별 해석 선택지(사용자가 뜻을 고름)
 
 처리: 입력 검증 → 읍면동 코드 → (B) 온톨로지 개념 확장 → (A) 카탈로그 검색 → 병합·순위
 → 지표 계산(DuckDB 읽기 전용) → 규칙 판정 → 계약 검증.
@@ -63,17 +64,48 @@ def run(query: dict, config: dict | None = None, *, use_ontology: bool | None = 
             engine.close()
 
 
+def interpret(query: dict, config: dict | None = None, *, mock: bool = False, engine=None) -> dict:
+    """구조화 질의 → 주장별 해석 선택지 (contracts/interpretation.schema.json).
+    사용자가 고른 선택지의 indicator_id 를 claims[].indicator_id 에, 고른 문장을 claims[].text 에 넣어 run() 을 부른다.
+    mock=True 면 DB 없이 등록부의 모든 지표를 쓸 수 있다고 보고 만든다.
+    """
+    config = config or load_config()
+    validate_query(query)
+    query = mask_query(query)
+    if mock:
+        from indicators.library import load_registry
+        from package.builder import resolve_emd, validate_interpretation
+        from package.interpret import interpret as build
+        tables = {t for ind in load_registry()["indicators"] for t in ind["tables"]}
+        code, _ = resolve_emd(query["location"], ENGINE_ROOT / config["paths"]["emd_codes"])
+        out = build(query, tables, query["location"]["emd_name"] if code else None)
+        validate_interpretation(out)
+        return out
+    from package.assemble import Engine
+    own = engine is None
+    engine = engine or Engine(config)
+    try:
+        return engine.interpret(query)
+    finally:
+        if own:
+            engine.close()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="근거 패키지 엔진")
     parser.add_argument("--query", required=True, type=Path, help="구조화 질의 JSON 파일")
     parser.add_argument("--out", type=Path, help="근거 패키지를 저장할 파일 (없으면 표준 출력)")
     parser.add_argument("--no-ontology", action="store_true", help="use_ontology=false로 실행")
     parser.add_argument("--mock", action="store_true", help="계산 없이 계약 형식만 맞춘 가짜 패키지")
+    parser.add_argument("--interpret", action="store_true", help="근거 대신 주장별 해석 선택지를 출력")
     args = parser.parse_args(argv)
 
     try:
         query = json.loads(args.query.read_text(encoding="utf-8"))
-        package = run(query, use_ontology=False if args.no_ontology else None, mock=args.mock)
+        if args.interpret:
+            package = interpret(query, mock=args.mock)
+        else:
+            package = run(query, use_ontology=False if args.no_ontology else None, mock=args.mock)
     except (OSError, json.JSONDecodeError, ContractError) as exc:
         print(f"오류: {exc}", file=sys.stderr)
         return 2

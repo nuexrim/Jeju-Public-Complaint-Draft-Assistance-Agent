@@ -31,7 +31,8 @@
 | 읍면동 공간키 부여 | 동작 (이름·법정동 연계표·좌표 공간조인) |
 | 데이터셋 카드 | 동작 (1,330건) |
 | 카탈로그 검색 | 동작 (BM25 + 개념 태그 가산 + 공간·최신성 순위. bge-m3 임베딩은 예정) |
-| 지표 계산·판정·차트 | 동작 (지표 13개, 읽기 전용 SQL, 규칙 판정, 비교군 막대그래프 PNG) |
+| 지표 계산·판정·차트 | 동작 (지표 13개, 읽기 전용 SQL, 규칙 판정, 간접 지표 강등, 비교군 막대그래프 PNG) |
+| 주장 해석 선택지 | 동작 (`--interpret`: 계산 가능한 뜻·자료 없는 뜻·기타 직접 쓰기. 화면은 대화·초안 모듈) |
 | 온톨로지 개념 확장 | 동작 (결정적 빌드: seed 상위 개념 + RIGOR 직접 매핑, HermiT 일관성 통과, 역량 질문 14/15). RIGOR LLM 보강은 승인 대기 |
 | 카드 개념 태그 | 규칙 태그 동작(615/1,330). LLM 태그·사람 검수는 승인 대기 |
 | LLM 보조(SQL 초안 폴백) | 코드 동작, 기본 mock이라 호출 없음. 공급자·키 확정 후 사용 |
@@ -167,6 +168,7 @@ cd evidence_engine
 python run_engine.py --query tests/fixtures/q01.json
 python run_engine.py --query tests/fixtures/q01.json --out out.json --no-ontology
 python run_engine.py --query tests/fixtures/q01.json --mock    # DB 없이 형식만 확인
+python run_engine.py --query tests/fixtures/q01.json --interpret   # 주장별 해석 선택지
 ```
 
 종료 코드는 성공 0, 입력 계약 위반 또는 파일 오류 2입니다.
@@ -176,6 +178,7 @@ python run_engine.py --query tests/fixtures/q01.json --mock    # DB 없이 형�
 - 지표가 온톨로지 경로로 찾은 테이블을 쓰면 `found_by`가 `ontology` 또는 `both`이고 `relation_path`에 경로가 들어갑니다(예: `병·의원 —하위개념→ 병·의원 정보`).
 - `chart`에는 비교군 막대그래프 경로(`charts/<request_id>_<claim_id>.png`)가 들어갑니다(비교형 지표만).
 - LLM은 기본 `mock`이라 호출하지 않습니다. 공급자를 설정하면 지표가 없는 claim에만 SQL 초안을 받아 읽기 전용으로 실행하고, 그 결과에는 검토 전이라는 caveat가 붙습니다. LLM이 실패하면 지표와 규칙만으로 결과를 냅니다.
+- 주장이 말하는 측면(운행 횟수·배차, 이용 실적, 거리·이용 어려움, 시설 수, 위험·사고)과 지표가 재는 측면이 다르면 간접 지표로 봅니다. `caveats`에 `간접 지표: …`를 남기고 `supported`는 `partial`로 낮춥니다. 그 측면을 재는 데이터가 없으면 `gaps`에도 남깁니다(예: "버스가 줄었다"를 승차 인원으로 본 경우 → 버스 운행 횟수·배차 간격 빈칸).
 - 맞는 지표나 데이터가 없으면 값을 만들지 않고 `unverifiable`과 `gaps`로 돌려줍니다(예: 무더위쉼터는 온톨로지가 `detected_by: "ontology"`로 검출).
 - 서귀포시 7개 동(송산·정방·중앙·천지·영천·동홍·서홍)은 법정동이 여러 행정동에 걸쳐 인구를 확정할 수 없어 인구 기준 지표에서 빠집니다.
 
@@ -201,11 +204,22 @@ python -m pytest
 | `request_id` | 예 | 요청 고유값 |
 | `normalized_text` | 예 | 표준어로 정규화한 문장 |
 | `complaint_type` | 예 | 민원 유형 (교통, 의료 접근, 환경·청소, 안전·재난, 생활물가 권장) |
-| `claims` | 예 | `{id, text}` 목록, 1개 이상 |
+| `claims` | 예 | `{id, text, indicator_id?}` 목록, 1개 이상. `indicator_id`는 해석 선택지에서 사용자가 고른 값 |
 | `location.emd_name` | 예 | 읍면동명. 엔진이 행정동 코드로 바꿉니다. |
 | `location.emd_code` | 아니오 | 행정동 8자리 코드 (예: 구좌읍 `50110256`) |
 | `period` | 아니오 | `{from, to}`, `YYYY-MM` |
 | `raw_text` | 아니오 | 원문. 엔진은 받자마자 버리고 로그에 남기지 않습니다. |
+
+**주장 해석 선택지 (엔진 → 대화·초안 모듈, `interpretation.schema.json`)**
+
+근거를 계산하기 전에 주장마다 "이런 뜻인가요?" 선택지를 받아 사용자가 고르게 할 수 있습니다. 엔진이 뜻을 혼자 정하면 다른 뜻의 지표로 판정할 수 있기 때문입니다.
+
+1. 구조화 질의로 `run_engine.interpret(query)`를 부릅니다(CLI `--interpret`).
+2. 주장마다 `options[]`가 옵니다. `kind`는 `indicator`(계산 가능), `no_data`(그 뜻을 확인할 자료 없음, `indicator_id = "gap:<id>"`), `other`(기타·직접 쓰기)입니다. 맨 앞이 `recommended`이고 맨 끝은 항상 기타입니다.
+3. 사용자가 고르면 `claims[i].text`를 고른 문장으로, `claims[i].indicator_id`를 고른 값으로 바꿔 `run()`을 부릅니다. 엔진은 그 지표로 계산하고 간접 지표 강등을 하지 않습니다.
+4. 기타를 고르면 사용자가 쓴 문장을 `claims[i].text`에 넣고 `indicator_id` 없이 다시 `interpret()` 또는 `run()`을 부릅니다.
+
+선택지 문장은 `indicators/registry.yaml`의 `ask` 틀로만 만들어 민원 원문(개인정보)을 옮기지 않습니다.
 
 **근거 패키지 (엔진 → 대화·초안 모듈)**
 

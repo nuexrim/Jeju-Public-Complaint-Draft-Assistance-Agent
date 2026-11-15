@@ -54,6 +54,52 @@ def known_gap(claim_text: str, context_text: str, registry: dict | None = None) 
     return None
 
 
+def indicator_by_id(indicator_id: str, registry: dict | None = None) -> dict | None:
+    registry = registry or load_registry()
+    return next((i for i in registry["indicators"] if i["id"] == indicator_id), None)
+
+
+def gap_by_id(gap_id: str, registry: dict | None = None) -> dict | None:
+    registry = registry or load_registry()
+    return next((g for g in registry.get("known_gaps", []) if g.get("id") == gap_id), None)
+
+
+def claim_aspect(claim_text: str, registry: dict | None = None) -> str | None:
+    """주장이 말하는 측면(usage/service/risk/access/supply). 단서가 없으면 None(판단 보류)."""
+    registry = registry or load_registry()
+    for a in registry.get("aspects", []):
+        if _has(claim_text, a["cues"]):
+            return a["id"]
+    return None
+
+
+def aspect_name(aspect_id: str | None, registry: dict | None = None) -> str | None:
+    registry = registry or load_registry()
+    return next((a["name"] for a in registry.get("aspects", []) if a["id"] == aspect_id), None)
+
+
+def claim_topics(claim_text: str, context_text: str = "", registry: dict | None = None) -> list[str]:
+    """주장 문장의 주제. 문장에 없으면 context(targets 등)에서 찾는다."""
+    registry = registry or load_registry()
+    for text in (claim_text, context_text):
+        found = [t["id"] for t in registry.get("topics", []) if _has(text, t["cues"])]
+        if found:
+            return found
+    return []
+
+
+def proxy_gap(indicator: dict, aspect: str | None, registry: dict | None = None) -> dict | None:
+    """주장 측면이 지표 측면과 다를 때, 그 측면을 재는 데이터가 없다고 등록된 빈칸(예: 버스 운행 횟수)."""
+    registry = registry or load_registry()
+    if not aspect or aspect == indicator.get("measures"):
+        return None
+    # 같은 주제에 그 측면을 재는 지표가 있으면 데이터가 없는 게 아니라 지표를 잘못 고른 것 → 빈칸으로 보지 않는다
+    if any(i.get("topic") == indicator.get("topic") and i.get("measures") == aspect for i in registry["indicators"]):
+        return None
+    return next((g for g in registry.get("known_gaps", [])
+                 if g.get("topic") == indicator.get("topic") and g.get("aspect") == aspect), None)
+
+
 @dataclass
 class IndicatorResult:
     indicator: dict

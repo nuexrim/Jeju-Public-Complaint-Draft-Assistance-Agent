@@ -39,10 +39,22 @@ def _validate(name: str, doc: dict) -> None:
 
 def validate_query(doc: dict) -> None:
     _validate("query", doc)
+    from indicators.library import gap_by_id, indicator_by_id
+    for c in doc["claims"]:
+        chosen = c.get("indicator_id")
+        if not chosen:
+            continue
+        ok = gap_by_id(chosen[4:]) if chosen.startswith("gap:") else indicator_by_id(chosen)
+        if not ok:
+            raise ContractError(f"query 계약 위반:\n  claims/{c['id']}/indicator_id: 등록되지 않은 값 '{chosen}'")
 
 
 def validate_package(doc: dict) -> None:
     _validate("evidence", doc)
+
+
+def validate_interpretation(doc: dict) -> None:
+    _validate("interpretation", doc)
 
 
 @lru_cache(maxsize=None)

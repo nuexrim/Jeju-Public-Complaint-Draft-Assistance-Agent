@@ -15,7 +15,8 @@ from pathlib import Path
 from compute.charts import comparison_bar
 from compute.sql_runner import SQLRunner
 from indicators.library import (
-    comparison_group, compute, describe, known_gap, median, select_indicator,
+    aspect_name, claim_aspect, comparison_group, compute, describe, gap_by_id, indicator_by_id, known_gap,
+    median, proxy_gap, select_indicator,
 )
 from package.builder import resolve_emd, validate_package
 from retrieval.catalog_search import claim_query, search
@@ -112,9 +113,22 @@ class Engine:
         kw = dict(today=self.today, max_missing=th["max_missing_ratio"], max_years=th["max_staleness_years"])
         cands = rank(hits, onto_hits, self.datasets, self.config["ranking"], **kw)
         catalog_top = {c.card_id for c in rank(hits, None, self.datasets, self.config["ranking"], **kw)}
-        indicator, _ = select_indicator(claim["text"], context, self.tables)
         empty = {"claim_id": claim["id"], "value": None, "unit": None, "region_compare": None, "sources": [],
                  "found_by": "catalog", "relation_path": None, "chart": None}
+        chosen = claim.get("indicator_id")          # 해석 선택지에서 사용자가 고른 뜻 (package/interpret.py)
+        if chosen and chosen.startswith("gap:"):
+            gap = gap_by_id(chosen[4:])
+            entry = {"concept": gap["concept"], "reason": gap["reason"], "detected_by": "catalog"}
+            if entry not in gaps:
+                gaps.append(entry)
+            return {**empty, "verdict": "unverifiable", "indicator": "해당 지표 없음",
+                    "caveats": [f"사용자가 고른 뜻({gap['concept']})을 확인할 데이터가 없어 판정하지 않음"]}
+        if chosen:
+            indicator = indicator_by_id(chosen)
+            if not set(indicator["tables"]) <= self.tables:
+                indicator = None
+        else:
+            indicator, _ = select_indicator(claim["text"], context, self.tables)
 
         for g in exp.gaps:
             if g not in gaps:
@@ -169,6 +183,11 @@ class Engine:
         j = judge(indicator["rule"], result.value, peers=peers, worse=indicator.get("worse", "high"),
                   params=self.config.get("verdict"))
         caveats.append(f"판정 근거: {j.detail}")
+        verdict = j.verdict
+        if chosen:
+            caveats.append("사용자가 해석 선택지에서 고른 뜻으로 계산")
+        else:
+            verdict = self._proxy_check(claim["text"], indicator, verdict, caveats, gaps)
         found_by, relation_path = self._found_by(indicator, catalog_top, exp)
         if found_by == "catalog" and not self._main_card(indicator) in catalog_top:
             caveats.append("카탈로그 검색 상위 5개 밖의 데이터셋을 지표 정의로 사용")
@@ -177,7 +196,7 @@ class Engine:
             "found_by": found_by,
             "relation_path": relation_path,
             "chart": chart,
-            "verdict": j.verdict,
+            "verdict": verdict,
             "indicator": f"{indicator['name']} · {emd_label if indicator['scope'] == 'emd' else '제주 전체'}",
             "value": None if result.value is None else round(result.value, 3),
             "unit": indicator["unit"] if result.value is not None else None,
@@ -185,6 +204,35 @@ class Engine:
             "sources": sources if result.value is not None else [],
             "caveats": caveats,
         }
+
+    @staticmethod
+    def _proxy_check(claim_text: str, indicator: dict, verdict: str, caveats: list, gaps: list) -> str:
+        """주장이 말하는 측면과 지표가 재는 측면이 다르면 간접 지표: 지지는 부분으로 낮추고 이유를 남긴다."""
+        aspect = claim_aspect(claim_text)
+        if not aspect or aspect == indicator.get("measures"):
+            return verdict
+        caveats.append(f"간접 지표: 주장은 '{aspect_name(aspect)}'에 관한 것인데 이 지표는 "
+                       f"'{aspect_name(indicator.get('measures'))}'을(를) 잼")
+        gap = proxy_gap(indicator, aspect)
+        if gap:
+            entry = {"concept": gap["concept"], "reason": gap["reason"], "detected_by": "catalog"}
+            if entry not in gaps:
+                gaps.append(entry)
+        if verdict == "supported":
+            caveats.append("간접 지표라 '지지'를 '부분 지지'로 낮춤")
+            return "partial"
+        if verdict == "contradicted":
+            caveats.append("간접 지표라 반박 근거로도 약함")
+        return verdict
+
+    def interpret(self, query: dict) -> dict:
+        """주장별 해석 선택지 (package/interpret.py). query 는 마스킹된 사본."""
+        from package.builder import validate_interpretation
+        from package.interpret import interpret
+        emd_code, _ = resolve_emd(query["location"], self.emd_codes_path)
+        out = interpret(query, self.tables, self.emd_names.get(emd_code) if emd_code else None)
+        validate_interpretation(out)
+        return out
 
     def _sql_fallback(self, query, claim, cands, emd_code, emd_label, empty) -> dict | None:
         """지표가 없는 claim: LLM이 쓴 읽기 전용 SQL 초안을 실행하고, 판정은 규칙(rank)으로 한다."""

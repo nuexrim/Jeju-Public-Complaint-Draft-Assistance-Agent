@@ -20,7 +20,8 @@
         "additionalProperties": false,
         "properties": {
           "id": {"type": "string", "minLength": 1},
-          "text": {"type": "string", "minLength": 1}
+          "text": {"type": "string", "minLength": 1},
+          "indicator_id": {"type": "string", "minLength": 1, "description": "해석 선택지(interpret)에서 사용자가 고른 지표 id 또는 gap:<id>. 있으면 엔진이 지표를 새로 고르지 않는다."}
         }
       }
     },

@@ -6,6 +6,13 @@
 #   excludes : claim·민원 본문·targets 어디에든 있으면 후보에서 뺀다 (예: 폭염 대피 ≠ 이재민 시설)
 #   bonus    : claim 문장에 있으면 가산점 (예: '노인'이 있으면 노인 인구 기준 지표를 우선)
 #
+# 뜻 맞추기 (주장이 말하는 것과 지표가 재는 것이 같은가)
+#   topic    : 주제 묶음 (아래 topics). 해석 선택지는 주장과 같은 주제의 지표에서 고른다.
+#   measures : 이 지표가 실제로 재는 측면 (아래 aspects). 주장 측면과 다르면 '간접 지표'로 보고
+#              지지(supported)를 부분(partial)으로 낮추고 주의 문구를 단다.
+#   ask      : 해석 선택지로 사용자에게 보여 줄 쉬운 문장. {emd} 는 읍면동 이름으로 바뀐다.
+#   option_requires : 이 중 하나가 주장·민원 본문·targets 에 있어야 선택지로 보인다 (예: 노인 기준 지표)
+#
 # 계산 결과 형태
 #   scope: emd  → SQL이 (emd_code, value) 를 43개 행정동 모두에 대해 돌려준다. 대상 읍면동 값과 비교군을 함께 본다.
 #   scope: jeju → SQL이 value 한 개를 돌려준다(제주 전체). 읍면동 비교가 불가능하므로 판정은 unverifiable.
@@ -20,6 +27,9 @@
 indicators:
   - id: clinic_per_1k_pop
     name: 인구 1천 명당 의원 수
+    topic: medical
+    measures: supply
+    ask: "{emd} 인구에 비해 동네 의원(병원) 수가 적다"
     unit: 곳/인구 1천 명
     tables: [hospital, pop_emd]
     keywords: [의원, 병원, 의료기관, 진료, 의료]
@@ -36,6 +46,10 @@ indicators:
 
   - id: clinic_per_1k_elderly
     name: 노인(65세 이상) 1천 명당 의원 수
+    topic: medical
+    measures: supply
+    ask: "{emd} 어르신 수에 비해 동네 의원(병원) 수가 적다"
+    option_requires: [노인, 어르신, 고령, 할머니, 할아버지]
     unit: 곳/노인 1천 명
     tables: [hospital, elderly_pop_emd]
     keywords: [의원, 병원, 의료기관, 진료, 의료]
@@ -53,6 +67,9 @@ indicators:
 
   - id: night_pharmacy_count
     name: 공공심야약국 수
+    topic: medical
+    measures: supply
+    ask: "{emd}에 밤늦게 여는 공공심야약국이 없다"
     unit: 곳
     tables: [night_pharmacy]
     keywords: [약국, 야간, 심야, 밤]
@@ -67,6 +84,9 @@ indicators:
 
   - id: emergency_distance_km
     name: 가장 가까운 응급의료기관까지 거리
+    topic: medical
+    measures: access
+    ask: "{emd}에서 응급실(응급의료기관)까지 너무 멀다"
     unit: km
     tables: [emergency_medical_center, emd_geo]
     keywords: [응급, 응급실, 응급의료, 멀다, 거리, 멀어]
@@ -87,6 +107,9 @@ indicators:
 
   - id: bus_stop_per_1k_pop
     name: 인구 1천 명당 버스 정류소 수
+    topic: bus
+    measures: supply
+    ask: "{emd} 인구에 비해 버스 정류소가 적다"
     unit: 곳/인구 1천 명
     tables: [bus_stop, pop_emd]
     keywords: [정류소, 정류장, 버스]
@@ -103,6 +126,9 @@ indicators:
 
   - id: bus_usage_change_pct
     name: 버스 정류소 이용 인원 증감률(최근 12개월 vs 직전 12개월)
+    topic: bus
+    measures: usage
+    ask: "{emd} 정류소에서 버스를 타는 사람이 1년 전보다 줄었다"
     unit: "%"
     tables: [bus_usage_monthly]
     keywords: [버스, 줄었, 줄어, 감소, 줄, 감편, 끊]
@@ -123,6 +149,10 @@ indicators:
 
   - id: elderly_bus_use_per_capita
     name: 노인 1인당 연간 경로 승차 인원(최근 12개월)
+    topic: bus
+    measures: usage
+    ask: "{emd} 어르신들이 버스를 적게 탄다(경로 승차 인원이 적다)"
+    option_requires: [노인, 어르신, 고령, 할머니, 할아버지]
     unit: 회/노인 1명
     tables: [bus_usage_monthly, elderly_pop_emd]
     keywords: [버스, 이용, 타기, 승차]
@@ -143,6 +173,9 @@ indicators:
 
   - id: evening_bus_share_jeju
     name: 제주 전체 버스 승차 중 19시 이후 비중(최근 12개월)
+    topic: bus
+    measures: usage
+    ask: "저녁 7시 이후 버스를 타는 사람이 적다(읍면동 자료 없이 제주 전체 기준)"
     unit: "%"
     tables: [bus_boarding_hourly]
     keywords: [저녁, 야간, 밤, 시간대, 귀가, 막차]
@@ -159,6 +192,9 @@ indicators:
 
   - id: accident_hotspot_occurrences
     name: 교통사고 다발지역 사고 건수
+    topic: traffic_safety
+    measures: risk
+    ask: "{emd}에 교통사고가 자주 나는 곳이 많다"
     unit: 건
     tables: [accident_hotspot]
     keywords: [교통사고, 사고, 위험]
@@ -174,6 +210,9 @@ indicators:
 
   - id: school_risk_points
     name: 초등학교 통학로 위험 지점 수
+    topic: traffic_safety
+    measures: risk
+    ask: "{emd} 초등학교 통학길에 위험한 곳이 많다"
     unit: 곳
     tables: [school_risk_point]
     keywords: [어린이, 통학, 학교, 스쿨존, 초등, 위험, 사고]
@@ -188,6 +227,9 @@ indicators:
 
   - id: clean_house_pop_per_site
     name: 클린하우스 1곳당 인구
+    topic: waste
+    measures: supply
+    ask: "{emd} 인구에 비해 클린하우스가 적다"
     unit: 명/곳
     tables: [clean_house_jeju, clean_house_seogwipo, pop_emd]
     keywords: [클린하우스, 쓰레기, 분리배출, 넘쳐]
@@ -207,6 +249,9 @@ indicators:
   # 시설이 0곳인 읍면동(예: 한경면)도 비교에 넣으려고 '1곳당 인구'가 아니라 '인구당 시설 수'로 계산한다.
   - id: recycling_center_per_10k_pop
     name: 인구 1만 명당 재활용도움센터 수
+    topic: waste
+    measures: supply
+    ask: "{emd} 인구에 비해 재활용도움센터가 적다"
     unit: 곳/인구 1만 명
     tables: [recycling_center, pop_emd]
     keywords: [재활용도움센터, 재활용, 도움센터]
@@ -222,6 +267,9 @@ indicators:
 
   - id: refugee_facility_per_10k_pop
     name: 인구 1만 명당 이재민 수용·임시주거시설 수
+    topic: disaster
+    measures: supply
+    ask: "{emd} 인구에 비해 이재민 임시주거시설이 적다"
     unit: 곳/인구 1만 명
     tables: [refugee_facility_jeju, refugee_facility_seogwipo, pop_emd]
     keywords: [이재민, 임시주거, 수용시설, 대피, 태풍, 재난]
@@ -240,8 +288,58 @@ indicators:
       WHERE p.total_pop IS NOT NULL
       GROUP BY p.emd_code, p.total_pop
 
+# 주장이 말하는 측면. 위에서부터 차례로 보고 처음 걸린 것을 쓴다(아무것도 안 걸리면 판단 보류).
+aspects:
+  - id: usage
+    name: 이용 실적
+    cues: [이용객, 이용자, 승객, 타는 사람, 이용이 줄, 이용 인원, 안 탄, 안 타]
+  - id: service
+    name: 운행 횟수·배차
+    cues: [배차, 운행, 노선, 감편, 막차, 버스가 줄, 버스 줄, 버스가 끊, 버스가 안 와, 버스가 없, 버스가 잘 안]
+  - id: risk
+    name: 위험·사고
+    cues: [위험, 사고, 다쳐, 다칠]
+  - id: access
+    name: 거리·이용 어려움
+    cues: [멀, 거리, 어렵, 힘들, 불편, 접근, 못 가, 못 타]
+  - id: supply
+    name: 시설 수
+    cues: [부족, 없다, 없어, 없음, 적다, 적어, 모자라, 더 필요, 늘려]
+
+# 주제 묶음. 주장 문장에서 먼저 찾고, 없으면 targets 에서 찾는다.
+topics:
+  - id: bus
+    cues: [버스, 정류소, 정류장, 노선, 배차, 막차, 승차, 대중교통]
+  - id: medical
+    cues: [병원, 의원, 진료, 의료, 약국, 응급, 아프]
+  - id: waste
+    cues: [쓰레기, 클린하우스, 재활용, 분리배출]
+  - id: traffic_safety
+    cues: [교통사고, 사고, 통학, 스쿨존, 횡단보도]
+  - id: disaster
+    cues: [대피, 이재민, 재난, 태풍, 폭염, 더위, 쉼터, 임시주거]
+
 # 확보하지 못한 데이터. claim 또는 민원 본문에 이 말이 있고 맞는 지표가 없으면 이 사유로 빈칸을 남긴다.
+# id·topic·aspect·ask 가 있으면 해석 선택지에도 '지금 자료로는 확인할 수 없음' 항목으로 나온다(indicator_id = gap:<id>).
 known_gaps:
-  - keywords: [폭염, 무더위, 더위, 쉼터]
+  - id: heat_shelter
+    topic: disaster
+    aspect: supply
+    ask: "폭염 때 쉴 무더위쉼터가 부족하다"
+    keywords: [폭염, 무더위, 더위, 쉼터]
     concept: 무더위쉼터(폭염 대피시설)
     reason: 제주데이터허브 카탈로그와 적재 DB에 무더위쉼터 현황 데이터가 없음
+  - id: bus_service
+    topic: bus
+    aspect: service
+    ask: "버스 운행 횟수나 배차가 줄었다"
+    keywords: [배차, 운행 횟수, 감편]
+    concept: 버스 운행 횟수·배차 간격
+    reason: 버스 노선 기본 정보(2021년 기준)에는 출발·도착 정류소만 있고, 운행 횟수·배차 자료는 적재 DB에 없음
+  - id: night_clinic
+    topic: medical
+    aspect: access
+    ask: "밤이나 주말에 진료하는 병원이 없다"
+    keywords: [야간 진료, 주말 진료, 밤에 진료, 휴일 진료]
+    concept: 야간·휴일 진료 병원
+    reason: 병·의원 정보에 진료 시간 항목이 없음

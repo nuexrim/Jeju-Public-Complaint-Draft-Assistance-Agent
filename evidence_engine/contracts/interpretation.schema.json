@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "interpretation.schema.json",
+  "title": "주장 해석 선택지 (근거 패키지 엔진 → 팀원). 사용자가 고른 선택지의 indicator_id 를 query.claims[].indicator_id 로 돌려보낸다.",
+  "type": "object",
+  "required": [
+    "request_id",
+    "claims"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "claim_id",
+          "aspect",
+          "options",
+          "recommended"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "aspect": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "주장 문장에서 읽은 측면(예: 운행 횟수·배차). 단서가 없으면 null"
+          },
+          "options": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "option_id",
+                "text",
+                "kind",
+                "indicator_id",
+                "measures",
+                "note"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "option_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "kind": {
+                  "enum": [
+                    "indicator",
+                    "no_data",
+                    "other"
+                  ],
+                  "description": "indicator=계산 가능, no_data=그 뜻을 확인할 자료 없음, other=기타(직접 쓰기)"
+                },
+                "indicator_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "measures": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "other"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "indicator_id": {
+                    "type": "null"
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "indicator_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "recommended": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
