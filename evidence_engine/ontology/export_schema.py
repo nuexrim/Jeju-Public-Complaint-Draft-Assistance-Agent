@@ -29,7 +29,7 @@ DOCS = ONTO / "rag_docs" / "generated"
 DB = ENGINE_ROOT / "data" / "jeju.duckdb"
 CARDS = ENGINE_ROOT / "catalog" / "cards.parquet"
 
-SKIP_TABLES = {"dataset", "bus_station_emd"}          # 메타·기술용 테이블
+SKIP_TABLES = {"dataset", "bus_station_emd", "pop_tongban"}          # 메타·기술용 테이블
 SKIP_COLUMNS = {"emd_method", "period"}               # 적재 과정에서 붙인 기술 컬럼
 TYPE_MAP = {
     "VARCHAR": "TEXT", "BIGINT": "INTEGER", "INTEGER": "INTEGER", "SMALLINT": "INTEGER", "TINYINT": "INTEGER",

@@ -27,7 +27,7 @@
 | --- | --- |
 | 입출력 계약(JSON Schema)과 검증 | 동작 |
 | 근거 패키지 엔진 CLI | 동작 (하이브리드 `engine: "hybrid"`, `--no-ontology`면 `"catalog"`, `--mock`이면 계산 없는 가짜 응답) |
-| 데이터 수집·DuckDB 적재 | 동작 (52개 테이블, 데이터허브 등록 데이터명 기준 47종) |
+| 데이터 수집·DuckDB 적재 | 동작 (54개 테이블, 데이터허브 등록 데이터명 기준 48종) |
 | 읍면동 공간키 부여 | 동작 (이름·법정동 연계표·좌표 공간조인) |
 | 데이터셋 카드 | 동작 (1,330건) |
 | 카탈로그 검색 | 동작 (BM25 + 개념 태그 가산 + 공간·최신성 순위. bge-m3 임베딩은 예정) |
@@ -124,6 +124,7 @@ pip install -r evidence_engine/requirements.txt
 | 이름 | 용도 | 발급 |
 | --- | --- | --- |
 | `JEJUDATAHUB_PROJECT_KEY` | 제주데이터허브 Open API 호출 | 데이터허브 회원가입 → 프로젝트 생성 → 키 발급. 쓸 API마다 데이터 상세 화면에서 "프로젝트 담기"를 해야 합니다(안 하면 HTTP 403). |
+| `DATA_GO_KR_SERVICE_KEY` | 공공데이터포털 Open API 호출(행정동 통·반 인구) | data.go.kr 회원가입 → API 상세에서 활용신청 → 마이페이지의 일반 인증키(Decoding). 과금 없음 |
 | `ANTHROPIC_API_KEY` | Claude 호출: RIGOR 온톨로지 보강·개념 태그(`dev_llm`), SQL 초안(`llm`) | console.anthropic.com → API Keys. 월 사용 한도를 걸어 둡니다. |
 | `OPENROUTER_API_KEY` | 선택. `provider: openrouter`로 바꿀 때만(여러 모델 비교 등) | openrouter.ai → Keys |
 
@@ -137,8 +138,8 @@ LLM 설정은 `config.yaml`의 두 곳입니다. `dev_llm`은 개발 단계 일�
 1. **데이터허브 목록**: `python data/ingest/fetch_hub_catalog.py`
 2. **데이터허브 FILE**: `python data/ingest/hub_files.py` (약 624MB 파일까지 받으려면 `--large`)
 3. **데이터허브 API**: `python data/ingest/hub_api.py` (`.env`의 키 필요, API별 하루 1,000건 쿼터)
-4. **공공데이터포털 파일**: `datasets.yaml`의 `portal_files`에 적힌 17개 파일을 공공데이터포털에서 내려받아 `raw/datagokr/`에 파일명 그대로 넣습니다.
-5. **법정동 연계표·인구**: [국가데이터처_법정동 연계정보](https://www.data.go.kr/data/15136368/fileData.do) CSV와 [행정안전부_지역별(법정동) 성별 연령별 주민등록 인구수](https://www.data.go.kr/data/15099158/fileData.do) CSV를 `raw/emd_link/`에 넣습니다.
+4. **공공데이터포털 파일**: `datasets.yaml`의 `portal_files`에 적힌 18개 파일을 공공데이터포털에서 내려받아 `raw/datagokr/`에 파일명 그대로 넣습니다.
+5. **법정동 연계표·인구**: [국가데이터처_법정동 연계정보](https://www.data.go.kr/data/15136368/fileData.do) CSV와 [행정안전부_지역별(법정동) 성별 연령별 주민등록 인구수](https://www.data.go.kr/data/15099158/fileData.do) CSV를 `raw/emd_link/`에 넣습니다. 이어서 `python data/ingest/portal_api.py --month <인구 파일 기준월 YYYY-MM>`로 법정동이 여러 행정동에 걸치는 곳(서귀포 7개 동)의 통·반 인구를 받습니다(`.env`의 `DATA_GO_KR_SERVICE_KEY` 필요).
 6. **행정동 경계**: [vuski/admdongkor](https://github.com/vuski/admdongkor)의 `HangJeongDong_ver<날짜>.geojson`을 `raw/boundary/`에 넣습니다.
 7. **빅데이터센터 데이터 명세서**: 센터에서 받은 명세서 xlsx를 `raw/center/`에 넣습니다(카드 생성용, 외부 공개 금지).
 8. **적재**: `python data/build_db.py` → `data/jeju.duckdb` 생성 (약 20초). 끝에 파생 테이블(`pop_emd`, `emd_geo`, `bus_usage_monthly`)도 만듭니다. 파생 테이블만 다시 만들 때는 `python data/derived.py`
@@ -180,7 +181,9 @@ python run_engine.py --query tests/fixtures/q01.json --interpret   # 주장별 �
 - LLM은 기본 `mock`이라 호출하지 않습니다. 공급자를 설정하면 지표가 없는 claim에만 SQL 초안을 받아 읽기 전용으로 실행하고, 그 결과에는 검토 전이라는 caveat가 붙습니다. LLM이 실패하면 지표와 규칙만으로 결과를 냅니다.
 - 주장이 말하는 측면(운행 횟수·배차, 이용 실적, 거리·이용 어려움, 시설 수, 위험·사고)과 지표가 재는 측면이 다르면 간접 지표로 봅니다. `caveats`에 `간접 지표: …`를 남기고 `supported`는 `partial`로 낮춥니다. 그 측면을 재는 데이터가 없으면 `gaps`에도 남깁니다(예: "버스가 줄었다"를 승차 인원으로 본 경우 → 버스 운행 횟수·배차 간격 빈칸).
 - 맞는 지표나 데이터가 없으면 값을 만들지 않고 `unverifiable`과 `gaps`로 돌려줍니다(예: 무더위쉼터는 온톨로지가 `detected_by: "ontology"`로 검출).
-- 서귀포시 7개 동(송산·정방·중앙·천지·영천·동홍·서홍)은 법정동이 여러 행정동에 걸쳐 인구를 확정할 수 없어 인구 기준 지표에서 빠집니다.
+- 서귀포시 7개 동(송산·정방·중앙·천지·영천·동홍·서홍)은 법정동이 여러 행정동에 걸쳐 법정동 인구로는 나눌 수 없어, 행정안전부 통·반 단위 인구를 행정동코드로 더해 채웁니다(총인구만, 65세 이상은 없음). 통·반 파일이 없으면 인구 기준 지표에서 빠집니다.
+- 버스 정류소 이용 실적은 정류소 이름만 있어 이름으로 행정동에 연결합니다(띄어쓰기·쉼표·괄호 설명 차이는 맞춰 줌). 같은 이름의 정류소가 여러 행정동에 있으면 연결하지 않으며, 전체 이용 인원의 86.0%(최근 12개월 90.9%)가 연결됩니다.
+- 버스 운행 횟수·배차는 읍면 지선 노선의 현재 값(`bus_branch_route`, 2025-12-31)만 있어 판정 지표로 쓰지 않고 빈칸 사유에 적습니다. 간선·급행 노선과 과거 값이 없어 줄었는지 판단할 수 없기 때문입니다.
 
 ## 테스트
 

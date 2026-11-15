@@ -63,6 +63,7 @@ portal_files:
   - {hub_id: 424,  portal_id: 3082504,  complaint: 안전·재난, table: refugee_facility_seogwipo, file: 제주특별자치도 서귀포시_이재민임시거주시설현황_20241024.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}, emd: {mode: address, columns: [주소]}, latlon: [위도, 경도]}
   - {hub_id: 436,  portal_id: 15056033, complaint: 안전·재난, table: steep_slope_jeju, file: 제주특별자치도 제주시_붕괴위험급경사지지정현황_20260630.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}, emd: {mode: address, columns: [위치]}}
   - {hub_id: 66,   portal_id: 15000484, complaint: 생활물가, table: good_price_seogwipo, file: 제주특별자치도 서귀포시_착한가격업소정보_20260731.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}, emd: {mode: address, columns: [주소]}, latlon: [위도, 경도]}
+  - {hub_id: 311,  portal_id: 15051472, complaint: 교통, table: bus_branch_route, file: 제주특별자치도_읍면지선버스노선현황_20251231.csv, period: {column: 데이터기준일자, format: yyyy-mm-dd}}
   - {hub_id: 1332, portal_id: 15051469, complaint: 생활물가, table: price_index, file: 제주특별자치도_제주지역물가지수동향_20250101.csv, period: {column: 해당연도, format: yyyy}}
 
 # hub_apis: 데이터허브 Open API (프로젝트 키 필요, 과금 없음, API별 하루 쿼터 1,000건)

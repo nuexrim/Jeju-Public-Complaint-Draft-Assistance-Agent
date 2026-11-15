@@ -1,5 +1,7 @@
 """파생 테이블: 법정동 인구 → 행정동 합산, 경계 면적·중심점."""
-from data.derived import population_by_emd
+import duckdb
+
+from data.derived import build_bus_usage, population_by_emd
 from data.spatial.boundary import emd_geometry, haversine_km
 
 EMD = "emd_code,sigungu_name,emd_name\n50110250,제주시,한림읍\n50130570,서귀포시,동홍동\n50130580,서귀포시,서홍동\n"
@@ -34,6 +36,49 @@ def test_population_sums_unique_links_and_blanks_split_dongs(tmp_path):
     assert got["50130570"] == (None, None, "ambiguous")
     assert got["50130580"] == (None, None, "ambiguous")
     assert month == "2026-10"
+
+
+def test_split_dongs_filled_from_tongban_population(tmp_path):
+    (tmp_path / "emd.csv").write_text(EMD, encoding="utf-8")
+    (tmp_path / "link.csv").write_text(LINK, encoding="utf-8-sig")
+    (tmp_path / "pop.csv").write_bytes(_pop_csv().encode("cp949"))
+    rows, _ = population_by_emd(tmp_path / "pop.csv", tmp_path / "link.csv", tmp_path / "emd.csv",
+                                tongban={"50130570": 600, "50130580": 399})
+    got = {r[0]: r[1:] for r in rows}
+    # 통·반 인구는 행정동코드가 있어 정확히 나뉜다. 연령은 없어 65세 이상은 비워 둔다
+    assert got["50130570"] == (600, None, "tongban")
+    assert got["50130580"] == (399, None, "tongban")
+    assert got["50110250"] == (150, 40, "ok")
+
+
+def test_ri_missing_from_link_table_falls_back_to_eupmyeon_name(tmp_path):
+    (tmp_path / "emd.csv").write_text(EMD, encoding="utf-8")
+    (tmp_path / "link.csv").write_text(LINK, encoding="utf-8-sig")
+    pop = _pop_csv().replace("5011025022,202610,제주특별자치도,x,x,x,",
+                             "5011025099,202610,제주특별자치도,제주시,한림읍,새리,")
+    (tmp_path / "pop.csv").write_bytes(pop.encode("cp949"))
+    rows, _ = population_by_emd(tmp_path / "pop.csv", tmp_path / "link.csv", tmp_path / "emd.csv")
+    assert {r[0]: r[1] for r in rows}["50110250"] == 150
+
+
+def test_bus_usage_matches_names_despite_spacing_and_skips_split_names():
+    con = duckdb.connect()
+    con.execute("CREATE TABLE bus_stop (stationName VARCHAR, emd_code VARCHAR)")
+    con.executemany("INSERT INTO bus_stop VALUES (?, ?)", [
+        ("제주도청 신제주로터리", "A"),
+        ("제주국제공항3(용담,시청)", "B"),
+        ("한림여중(동)", "C"),
+        ("시민회관", "D"), ("시민회관", "E"),          # 같은 이름이 두 행정동에 있음
+    ])
+    con.execute("CREATE TABLE bus_stop_usage_by_user_type (station_name VARCHAR, user_type VARCHAR, "
+                "user_count BIGINT, period VARCHAR)")
+    con.executemany("INSERT INTO bus_stop_usage_by_user_type VALUES (?, '일반', ?, '2026-01-01')", [
+        ("제주도청신제주로터리", 10), ("제주국제공항3(용담시청)", 20), ("한림여중", 30),
+        ("시민회관", 40), ("없는정류소", 0),
+    ])
+    assert build_bus_usage(con) == "이용 인원의 60.0%를 행정동에 연결"
+    got = dict(con.execute("SELECT station_name, emd_code FROM bus_station_emd").fetchall())
+    assert got == {"제주도청신제주로터리": "A", "제주국제공항3(용담시청)": "B", "한림여중": "C"}
 
 
 def test_area_and_centroid_of_square():

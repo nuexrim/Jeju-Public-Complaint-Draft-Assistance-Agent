@@ -52,7 +52,7 @@ def test_load_table_rejects_unknown_column(tmp_path):
 
 
 PORTAL_TABLES = {
-    "elderly_pop_emd": 43, "senior_center_all": 474, "clean_house_jeju": 1294, "night_pharmacy": 6,
+    "elderly_pop_emd": 43, "senior_center_all": 474, "clean_house_jeju": 1294, "night_pharmacy": 6, "bus_branch_route": 26,
 }
 
 
@@ -66,7 +66,7 @@ def test_built_db_has_portal_tables_with_sources():
     for table, rows in PORTAL_TABLES.items():
         assert con.execute(f"SELECT count(*) FROM {table}").fetchone()[0] == rows
     kinds = dict(con.execute("SELECT source_kind, count(*) FROM dataset GROUP BY 1").fetchall())
-    assert kinds["datagokr_file"] == 17
+    assert kinds["datagokr_file"] == 18
     if "hub_api" in kinds:  # API 수집본이 있을 때만
         assert kinds["hub_api"] == 6
         assert con.execute("SELECT count(*) FROM bus_stop WHERE latitude IS NULL").fetchone()[0] == 0

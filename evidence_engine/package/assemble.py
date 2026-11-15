@@ -31,6 +31,7 @@ ENGINE_ROOT = Path(__file__).resolve().parent.parent
 DERIVED_SOURCES = {
     "bus_usage_monthly": ["bus_stop_usage_by_user_type", "bus_stop"],
     "bus_station_emd": ["bus_stop"],
+    "pop_emd": ["pop_emd", "pop_tongban"],   # 법정동이 여러 행정동에 걸친 서귀포 7개 동은 통·반 인구로 채움
 }
 BOUNDARY_SOURCE = {
     "dataset": "행정동 경계(통계청 SGIS 원자료, vuski/admdongkor 가공 HangJeongDong_ver20261001)",

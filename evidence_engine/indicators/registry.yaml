@@ -335,7 +335,7 @@ known_gaps:
     ask: "버스 운행 횟수나 배차가 줄었다"
     keywords: [배차, 운행 횟수, 감편]
     concept: 버스 운행 횟수·배차 간격
-    reason: 버스 노선 기본 정보(2021년 기준)에는 출발·도착 정류소만 있고, 운행 횟수·배차 자료는 적재 DB에 없음
+    reason: 운행 횟수·배차는 읍면 지선 노선의 현재 값(2025-12-31, bus_branch_route)만 있고 간선·급행 노선과 과거 값이 없어, 줄었는지나 다른 지역보다 적은지 판정할 수 없음
   - id: night_clinic
     topic: medical
     aspect: access
