@@ -18,8 +18,9 @@ __pycache__/
 .DS_Store
 
 # 평가 결과 중 AI Hub 문장이 들어간 파일 (summary.json만 공유)
-results/pred_*.jsonl
-results/examples_*.md
+# 모델별 하위 폴더(results/<모델>/...)까지 막는다. 예전 패턴은 results/ 바로 아래만 막아 하위 폴더 파일이 올라갔었다.
+results/**/pred_*.jsonl
+results/**/examples_*.md
 
 # LLM 사용량 기록
 logs/

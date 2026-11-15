@@ -73,3 +73,16 @@ def test_engine_package_has_no_personal_data_or_claim_text_in_gaps(use_ontology)
     claim_texts = [c["text"] for c in mask_query(PII_QUERY)["claims"]]
     for g in p["gaps"]:
         assert not any(t in g["concept"] or t in g["reason"] for t in claim_texts)
+
+
+def test_words_ending_in_ssi_are_not_names():
+    from package.privacy import mask_with_labels
+    for w in ("오늘날씨가 덥다", "손글씨로 썼다", "아저씨가 그래요", "고운 마음씨"):
+        assert mask_with_labels(w)[1] == [], w
+
+
+def test_local_number_masked_but_year_range_kept():
+    from package.privacy import mask_with_labels
+    assert mask_with_labels("710-2584로 전화 주세요")[1] == ["전화번호"]
+    assert mask_with_labels("2018-2019년 사고")[1] == [] and mask_with_labels("2018-2019 사고")[1] == []
+    assert mask_with_labels("김철수 씨 노형로 123", "○○")[0] == "○○ 씨 노형로 ○○"

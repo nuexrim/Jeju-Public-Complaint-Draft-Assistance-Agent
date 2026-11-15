@@ -88,6 +88,9 @@ def call_json(system: str, user: str, schema: dict, *, purpose: str = "",
 
 def _call_claude(system, user, schema, model, max_tokens, purpose):
     global _client
+    # 키가 없으면 SDK 는 요청 직전에 TypeError 를 낸다 → 호출한 쪽이 'LLM 을 못 씀'으로 처리할 수 있게 LLMError 로 알린다
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        raise LLMError("ANTHROPIC_API_KEY 가 없어요. .env 에 넣거나 환경 변수로 설정해 주세요.")
     import anthropic
     if _client is None:
         _client = anthropic.Anthropic()        # ANTHROPIC_API_KEY 환경변수를 읽음

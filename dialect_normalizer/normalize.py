@@ -290,11 +290,17 @@ def check_evidence(text, llm_out, ddict):
 _res = {}
 
 
+class ResourceMissing(FileNotFoundError):
+    """방언 사전·예문 색인(processed/)이 없을 때. 라이브러리로 쓸 때 호출한 쪽 프로세스를 끝내지 않도록 예외로 알린다."""
+
+
 def _load(use_rag):
     if use_rag and "dict" not in _res:
-        _res["dict"] = DialectDict()
+        if not DICT_PATH.exists():
+            raise ResourceMissing(f"방언 사전이 없어요: {DICT_PATH} (먼저 python3 preprocess.py)")
         if not INDEX_PATH.exists():
-            sys.exit("예문 색인이 없어요. 먼저 실행하세요:  python3 normalize.py --build-index")
+            raise ResourceMissing("예문 색인이 없어요. 먼저 실행하세요:  python3 normalize.py --build-index")
+        _res["dict"] = DialectDict()
         _res["index"] = ExampleIndex()
     return _res.get("dict"), _res.get("index")
 
@@ -358,7 +364,10 @@ def main():
         return
 
     def run(t):
-        r = normalize(t, use_rag=not args.zero_shot)
+        try:
+            r = normalize(t, use_rag=not args.zero_shot)
+        except ResourceMissing as e:          # 명령줄에서는 전처리 안내를 보여 주고 끝낸다(예전 동작과 같음)
+            sys.exit(str(e))
         print(json.dumps(r, ensure_ascii=False, indent=2)) if args.json else pretty(r)
 
     if args.text:

@@ -189,7 +189,7 @@ class LLMClient:
                             "tool_choice": {"type": "auto"}, "messages": messages}
             if self.effort:
                 params["output_config"] = {"effort": self.effort}
-            if self.fallbacks:
+            if self._use_fallbacks():
                 params["betas"] = [FALLBACK_BETA]
                 params["fallbacks"] = "default"
             resp = self._anthropic_create(params)
@@ -216,6 +216,10 @@ class LLMClient:
             disk.parent.mkdir(parents=True, exist_ok=True)
             disk.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
         return trace
+
+    def _use_fallbacks(self) -> bool:
+        """서버측 대체 모델. Claude Haiku 5.5 는 fallbacks 를 받지 않는다(400) — Haiku 로 바꿔도 깨지지 않게 뺀다."""
+        return self.fallbacks and not str(self.model or "").startswith("claude-haiku")
 
     def _mock(self, prompt: str, system: str) -> LLMResponse:
         digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:8]
@@ -246,7 +250,7 @@ class LLMClient:
             params["system"] = system
         if self.effort:
             params["output_config"] = {"effort": self.effort}
-        if self.fallbacks:
+        if self._use_fallbacks():
             params["betas"] = [FALLBACK_BETA]
             params["fallbacks"] = "default"
         resp = self._anthropic_create(params)

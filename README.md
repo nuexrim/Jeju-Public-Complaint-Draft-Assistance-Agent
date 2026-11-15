@@ -12,6 +12,7 @@
 - [시작하기](#시작하기)
 - [데이터 준비](#데이터-준비)
 - [실행](#실행)
+- [연결 실행 (도민 발화 → 근거 패키지)](#연결-실행-도민-발화--근거-패키지)
 - [테스트](#테스트)
 - [모듈 간 인터페이스](#모듈-간-인터페이스)
 - [협업 규칙](#협업-규칙)
@@ -38,7 +39,9 @@
 | 근거 탐색 에이전트 | 코드 동작, 기본 mock이라 호출 없음(대신 지표마다 정해 둔 교차 확인을 붙임). 실제 Claude 호출 시험은 승인 대기 |
 | LLM 보조(SQL 초안 폴백) | 코드 동작, 기본 mock이라 호출 없음. 공급자·키 확정 후 사용 |
 | 재현용 스냅샷 | 동작 (`data/snapshot/2026-11-14`, 약 24MB parquet) |
-| 제주어 이해·민원 초안·UI | 대화·초안 담당 모듈에서 개발 중 (이 브랜치에는 없음) |
+| 제주어 이해·구조화 (`dialect_normalizer/`) | 동작 (사전+예문+Claude 표준어 변환, Claude 구조화, 되묻기 질문). 사전·예문은 AI Hub 원자료로 직접 만들어야 함 |
+| 두 모듈 연결 (`complaint_agent/`) | 동작 (이해 → 되묻기 → 뜻 선택 → 최종 확인 → 근거 패키지, 실패 시 규칙 구조화·엔진 mock) |
+| 민원 초안 생성·UI | 대화·초안 담당이 개발 중 (`handoff` 결과를 입력으로 받음) |
 
 ## 아키텍처
 
@@ -67,6 +70,9 @@ flowchart LR
 .
 ├── README.md
 ├── .gitignore
+├── requirements.txt            # 두 모듈을 한 가상환경에 설치 (-r 두 파일)
+├── complaint_agent/            # 연결 파이프라인과 대화형 실행 (python -m complaint_agent)
+├── dialect_normalizer/         # 제주어 → 표준어, 구조화·되묻기 질문 (자세한 내용은 그 폴더 README)
 └── evidence_engine/            # 근거 패키지 엔진
     ├── run_engine.py           # CLI 진입점
     ├── config.yaml             # 경로·임계값·점수 가중치·LLM 설정 (비밀값 없음)
@@ -107,7 +113,7 @@ Windows (PowerShell):
 ```powershell
 py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install -r evidence_engine\requirements.txt
+pip install -r requirements.txt
 ```
 
 macOS:
@@ -115,8 +121,10 @@ macOS:
 ```bash
 python3.11 -m venv .venv
 source .venv/bin/activate
-pip install -r evidence_engine/requirements.txt
+pip install -r requirements.txt
 ```
+
+근거 엔진만 쓸 때는 `evidence_engine/requirements.txt`만 설치해도 됩니다.
 
 ### 환경 변수
 
@@ -128,9 +136,12 @@ pip install -r evidence_engine/requirements.txt
 | `DATA_GO_KR_SERVICE_KEY` | 공공데이터포털 Open API 호출(행정동 통·반 인구) | data.go.kr 회원가입 → API 상세에서 활용신청 → 마이페이지의 일반 인증키(Decoding). 과금 없음 |
 | `ANTHROPIC_API_KEY` | Claude 호출: RIGOR 온톨로지 보강·개념 태그(`dev_llm`), SQL 초안(`llm`) | console.anthropic.com → API Keys. 월 사용 한도를 걸어 둡니다. |
 | `OPENROUTER_API_KEY` | 선택. `provider: openrouter`로 바꿀 때만(여러 모델 비교 등) | openrouter.ai → Keys |
+| `CLAUDE_MODEL` | 선택. 대화 모듈(정규화·구조화) 모델. 기본 `claude-haiku-5-5` | — |
+| `ALLOW_PAID_CALLS` | 유료 LLM 호출 허용 스위치 | 사람이 실행할 때 셸에서 직접 `1`로 설정할 때만 실제 호출이 나갑니다. 연결 실행(`complaint_agent`)은 `.env`에서 이 값을 읽지 않습니다. |
 
-LLM 설정은 `config.yaml`의 두 곳입니다. `dev_llm`은 개발 단계 일괄 작업(Claude Sonnet 5.5 `claude-sonnet-5-5`, effort `high`), `llm`은 실행 중 SQL 초안(기본 `mock`, 호출 없음)입니다. Claude 호출은 공식 `anthropic` SDK로 하며, 최신 모델은 thinking이 항상 켜져 있어 thinking 토큰도 출력 토큰으로 과금됩니다. 안전 분류기 거절에 대비해 서버측 대체 모델(`fallbacks: "default"`)이 켜져 있습니다.
-| `ALLOW_PAID_CALLS` | 유료 LLM 호출 허용 스위치 | 사람이 직접 `1`로 설정할 때만 실제 호출이 나갑니다. |
+대화 모듈의 키는 `dialect_normalizer/.env`에 둬도 되고, 연결 실행은 두 `.env`에서 `ANTHROPIC_API_KEY`·`CLAUDE_MODEL`·`CLAUDE_THINKING`만 읽습니다.
+
+LLM 설정은 `config.yaml`의 두 곳입니다. `dev_llm`은 개발 단계 일괄 작업(Claude Sonnet 5.5 `claude-sonnet-5-5`, effort `high`), `llm`은 실행 중 SQL 초안(기본 `mock`, 호출 없음)입니다. Claude 호출은 공식 `anthropic` SDK로 하며, 최신 모델은 thinking이 항상 켜져 있어 thinking 토큰도 출력 토큰으로 과금됩니다. 안전 분류기 거절에 대비해 서버측 대체 모델(`fallbacks: "default"`)이 켜져 있습니다(Claude Haiku 5.5는 이 기능을 받지 않아 Haiku 모델일 때는 보내지 않습니다).
 
 ## 데이터 준비
 
@@ -191,14 +202,47 @@ python run_engine.py --query tests/fixtures/q01.json --interpret   # 주장별 �
 
 ## 테스트
 
+세 묶음을 각각 실행합니다(모두 네트워크·유료 호출 없음).
+
 ```bash
-cd evidence_engine
-python -m pytest
+cd evidence_engine && python -m pytest -q          # 근거 엔진
+cd dialect_normalizer && python -m pytest -q       # 제주어 이해·구조화
+python -m pytest -q complaint_agent/tests          # 두 모듈 연결 (저장소 맨 위에서)
 ```
 
 - 기본 실행은 네트워크·유료 호출 없이 끝납니다.
 - 실제 유료 API를 쓰는 테스트는 `@pytest.mark.paid`로 표시되어 있고, `ALLOW_PAID_CALLS=1`이 없으면 건너뜁니다.
 - `data/jeju.duckdb`와 `catalog/cards.parquet`가 있으면 적재 결과 검사, fixtures 10개 실제 계산·검색 상위 5개(`test_engine.py`), 하이브리드·역량 질문(`test_hybrid.py`)도 함께 돌고, 없으면 그 테스트만 건너뜁니다.
+
+## 연결 실행 (도민 발화 → 근거 패키지)
+
+저장소 맨 위에서 실행합니다.
+
+```bash
+python -m complaint_agent "우리 동네 버스가 확 줄어부난 할망덜 병원 가기가 막 힘들어마씸 구좌읍"
+python -m complaint_agent --out handoff.json "..."    # 민원 초안 모델에 넘길 JSON 저장
+python -m complaint_agent --mock-engine "..."          # 근거 DB 없이 형식만
+```
+
+흐름 (`complaint_agent/pipeline.py`의 `Agent`, 대화는 `conversation.py`)
+
+1. **이해**: 개인정보 가리기(LLM에 보내기 전) → 제주어 → 표준어 → Claude 구조화(유형·읍면동·주장·대상·요구사항·기간).
+2. **되묻기** (`dialect_normalizer/structure.py`): 비어 있거나 확실하지 않은 것만 묻습니다. 제주어 뜻 확인, 읍·면·동, 주장이 없을 때 자세한 설명, 요구사항(선택). 답한 자유 입력도 먼저 가립니다. 문장을 고쳐 쓰거나 설명을 덧붙이면 그 문장으로 다시 이해하고, 앞서 받은 읍면동·요구사항은 유지합니다.
+3. **뜻 선택** (엔진 `interpret`): 주장마다 계산 가능한 뜻·자료 없는 뜻·기타(직접 쓰기). 기타는 다시 선택지를 받고, 2번 넘으면 쓴 문장 그대로 계산합니다.
+4. **최종 확인**: 질의 필드로만 만든 문장("[교통 · 구좌읍] … 이렇게 이해했어요. 맞나요?")에 사용자가 답합니다.
+5. **근거**: 엔진 `run` → 근거 패키지. `handoff()`가 가린 질의 + 근거 패키지를 민원 초안 모델에 넘깁니다.
+
+기간은 묻지 않습니다. 엔진의 증감 지표는 원자료의 최근 24개월로 정해져 있어 기간을 받아도 계산이 바뀌지 않고, 사용자가 말한 기간은 caveat에만 반영됩니다.
+
+실패해도 멈추지 않습니다.
+
+| 상황 | 동작 |
+| --- | --- |
+| 제주어 사전·예문(`dialect_normalizer/processed/`)이 없음 | 표준어 변환 없이 구조화 (`notices`에 기록) |
+| Claude를 못 씀 (`ALLOW_PAID_CALLS` 없음, 키 없음, 네트워크·API 오류) | 규칙 구조화: 읍면동은 문장 속 43개 이름 또는 하나로 정해지는 리·법정동 이름(예: 종달리 → 구좌읍), 유형은 엔진 주제 단서(테스트 질의 10개 모두 일치), 주장은 문장 전체 하나. `structured_by: "rules"` |
+| 근거 DB(`data/jeju.duckdb`)가 없음 | 엔진 mock (형식만, 계산값 아님) |
+
+**민원 초안 모델에 넘기는 것 (`handoff`)**: `query`(가린 구조화 질의, `raw_text` 없음), `package`(근거 패키지), `structured_by`(`llm` | `rules`), `notices`(위 실패 기록), `pii_masked`(가린 종류). 초안의 숫자는 `package.evidence[].value`·`sources`만 인용합니다.
 
 ## 모듈 간 인터페이스
 
@@ -274,18 +318,22 @@ python -m pytest
 
 - API 키·`.env`·원본 데이터·DuckDB 파일은 커밋하지 않습니다(`.gitignore` 처리).
 - 대회가 제공한 데이터 목록·명세서 파일은 외부 배포 금지이므로 저장소에 올리지 않습니다.
+- 마스킹 구현은 `evidence_engine/package/privacy.py` 하나입니다. 대화 모듈은 Claude에 보내기 전에 같은 규칙으로 가리고(자리표시 `○○`, AI Hub 예문의 가명 표기와 같음), 사용자가 되묻기에 답한 자유 입력도 가립니다.
 - 엔진은 입력 계약 검증 직후 `package/privacy.py`로 주민번호·전화번호·이메일·상세주소(건물번호·지번·동호수)·호칭이 붙은 이름(`김철수 씨`)을 가린 사본만 씁니다. 읍면동·도로명은 근거 계산에 필요해 남기며, 호칭 없는 이름은 문장만으로 가를 수 없어 대화·초안 모듈의 정규화 단계에서도 함께 막습니다.
 - `raw_text`는 받자마자 버리고, 로그와 빈칸 기록(`gaps`)에는 민원 문장을 남기지 않습니다(빈칸은 `claim c1 관련 지표`처럼 id로만 가리킵니다).
-- 유료 LLM 호출은 `agent/llm_client.py` 한 곳을 거치며, 사람이 `ALLOW_PAID_CALLS=1`을 설정하지 않으면 차단됩니다.
+- 유료 LLM 호출은 근거 엔진은 `agent/llm_client.py`, 대화 모듈은 `dialect_normalizer/llm.py`를 거치며, 둘 다 사람이 `ALLOW_PAID_CALLS=1`을 설정하지 않으면 차단됩니다. `.env.example`에는 이 값을 켜 두지 않습니다.
+- AI Hub 원자료와 그 문장이 들어간 평가 결과(`results/**/pred_*.jsonl`, `results/**/examples_*.md`)는 커밋하지 않습니다(점수 요약 `summary.json`만 공유).
 
 ## 데이터 출처와 이용조건
 
 | 데이터 | 출처 | 이용조건 |
 | --- | --- | --- |
 | 데이터허브 FILE·API 30종 | [제주데이터허브](https://jejudatahub.net) | 대회 필수 데이터 |
-| 공공데이터포털 파일 17종 | [공공데이터포털](https://www.data.go.kr) (데이터허브에 등록된 데이터의 원본) | 데이터별 이용허락범위 확인 |
+| 공공데이터포털 파일 18종 | [공공데이터포털](https://www.data.go.kr) (데이터허브에 등록된 데이터의 원본) | 데이터별 이용허락범위 확인 |
 | 법정동 연계정보 | [국가데이터처](https://www.data.go.kr/data/15136368/fileData.do) | 공공누리 제3유형 (출처표시, 변경금지) |
 | 법정동별 주민등록 인구 | [행정안전부](https://www.data.go.kr/data/15099158/fileData.do) (외부 공공데이터, 인구 분모용) | 이용허락범위 제한 없음 (포털 표기, 2026-11-14 확인) |
+| 행정동 통·반 인구, 법정동 인구(월별) | [행정안전부 API](https://www.data.go.kr/data/15108071/openapi.do) (서귀포 7개 동 인구, 1년 인구 증감) | 이용허락범위 제한 없음 |
+| 한국어 방언 발화(제주도), 중·노년층 방언 | AI Hub (제주어 사전·예문 생성용, 저장소에 넣지 않음) | AI Hub 이용 약관 (재배포 금지) |
 | 행정동 경계 | 통계청 SGIS(공공누리 제1유형)를 [vuski/admdongkor](https://github.com/vuski/admdongkor)가 가공 | CC BY 4.0 |
 
 행정동 경계 출처 표기: 본 데이터는 통계청 통계지리정보서비스(SGIS, https://sgis.kostat.go.kr)에서 공공누리 제1유형으로 개방한 행정동 경계를 가공한 것이며(가공: vuski/admdongkor, https://github.com/vuski/admdongkor), CC BY 4.0으로 배포됩니다.
@@ -297,4 +345,5 @@ python -m pytest
 | 영역 | 주요 산출물 |
 | --- | --- |
 | 근거·분석 | 데이터 수집·정제, 근거 탐색·분석, 근거 패키지 엔진 (`evidence_engine/`) |
-| 대화·초안 | 제주어 이해·정규화, 민원 초안 생성, UI |
+| 대화·초안 | 민원 초안 생성, UI |
+| 연결 (근거·분석 담당이 맡음) | 제주어 이해·구조화 모듈 합치기, 되묻기·마스킹·계약 맞추기 (`complaint_agent/`, `dialect_normalizer/`) |

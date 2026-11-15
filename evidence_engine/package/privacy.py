@@ -8,7 +8,11 @@
                  예: 한림로 650 → 한림로 [번지],  1820번지 10호 → [번지],  101동 1203호 → [동호수]
 - 이름         → 성씨로 시작하는 2~4글자 + 씨/님 호칭 (예: 김철수 씨 → [이름] 씨)
                  호칭 없는 이름은 문장만으로 확실히 가를 수 없어 가리지 않는다(팀원 모듈의 정규화 단계와 함께 막는다).
+- 지역번호 없는 번호 → [연락처]  예: 710-2584, 1588-1234 (하이픈이 있을 때만. 2018-2019 같은 연도 범위는 남긴다)
 읍면동명(이도2동 등)과 숫자가 든 지명은 건드리지 않도록 패턴을 좁게 잡았다.
+
+이 파일이 마스킹의 유일한 구현이다. 대화 모듈(dialect_normalizer/structure.py)도 mask_with_labels 를 쓴다.
+그쪽은 LLM에 보내기 전에 가리며, 예문 데이터(AI Hub)의 가명 표기와 같은 '○○'를 자리표시로 쓴다.
 """
 from __future__ import annotations
 
@@ -30,21 +34,54 @@ TITLE_NOUNS = ("선생", "기사", "사장", "회장", "원장", "과장", "부�
                "국장", "시장", "지사", "도지사", "의원", "위원", "대표", "목사", "신부", "주무관", "공무원", "담당자",
                "관리자", "직원", "고객", "주민", "환자", "보호자", "운전", "기관", "간호사", "의사", "약사")
 
+_LOCAL_PHONE = re.compile(r"(?<![\d-])(\d{3,4})-(\d{4})(?![\d-])")
+_YEAR = re.compile(r"(?:19|20)\d\d")
+
+# '씨'로 끝나지만 이름이 아닌 낱말 (날씨·솜씨·아저씨 등). 대화 모듈 테스트에서 '오늘날씨'가 이름으로 가려지는 것을 발견해 추가.
+NOT_NAME_WORDS = ("날씨", "솜씨", "말씨", "글씨", "마음씨", "맵씨", "불씨", "씨앗", "아저씨", "아가씨", "맘씨", "아재씨")
+
 PLACEHOLDERS = ("[주민번호]", "[연락처]", "[이메일]", "[동호수]", "[번지]", "[이름]")
+# (라벨, 기본 자리표시) — 라벨은 사용자에게 "무엇을 가렸는지" 알려 줄 때 쓴다
+_TAGS = {"주민번호": "[주민번호]", "이메일": "[이메일]", "전화번호": "[연락처]", "동호수": "[동호수]",
+         "지번": "[번지]", "건물번호": "[번지]", "이름": "[이름]"}
+
+
+def mask_with_labels(text: str | None, placeholder: str | None = None) -> tuple[str | None, list[str]]:
+    """(가린 문장, 가린 종류 목록). placeholder 를 주면 모든 자리표시를 그 글자로 쓴다(예: '○○')."""
+    if not text:
+        return text, []
+    found: list[str] = []
+
+    def tag(label: str) -> str:
+        found.append(label)
+        return placeholder or _TAGS[label]
+
+    def local_phone(m: re.Match) -> str:
+        a, b = m.group(1), m.group(2)
+        if _YEAR.fullmatch(a) and _YEAR.fullmatch(b):        # 2018-2019 처럼 연도 범위
+            return m.group(0)
+        if text[m.end():m.end() + 1] == "년":
+            return m.group(0)
+        return tag("전화번호")
+
+    def name(m: re.Match) -> str:
+        if m.group(1).endswith(TITLE_NOUNS) or (m.group(1) + m.group(3)).endswith(NOT_NAME_WORDS):
+            return m.group(0)
+        return f"{tag('이름')}{m.group(2)}{m.group(3)}"
+
+    t = _RRN.sub(lambda m: tag("주민번호"), text)
+    t = _EMAIL.sub(lambda m: tag("이메일"), t)
+    t = _PHONE.sub(lambda m: tag("전화번호"), t)
+    t = _LOCAL_PHONE.sub(local_phone, t)
+    t = _APT.sub(lambda m: tag("동호수"), t)
+    t = _LOT.sub(lambda m: tag("지번"), t)
+    t = _ROAD.sub(lambda m: f"{m.group(1)} {tag('건물번호')}", t)
+    t = _NAME.sub(name, t)
+    return t, sorted(set(found))
 
 
 def mask_text(text: str | None) -> str | None:
-    if not text:
-        return text
-    t = _RRN.sub("[주민번호]", text)
-    t = _EMAIL.sub("[이메일]", t)
-    t = _PHONE.sub("[연락처]", t)
-    t = _APT.sub("[동호수]", t)
-    t = _LOT.sub("[번지]", t)
-    t = _ROAD.sub(lambda m: f"{m.group(1)} [번지]", t)
-    t = _NAME.sub(lambda m: m.group(0) if m.group(1).endswith(TITLE_NOUNS)
-                  else f"[이름]{m.group(2)}{m.group(3)}", t)
-    return t
+    return mask_with_labels(text)[0]
 
 
 def mask_query(query: dict) -> dict:

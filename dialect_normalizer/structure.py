@@ -58,35 +58,23 @@ MAX_CLAIMS = 3
 
 # =====================================================================
 # ① 개인정보 가리기
-#    팀원 엔진의 package/privacy.py 와 같은 대상. 팀원 코드를 받으면 그 함수로 바꿔도 됨.
+#    구현은 근거 엔진의 evidence_engine/package/privacy.py 하나뿐이다(두 벌로 두면 규칙이 어긋난다).
+#    LLM에 보내기 전에 가리고, 자리표시는 예문 데이터(AI Hub)의 가명 표기와 같은 '○○'를 쓴다.
 # =====================================================================
-_NOT_NAMES = {"아저씨", "아가씨", "날씨", "솜씨", "말씨", "글씨", "마음씨", "맵씨", "불씨", "씨앗"}
-PII_PATTERNS = [
-    ("주민번호", re.compile(r"\d{6}\s?-\s?[1-4]\d{6}")),
-    ("전화번호", re.compile(r"(?:0\d{1,2}[-.\s]?)?\d{3,4}[-.\s]?\d{4}")),
-    ("이메일", re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")),
-    ("동호수", re.compile(r"\d+\s?동\s?\d+\s?호")),
-    ("지번", re.compile(r"\d+(?:-\d+)?\s?번지")),
-    ("건물번호", re.compile(r"(?<=[로길])\s?\d+(?:-\d+)?(?=\s|$|[,.])")),
-]
-_NAME_RE = re.compile(r"([가-힣]{2,4})(\s?)(씨)(?=[^가-힣]|$|[은는이가를에도의네께한랑와과])")
+import sys as _sys
+
+_ENGINE = REPO / "evidence_engine"
+if str(_ENGINE) not in _sys.path:
+    _sys.path.insert(0, str(_ENGINE))
+from package.privacy import mask_with_labels  # noqa: E402
+
+PII_PLACEHOLDER = "○○"
 
 
 def mask_pii(text: str) -> tuple[str, list[str]]:
-    found = []
-    for label, pat in PII_PATTERNS:
-        if pat.search(text):
-            found.append(label)
-            text = pat.sub(" ○○" if label == "건물번호" else "○○", text)
-
-    def _name(m):
-        w = m.group(1) + m.group(3)
-        if any(w.endswith(x) for x in _NOT_NAMES):     # '오늘날씨', '아저씨' 등은 이름 아님
-            return m.group(0)
-        found.append("이름")
-        return "○○" + m.group(2) + m.group(3)
-    text = _NAME_RE.sub(_name, text)
-    return re.sub(r"\s+", " ", text).strip(), sorted(set(found))
+    """(가린 문장, 가린 종류). 종류: 주민번호·전화번호·이메일·동호수·지번·건물번호·이름"""
+    masked, found = mask_with_labels(text, PII_PLACEHOLDER)
+    return re.sub(r"\s+", " ", masked or "").strip(), found
 
 
 # =====================================================================
@@ -182,9 +170,17 @@ def build_prompt(text: str, exclude_id: str | None = None) -> str:
 _YM = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 
+# 읍면동 이름 바로 뒤에 올 수 있는 말(조사·장소 말). 이것이 아닌 한글이 붙으면 다른 낱말로 본다
+# (예: '연동되어'의 '연동'은 지명이 아님 — 연결 시험에서 발견).
+_AFTER_PLACE = ("에서", "에는", "에도", "에", "은", "는", "이", "가", "을", "를", "의", "도", "만", "과", "와", "까지",
+                "부터", "으로", "로", "쪽", "주민", "사람", "근처", "일대", "지역", "인데", "이고", "이에요", "입니다", "에요",
+                "사무소", "행정복지센터", "주민센터")
+_PLACE_END = "(?=$|[^가-힣]|" + "|".join(sorted(_AFTER_PLACE, key=len, reverse=True)) + ")"
+
+
 def find_emd_in_text(text: str) -> str:
     """문장에 읍면동 이름이 그대로 들어 있으면 그것을 씀 (하나일 때만). LLM 판단보다 우선."""
-    found = {e for e in EMD_NAMES if re.search(rf"(?<![가-힣]){e}", text)}
+    found = {e for e in EMD_NAMES if re.search(rf"(?<![가-힣]){e}{_PLACE_END}", text)}
     return found.pop() if len(found) == 1 else ""
 
 

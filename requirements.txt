@@ -1,0 +1,6 @@
+# 센터 PC: 가상환경 하나에 두 모듈을 함께 설치한다 (Python 3.11).
+#   pip install -r requirements.txt
+# 두 파일에 함께 있는 패키지(anthropic 2.8.0, jsonschema 4.23.0, pytest 8.3.4)는 버전이 같다.
+# numpy 는 대화 모듈만 2.4.4 로 고정하고, 근거 엔진의 matplotlib 3.9.2 는 numpy>=1.23 이면 된다.
+-r evidence_engine/requirements.txt
+-r dialect_normalizer/requirements.txt

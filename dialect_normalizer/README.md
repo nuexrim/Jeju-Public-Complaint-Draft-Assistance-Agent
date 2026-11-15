@@ -32,6 +32,7 @@ LLM이 근거 없이 추측하는 것을 줄이기 위해, 변환을 LLM에게 �
    (LLM 보내기 전)                        (Structured Outputs)
 ```
 
+- 개인정보 가리기는 근거 엔진의 `evidence_engine/package/privacy.py`를 그대로 씁니다(자리표시 `○○`). 구현을 두 벌로 두지 않습니다.
 - 유형: 교통, 의료 접근, 환경·청소, 안전·재난, 생활물가, 기타 (엔진 README 권장 유형 + 기타)
 - 읍면동: 제주 43개 행정동 목록 안에서만 고르게 강제하고, "노형" → "노형동"처럼 줄여 말한 것도 찾음. 모르면 되물음
 - 주장(claims): 데이터로 확인할 수 있는 짧은 평서문 1~3개. 팀원 예시 질의(`tests/fixtures`)를 few-shot 예시로 사용
@@ -73,7 +74,7 @@ LLM이 근거 없이 추측하는 것을 줄이기 위해, 변환을 LLM에게 �
 macOS:
 ```bash
 pip3 install -r requirements.txt
-cp .env.example .env     # .env를 열어 ANTHROPIC_API_KEY 입력
+cp .env.example .env     # .env를 열어 ANTHROPIC_API_KEY 입력 (ALLOW_PAID_CALLS 는 쓸 때 직접 켬)
 ```
 Windows (PowerShell):
 ```powershell
@@ -215,6 +216,8 @@ result = normalize("고냉이 허고 강생이들 왕 막 파불민")
 - 방언 비율 기준(10%, 50%)은 평가 전에 정한 값이며, 평가 결과를 본 뒤 조정하지 않음
 
 ## 변경 이력
+
+- v3.4 (연결): 마스킹을 근거 엔진 `privacy.py`로 통일(님 호칭 이름 추가, 날짜 숫자·'할망씨' 과잉 가림 해소), 읍면동 이름 뒤에 다른 낱말이 붙으면 지명으로 보지 않음('연동되어'), 사전·색인이 없을 때 `sys.exit` 대신 `ResourceMissing` 예외, 키가 없으면 `LLMError`, `.env.example`의 `ALLOW_PAID_CALLS=1` 주석 처리, AI Hub 문장이 든 평가 결과 하위 폴더도 커밋 제외
 
 - v3.3: 평가 지표를 선행 연구 정의로 교체 — ERR(메인)·재현율·FPR·단어 정확도·LAI 정확도(어절 편집 거리 정렬 후 TP/FN/FP/TN 분류), CER(공백 포함·제외)·BLEU 추가, README에 계산식·근거·적용 규칙 정리
 - v3.2: 일상대화 데이터의 이중 전사 표기 "(방언)/(표준어)"와 '#' 기호 정리(학습 문장 2.9%, 일상대화 평가 문장 21%에 남아 있었음), 문장에 읍면동이 직접 있으면 확인 질문 생략

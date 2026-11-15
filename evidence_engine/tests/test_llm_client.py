@@ -207,3 +207,12 @@ def test_rigor_calls_are_routed_to_anthropic(allowed, sdk, monkeypatch, tmp_path
     assert len(seen) == 1 and seen[0]["model"] == "claude-opus-5-5" and "temperature" not in seen[0]
     assert seen[0]["max_tokens"] == 10000 and client.calls == 1
     assert "@ko" in app.OntologyLLM()._build_prompt()          # 한글 라벨 요구가 덧붙는다
+
+
+def test_haiku_gets_no_server_fallbacks(allowed, sdk, tmp_path):
+    """Claude Haiku 5.5 는 fallbacks 를 받지 않는다(400). Sonnet 등에는 그대로 보낸다."""
+    seen, _ = sdk
+    LLMClient(provider="anthropic", model="claude-haiku-5-5", usage_log=tmp_path / "u.csv").complete("q")
+    LLMClient(provider="anthropic", model="claude-sonnet-5-5", usage_log=tmp_path / "u.csv").complete("q")
+    assert "fallbacks" not in seen[0] and "betas" not in seen[0]
+    assert seen[1]["fallbacks"] == "default"

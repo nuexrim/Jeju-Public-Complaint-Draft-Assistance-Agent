@@ -127,3 +127,16 @@ def test_no_confirm_when_emd_written_in_text(run):
 def test_confirm_when_emd_inferred_from_village(run):
     r = run({**BASE_OUT, "location_mention": "세화리", "emd_name": "구좌읍"}, text="세화리 버스가 줄었어요")
     assert any(x["field"] == "emd_name" and x.get("confirm") for x in r["questions"])
+
+
+def test_emd_name_inside_other_word_is_not_a_place():
+    """'연동되어'의 '연동'은 지명이 아니다. 조사·기관명이 붙은 경우는 지명으로 본다."""
+    assert S.find_emd_in_text("버스가 연동되어 불편해요") == ""
+    assert S.find_emd_in_text("연동에 사는데") == "연동"
+    assert S.find_emd_in_text("성산읍사무소 앞 도로") == "성산읍"
+
+
+def test_mask_uses_engine_rules():
+    """마스킹 구현은 근거 엔진 privacy.py 하나. 님 호칭 이름도 가리고, 날짜 숫자는 남긴다."""
+    t, found = S.mask_pii("박영희님이 20261115에 신청했어요")
+    assert "박영희" not in t and "20261115" in t and found == ["이름"]
