@@ -1,5 +1,5 @@
 """
-제주 방언 라벨 JSON 전처리 스크립트 (v2.2: 중·노년층 데이터 추가, 비식별화 오류 처리)
+제주 방언 라벨 JSON 전처리 스크립트 (v2.3: 방언 비율 추가)
 
 사용법:  python3 preprocess.py
         python3 preprocess.py --daily ./label --senior ./label_senior --output ./processed
@@ -12,7 +12,9 @@
   pairs_train.jsonl  : 방언-표준어 문장 쌍 (source 칸에 daily / senior 표시)
   test.jsonl         : 일상대화 평가셋 (학습 쪽과 대화 파일이 겹치지 않음)
   test_senior.jsonl  : 어르신 평가셋 (학습 쪽과 화자가 겹치지 않음)
-  dialect_dict.json  : 방언 어절 → 표준어 후보 + 출처별 등장 횟수 (학습 쪽으로만 만듦)
+  dialect_dict.json  : 방언 어절 → {dialect_ratio, seen, cands: 표준어 후보 + 출처별 횟수} (학습 쪽으로만 만듦)
+                       dialect_ratio = 방언으로 쓰인 횟수 ÷ 그 어절이 등장한 전체 횟수
+                       (예: '안'은 대부분 표준어로 쓰여 비율이 매우 낮음 → 변환 모듈이 약한 근거로 취급)
   stats.json         : 데이터 통계
 """
 import argparse
@@ -65,7 +67,10 @@ def read_daily(doc, fp):
     for u in doc.get("utterance", []):
         pairs = [p for e in u.get("eojeolList", []) if e.get("isDialect")
                  if (p := eojeol_pair(e.get("eojeol"), e.get("standard")))]
+        all_eojeols = [w for e in u.get("eojeolList", [])
+                       if (w := clean(e.get("eojeol")).strip(PUNCT))]
         yield {
+            "all_eojeols": all_eojeols,
             "source": "daily",
             "group": file_id,                       # 평가셋 분리 기준: 대화 파일
             "utt_id": u.get("id"),
@@ -105,7 +110,9 @@ def read_senior(doc, fp):
         if s.get("standard") and (p := eojeol_pair(d, s["standard"])):
             pairs.append(p)
     script = doc.get("script", {})
+    all_eojeols = [w for x in dialect_words if (w := clean(x).strip(PUNCT))]
     yield {
+        "all_eojeols": all_eojeols,
         "source": "senior",
         "group": spk.get("speakerId", fp.stem),  # 평가셋 분리 기준: 화자 (한 화자가 여러 파일에 나옴)
         "utt_id": doc.get("fileName", fp.stem),
@@ -130,6 +137,7 @@ def main():
     train = []
     test_pool = {"daily": [], "senior": []}
     pair_counter = defaultdict(lambda: defaultdict(Counter))  # 방언 → 표준어 → 출처별 횟수
+    eojeol_seen = Counter()                                    # 어절이 (방언이든 아니든) 등장한 전체 횟수
     stats = Counter()
     ages = {"daily": Counter(), "senior": Counter()}
     domains = Counter()
@@ -150,6 +158,7 @@ def main():
                 print(f"  [건너뜀] {fp.name}: {e}")
                 continue
             for rec in reader(doc, fp):
+                all_eojeols = rec.pop("all_eojeols")
                 stats[f"{name}_total"] += 1
                 if is_bad(rec["dialect"]) or is_bad(rec["standard"]):
                     stats[f"{name}_dropped"] += 1
@@ -166,6 +175,7 @@ def main():
                     test_pool[name].append(rec)
                 else:
                     train.append(rec)
+                    eojeol_seen.update(all_eojeols)
                     for d, s in rec["dialect_eojeols"]:
                         pair_counter[d][s][name] += 1
             if i % 5000 == 0:
@@ -185,8 +195,13 @@ def main():
         senior = sum(c["senior"] for c in std_map.values())
         if total >= DICT_MIN_COUNT or senior >= SENIOR_MIN_COUNT:
             ranked = sorted(std_map.items(), key=lambda kv: -sum(kv[1].values()))[:3]
-            dictionary[d] = [{"standard": s, "count": sum(c.values()), "sources": dict(c)}
-                             for s, c in ranked]
+            seen = max(eojeol_seen[d], total)
+            dictionary[d] = {
+                "dialect_ratio": round(total / seen, 4),
+                "seen": seen,
+                "cands": [{"standard": s, "count": sum(c.values()), "sources": dict(c)}
+                          for s, c in ranked],
+            }
 
     def dump_jsonl(path, rows):
         with open(path, "w", encoding="utf-8") as f:
@@ -201,13 +216,17 @@ def main():
 
     src_count = Counter(r["source"] for r in train)
     only_senior = sum(1 for v in dictionary.values()
-                      if all(set(x["sources"]) == {"senior"} for x in v))
+                      if all(set(x["sources"]) == {"senior"} for x in v["cands"]))
+    ratios = [v["dialect_ratio"] for v in dictionary.values()]
     summary = {
         "train_pairs": dict(src_count),
         "test_daily": len(tests["daily"]),
         "test_senior": len(tests["senior"]),
         "dict_entries": len(dictionary),
         "dict_entries_only_from_senior": only_senior,
+        "dict_ratio_lt_0.1": sum(r < 0.1 for r in ratios),
+        "dict_ratio_0.1_0.5": sum(0.1 <= r < 0.5 for r in ratios),
+        "dict_ratio_ge_0.5": sum(r >= 0.5 for r in ratios),
         "age_daily": dict(ages["daily"].most_common()),
         "age_senior": dict(ages["senior"].most_common()),
         "senior_domains": dict(domains.most_common()),
@@ -222,6 +241,9 @@ def main():
     print("\n===== 어르신 데이터 예시 3개 (방언 → 표준어) =====")
     for r in [r for r in train if r["source"] == "senior" and r["n_dialect"] >= 2][:3]:
         print(f"- [{r['domain']}, {r['age']}] {r['dialect']}\n  → {r['standard']}\n  어절: {r['dialect_eojeols']}")
+    print("\n===== 방언 비율 확인 (자주 나오는 사전 단어 10개) =====")
+    for d, v in sorted(dictionary.items(), key=lambda kv: -kv[1]["seen"])[:10]:
+        print(f"  {d}: 방언 비율 {v['dialect_ratio']:.3f} (전체 {v['seen']}회) → {v['cands'][0]['standard']}")
     print(f"\n저장 위치: {out_dir.resolve()}")
 
 

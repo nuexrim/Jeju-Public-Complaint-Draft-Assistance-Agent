@@ -43,6 +43,8 @@ EXAMPLE_MAX_LEN = 200            # 이보다 긴 문장은 예문에서 제외 (
 TOP_K_EXAMPLES = 5               # LLM에게 보여줄 예문 수
 PREFIX_MIN_COVER = 0.5           # 앞부분 일치: 사전 단어가 어절 길이의 50% 이상이어야 인정
 FUZZY_CUTOFF = 0.85              # 비슷한 철자 찾기 기준 (1.0 = 완전히 같음)
+MIN_PROMPT_RATIO = 0.1           # 방언 비율이 이보다 낮은 단어(예: '안', '잘')는 프롬프트에 넣지 않음
+STRONG_RATIO = 0.5               # 이 이상이면 '강한 근거', 그 아래는 '표준어로도 자주 쓰임' 표시
 SEED = 42
 PUNCT = "?.,!~…\"'“”‘’()[]"
 SOURCE_NAME = {"daily": "일상대화", "senior": "어르신", "official": "도청"}
@@ -53,7 +55,10 @@ SOURCE_NAME = {"daily": "일상대화", "senior": "어르신", "official": "도�
 # =====================================================================
 class DialectDict:
     def __init__(self, path=DICT_PATH):
-        self.d = json.loads(Path(path).read_text(encoding="utf-8"))
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+        self.d = {}
+        for k, v in raw.items():          # v2.2 이전 형식(목록)과 v2.3 형식(dict) 모두 지원
+            self.d[k] = v if isinstance(v, dict) else {"dialect_ratio": 1.0, "seen": 0, "cands": v}
         self.by_first = defaultdict(list)      # 첫 글자별로 묶어서 비슷한 철자 찾기를 빠르게
         for k in self.d:
             self.by_first[k[0]].append(k)
@@ -64,18 +69,25 @@ class DialectDict:
         if not w:
             return None
         if w in self.d:
-            return {"word": w, "match": "정확히 일치", "key": w, "cands": self.d[w]}
+            return self._hit(w, "정확히 일치", w)
         # 앞부분 일치: '고냉이가'는 사전에 없어도 '고냉이'가 있으면 인정 (뒤에 붙은 조사 등)
         for L in range(len(w) - 1, 1, -1):
             k = w[:L]
             if k in self.d and L / len(w) >= PREFIX_MIN_COVER:
-                return {"word": w, "match": "앞부분 일치", "key": k, "cands": self.d[k]}
+                return self._hit(w, "앞부분 일치", k)
         # 비슷한 철자: 받아쓰기·음성인식 오류 대비
         if len(w) >= 3:
             m = difflib.get_close_matches(w, self.by_first.get(w[0], []), n=1, cutoff=FUZZY_CUTOFF)
             if m:
-                return {"word": w, "match": "비슷한 철자", "key": m[0], "cands": self.d[m[0]]}
+                return self._hit(w, "비슷한 철자", m[0])
         return None
+
+    def _hit(self, word, match, key):
+        e = self.d[key]
+        r = e["dialect_ratio"]
+        strength = "강함" if r >= STRONG_RATIO else ("보통" if r >= MIN_PROMPT_RATIO else "약함")
+        return {"word": word, "match": match, "key": key, "cands": e["cands"],
+                "ratio": r, "strength": strength}
 
 
 def describe_cands(cands):
@@ -151,11 +163,13 @@ RULES_RAG = """너는 제주 방언 문장을 표준어 문장으로 바꾸는 �
 규칙:
 1. [사전 근거]에 나온 단어는 후보 중 문맥에 맞는 것으로 바꾼다. 후보가 여러 개면 문맥과 [비슷한 예문]을 보고 고른다.
    단, 그 단어가 이 문장에서 이미 표준어로 쓰였다면 바꾸지 않는다.
+   '표준어로도 자주 쓰임' 표시가 붙은 단어는 특히 주의해서, 이 문장에서 방언 뜻으로 쓰였을 때만 바꾼다.
 2. [사전 근거]에 없는 단어는 함부로 바꾸지 않는다. 방언으로 보이는데 뜻이 확실하지 않으면 원래 단어를 그대로 두고 unclear에 넣는다.
-3. 뜻을 더하거나 빼지 않는다. 요약하거나 공손하게 고쳐 쓰지 말고, 단어만 표준어로 바꾼다.
+3. 뜻을 더하거나 빼지 않는다. 요약하거나 공손하게 고쳐 쓰지 말고, 단어만 표준어로 바꾼다. 문장부호를 새로 붙이지 않는다.
 4. '○○'는 가려진 이름이니 그대로 둔다.
-5. 바꾼 단어는 하나도 빠짐없이 changes에 원래 어절(from)과 바꾼 표현(to)으로 적는다.
-6. unclear의 question은 어르신이 이해하기 쉬운 짧은 존댓말 질문으로 쓴다."""
+5. changes에는 실제로 바꾼 단어만 원래 어절(from)과 바꾼 표현(to)으로 적는다. 바꾸지 않은 단어는 적지 않는다.
+6. unclear는 뜻을 모르는 방언 단어에만 쓴다. question에는 그 단어를 작은따옴표로 넣고, 어르신이 이해하기 쉬운 짧은 존댓말로 뜻만 묻는다.
+   (예: "'○○'는 어떤 뜻인가요?") 문장 내용이나 상황을 묻지 않는다."""
 
 RULES_ZERO = """너는 제주 방언 문장을 표준어 문장으로 바꾸는 도우미다.
 규칙:
@@ -188,7 +202,9 @@ def build_prompt(text, hits, examples):
     if hits:
         for h in hits:
             via = "" if h["match"] == "정확히 일치" else f" (사전 단어 '{h['key']}', {h['match']})"
-            lines.append(f"- {h['word']}{via} → {describe_cands(h['cands'])}")
+            weak = "" if h["strength"] == "강함" else \
+                f"  ※ 표준어로도 자주 쓰임 (방언으로 쓰인 비율 {h['ratio']:.0%})"
+            lines.append(f"- {h['word']}{via} → {describe_cands(h['cands'])}{weak}")
     else:
         lines.append("- (사전에서 찾은 단어 없음)")
     lines.append("\n[비슷한 예문]")
@@ -217,12 +233,26 @@ def call_llm(system, user):
 # =====================================================================
 # ⑤ 근거 검사 (감시)
 # =====================================================================
+def _bare(t):
+    return [w.strip(PUNCT) for w in t.split() if w.strip(PUNCT)]
+
+
 def check_evidence(text, llm_out, ddict):
-    changes, ask, warnings = [], [], []
+    out = llm_out["standard"]
+    in_words, out_words = _bare(text), _bare(out)
+    changes, ask, warnings, ignored = [], [], [], []
+
     for c in llm_out["changes"]:
-        src, dst = c["from"].strip(), c["to"].strip()
-        if src and src not in text:
+        src, dst = c["from"].strip().strip(PUNCT), c["to"].strip().strip(PUNCT)
+        if not src or src == dst:
+            continue
+        if src not in text:
             warnings.append(f"입력에 없는 단어를 바꿨다고 함: '{src}'")
+            continue
+        # 가짜 변경: '바꿨다'고 했지만 결과 문장에 그대로 남아 있음 → 무시
+        if out_words.count(src) >= in_words.count(src) and src in out_words:
+            ignored.append(f"{src} → {dst}")
+            continue
         hit = ddict.lookup(src) if ddict else None
         matched = None
         if hit:
@@ -230,30 +260,41 @@ def check_evidence(text, llm_out, ddict):
                 if cand["standard"] in dst or dst in cand["standard"]:
                     matched = cand
                     break
-        if matched:
+        if matched and hit["strength"] != "약함":
             changes.append({"from": src, "to": dst, "type": "사전",
                             "evidence": f"{hit['key']}→{matched['standard']} "
-                                        f"({describe_cands([matched])}, {hit['match']})"})
+                                        f"({describe_cands([matched])}, {hit['match']}, "
+                                        f"방언 비율 {hit['ratio']:.0%})"})
         else:
-            changes.append({"from": src, "to": dst, "type": "추정",
-                            "evidence": "사전 근거 없음" if not hit else
-                                        f"사전 후보({describe_cands(hit['cands'])})와 다름"})
+            if matched:
+                why = f"사전에 있지만 표준어로 더 자주 쓰이는 단어 (방언 비율 {hit['ratio']:.0%})"
+            elif hit:
+                why = f"사전 후보({describe_cands(hit['cands'])})와 다름"
+            else:
+                why = "사전 근거 없음"
+            changes.append({"from": src, "to": dst, "type": "추정", "evidence": why})
             ask.append(f"'{src}'을(를) '{dst}'(으)로 이해했는데 맞나요?")
 
+    changed = {c["from"] for c in changes}
     for u in llm_out["unclear"]:
-        ask.append(u["question"] or f"'{u['word']}'은(는) 어떤 뜻인가요?")
+        w = u["word"].strip().strip(PUNCT)
+        if not w or w not in text or w in changed:      # 입력에 없는 단어, 이미 처리한 단어는 버림
+            continue
+        q = u["question"] if f"'{w}'" in u["question"] else ""   # 단어를 '따옴표'로 묻는 질문만 인정
+        ask.append(q or f"'{w}'은(는) 어떤 뜻인가요?")  # 단어가 안 들어간 질문은 기본 질문으로 교체
 
-    # changes에 적지 않고 몰래 바꾼 부분 찾기
-    a, b = text.split(), llm_out["standard"].split()
+    # changes에 적지 않고 몰래 바꾼 단어 찾기 (문장부호·띄어쓰기 차이는 무시)
     declared = " ".join(c["from"] for c in llm_out["changes"])
-    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(a=a, b=b).get_opcodes():
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(a=in_words, b=out_words).get_opcodes():
         if op == "equal":
             continue
-        hidden = [w for w in a[i1:i2] if w.strip(PUNCT) and w.strip(PUNCT) not in declared]
+        if "".join(in_words[i1:i2]) == "".join(out_words[j1:j2]):   # 띄어쓰기만 다름
+            continue
+        hidden = [w for w in in_words[i1:i2] if w not in declared]
         if hidden:
             warnings.append(f"기록 없이 바뀐 단어: {', '.join(hidden)}  "
-                            f"(구간: '{' '.join(a[i1:i2])}' → '{' '.join(b[j1:j2])}')")
-    return changes, ask, warnings
+                            f"(구간: '{' '.join(in_words[i1:i2])}' → '{' '.join(out_words[j1:j2])}')")
+    return changes, ask, warnings, ignored
 
 
 # =====================================================================
@@ -275,21 +316,23 @@ def normalize(text, use_rag=True):
     text = " ".join(text.split())
     ddict, index = _load(use_rag)
     if use_rag:
-        hits = [h for w in text.split() if (h := ddict.lookup(w))]   # ① 어절 나누기 + ② 사전
+        all_hits = [h for w in text.split() if (h := ddict.lookup(w))]   # ① 어절 나누기 + ② 사전
+        hits = [h for h in all_hits if h["strength"] != "약함"]          # '안', '잘' 같은 단어는 제외
         examples = index.search(text)                                 # ③ 예문
         llm_out = call_llm(RULES_RAG, build_prompt(text, hits, examples))  # ④ LLM
     else:
         hits, examples = [], []
         llm_out = call_llm(RULES_ZERO, f"[입력 문장]\n{text}")
-    changes, ask, warnings = check_evidence(text, llm_out, ddict)     # ⑤ 감시
+    changes, ask, warnings, ignored = check_evidence(text, llm_out, ddict)  # ⑤ 감시
     return {
         "input": text,
         "standard": llm_out["standard"],
         "changes": changes,
         "ask_user": ask,
         "warnings": warnings,
+        "ignored_changes": ignored,
         "dict_hits": [{"word": h["word"], "key": h["key"], "match": h["match"],
-                       "cands": h["cands"]} for h in hits],
+                       "ratio": h["ratio"], "cands": h["cands"]} for h in hits],
         "examples": examples,
         "mode": "rag" if use_rag else "zero_shot",
         "model": os.getenv("OPENAI_MODEL", DEFAULT_MODEL),
