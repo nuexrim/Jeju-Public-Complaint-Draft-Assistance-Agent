@@ -18,8 +18,7 @@ TITLE_TOPIC = "{place} {topic} 관련 불편 개선 요청"
 TITLE_MAX = 60                    # 제목이 이보다 길면 줄인다(창구 공식 제한이 아니라 읽기 좋은 길이)
 REQUEST_ENDINGS = ("요청", "요망", "건의", "바랍니다", "주세요", "주십시오")   # 이미 요청으로 끝나면 '요청'을 덧붙이지 않는다
 
-CONTENT_INTRO = "{place}의 생활 불편에 대해 말씀드립니다."
-CONTENT_INTRO_NO_PLACE = "생활 불편에 대해 말씀드립니다."
+CONTENT_INTRO = "다음과 같은 생활 불편이 있어 말씀드립니다."   # 장소는 제목과 [발생 장소]에 있으므로 되풀이하지 않는다
 CONTENT_CLAIMS_HEAD = "불편한 점은 다음과 같습니다."
 
 REQUEST = "다음 사항을 검토해 주시기 바랍니다: {user_request}"
@@ -64,3 +63,6 @@ SUBMIT_STEPS = [
     "처리기관을 고릅니다. 잘못 골라도 맞는 기관으로 넘겨집니다.",
     "내용을 다시 읽어 보고 제출합니다.",
 ]
+
+# 사용자가 직접 고칠 수 있는 섹션. 근거 자료는 숫자·출처가 바뀌지 않게 잠근다.
+EDITABLE = ("title", "content", "request")

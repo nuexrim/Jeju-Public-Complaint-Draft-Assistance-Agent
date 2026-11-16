@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import copy
 
-from complaint_draft.draft import build_draft
+from complaint_draft.draft import build_draft, friendly
 
 MAX_QUESTION_ROUNDS = 4       # conversation.py 와 같음: 같은 빈 칸을 끝없이 묻지 않는다
 MAX_OTHER_ROUNDS = 2          # pipeline.py 와 같음: '기타(직접 쓰기)'를 다시 해석하는 최대 횟수
@@ -43,7 +43,7 @@ def start(agent, text: str) -> dict:
     s["said"] = [text]
     r = agent.understand(text)
     s["result"] = r
-    s["messages"] = [f"알림: {n}" for n in r.get("notices", [])]
+    s["messages"] = [f"알림: {friendly(n)}" for n in r.get("notices", [])]
     if r.get("pii_masked"):
         s["messages"].append("개인정보를 가렸어요: " + ", ".join(r["pii_masked"]))
     return _after_questions(agent, s)
@@ -111,7 +111,7 @@ def answer_question(agent, state: dict, *, text: str = "", yes: bool | None = No
     else:
         r = agent.answer(r, user_request=text)
     for n in r.get("notices", [])[before:]:
-        s["messages"].append(n if "찾지 못했어요" in n else f"알림: {n}")
+        s["messages"].append(n if "찾지 못했어요" in n else f"알림: {friendly(n)}")
     s["result"] = r
     s["q_rounds"] += 1
     return _after_questions(agent, s)

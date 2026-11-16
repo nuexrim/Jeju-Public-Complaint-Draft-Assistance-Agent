@@ -20,7 +20,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from complaint_draft import flow                            # noqa: E402
-from complaint_draft.draft import build_draft, plain_text   # noqa: E402
+from complaint_draft.draft import apply_edits, build_draft, plain_text   # noqa: E402
 from complaint_draft.view import render_html                # noqa: E402
 
 SAMPLES = {
@@ -41,7 +41,41 @@ st.markdown("""
 
 
 # ---------------------------------------------------------------- 공통: 초안 보여 주기
-def show_draft(draft: dict) -> None:
+def edited_draft(base: dict) -> dict:
+    """사용자가 고친 내용(민원 request_id 마다 따로 기억)을 반영한 초안."""
+    store = st.session_state.setdefault("edits", {})
+    return apply_edits(base, store.get(base["request_id"] or "draft"))
+
+
+def edit_panel(draft: dict) -> None:
+    """표준어본을 직접 고치는 칸."""
+    rid = draft["request_id"] or "draft"
+    store = st.session_state.setdefault("edits", {})
+    now = {sec["id"]: sec for sec in draft["sections"]}
+    edited = any(sec.get("edited") for sec in draft["sections"])
+    with st.expander("민원서 고치기" + (" (고친 글 있음)" if edited else ""), expanded=False):
+        st.caption("표준어 민원서의 제목·민원 내용·요청 사항을 고칠 수 있어요. 근거 자료는 숫자와 출처가 바뀌지 않게 잠겨 있어요.")
+        with st.form(f"f_edit_{rid}"):
+            title = st.text_input("제목", value=now["title"]["standard"], key=f"e_title_{rid}")
+            content = st.text_area("민원 내용", value=now["content"]["standard"], height=220, key=f"e_content_{rid}")
+            request = st.text_area("요청 사항", value=now["request"]["standard"], height=100, key=f"e_request_{rid}")
+            st.text_area("근거 자료 (고칠 수 없음)", value=now["evidence"]["standard"], height=140, disabled=True,
+                         key=f"e_evidence_{rid}")
+            c1, c2 = st.columns(2)
+            save = c1.form_submit_button("고친 내용 반영하기", type="primary", use_container_width=True)
+            reset = c2.form_submit_button("처음 글로 되돌리기", use_container_width=True)
+        if save or reset:
+            if save:
+                store[rid] = {"title": title, "content": content, "request": request}
+            else:
+                store.pop(rid, None)
+            for k in ("title", "content", "request"):      # 칸을 반영된 글(개인정보 가린 뒤)로 다시 채운다
+                st.session_state.pop(f"e_{k}_{rid}", None)
+            st.rerun()
+
+
+def show_draft(base: dict) -> None:
+    draft = edited_draft(base)
     for w in draft["warnings"]:
         st.warning(w)
     for n in draft["notices"]:
@@ -55,6 +89,8 @@ def show_draft(draft: dict) -> None:
     st.download_button("표준어 민원서 글로 받기 (.txt)", plain_text(draft, "standard"),
                        file_name=f"민원서_{draft['request_id'] or '초안'}.txt", mime="text/plain",
                        disabled=not draft["copy_allowed"])
+
+    edit_panel(draft)
 
     sub = draft["submission"]
     with st.expander("제출하는 방법", expanded=False):

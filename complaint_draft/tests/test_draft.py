@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from complaint_draft.draft import SECTION_IDS, build_draft, format_value, load_handoff, plain_text, validate_draft
+from complaint_draft.draft import SECTION_IDS, apply_edits, build_draft, friendly, format_value, load_handoff, plain_text, validate_draft
 from complaint_draft.view import render_html
 
 SAMPLES = Path(__file__).resolve().parents[1] / "samples"
@@ -162,3 +162,45 @@ def test_seogwipo_and_unknown_place():
 def test_html_has_two_copy_buttons():
     html = render_html(build_draft(load_handoff(SAMPLES / "supported.json")))
     assert 'id="copyTitle"' in html and 'id="copyBody"' in html
+
+
+def test_edits_change_standard_and_submission_but_not_evidence_or_original():
+    base = build_draft(load_handoff(SAMPLES / "supported.json"))
+    before = copy.deepcopy(base)
+    d = apply_edits(base, {"title": "구좌읍 버스 노선 증편 요청", "content": "버스가 하루 세 번만 다닙니다.\n어르신들이 병원에 가기 어렵습니다.",
+                           "request": "버스를 늘려 주세요.", "evidence": "지어낸 숫자 99%"})
+    assert base == before                                           # 받은 초안은 바꾸지 않는다
+    by = {s["id"]: s for s in d["sections"]}
+    assert by["title"]["standard"] == "구좌읍 버스 노선 증편 요청" and by["title"]["edited"]
+    assert by["title"]["dialect"] == by["title"]["standard"]        # 표준어를 보여 주던 섹션은 따라간다
+    assert by["content"]["dialect"] == before["sections"][1]["dialect"]   # 원문은 그대로
+    assert by["content"]["standard"].count("\n") == 1               # 줄바꿈 유지
+    assert by["evidence"]["standard"] == before["sections"][3]["standard"] and "edited" not in by["evidence"]
+    assert d["evidence"] == before["evidence"]
+    sub = d["submission"]
+    assert sub["title"] == "구좌읍 버스 노선 증편 요청" and "버스를 늘려 주세요." in sub["body"]
+    assert "지어낸 숫자" not in sub["body"] and before["sections"][3]["standard"] in sub["body"]
+    assert sub["body_chars"] == len(sub["body"]) and validate_draft(d) == []
+
+
+def test_edits_are_masked_and_empty_edit_keeps_original():
+    base = build_draft(load_handoff(SAMPLES / "supported.json"))
+    d = apply_edits(base, {"content": "연락은 010-1234-5678 로 주세요", "title": "   "})
+    by = {s["id"]: s for s in d["sections"]}
+    assert "010-1234-5678" not in by["content"]["standard"] and "010-1234-5678" not in d["submission"]["body"]
+    assert d["pii_masked"]
+    assert by["title"]["standard"] == base["sections"][0]["standard"] and "edited" not in by["title"]
+    assert apply_edits(base, None) == base and apply_edits(base, {}) == base
+
+
+def test_friendly_strips_developer_codes_only():
+    assert friendly("Claude 구조화를 쓰지 못해 규칙으로 정리했어요 (PaidCallNotAllowed)") == "Claude 구조화를 쓰지 못해 규칙으로 정리했어요"
+    assert friendly("'가나동'에 해당하는 읍·면·동을 찾지 못했어요") == "'가나동'에 해당하는 읍·면·동을 찾지 못했어요"
+    assert friendly("비교 (읍·면 12곳)") == "비교 (읍·면 12곳)"
+    d = build_draft(load_handoff(SAMPLES / "mixed.json"))
+    assert d["notices"] == ["Claude 구조화를 쓰지 못해 규칙으로 정리했어요"]
+
+
+def test_content_does_not_repeat_place_sentence():
+    d = build_draft(load_handoff(SAMPLES / "supported.json"))
+    assert d["submission"]["body"].count("구좌읍") == 3              # 발생 장소 1 + 주장 문장 2

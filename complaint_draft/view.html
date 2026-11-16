@@ -25,6 +25,7 @@
   section { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 18px 22px; margin-bottom: 16px; }
   section h2 { margin: 0 0 8px; font-size: 20px; color: var(--muted); display: flex; align-items: center; gap: 10px; }
   .badge { font-size: 15px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: #eceff4; color: var(--muted); }
+  .badge.edited { background: #e6f4ea; color: #1e6b3a; }
   .text { white-space: pre-wrap; word-break: keep-all; font-size: 22px; margin: 0; }
   body.std .dia-only, body.dia .std-only { display: none; }
   body.dia section.original { border-color: var(--dia); }
@@ -72,6 +73,7 @@
     const h = el("h2", "", s.title);
     if (s.dialect_source === "original") h.appendChild(el("span", "badge dia-only", "하신 말씀 그대로"));
     else h.appendChild(el("span", "badge dia-only", "표준어로 표시"));
+    if (s.edited) h.appendChild(el("span", "badge edited", "직접 고친 글"));
     sec.appendChild(h);
     sec.appendChild(el("p", "text std-only", s.standard));
     sec.appendChild(el("p", "text dia-only", s.dialect));

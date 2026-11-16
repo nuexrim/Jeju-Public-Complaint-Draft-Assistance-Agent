@@ -83,6 +83,15 @@ Streamlit 과 무관한 함수라 다른 화면에서도 쓸 수 있습니다.
 - 글자 수 제한은 창구의 공식 수치를 확인하지 못해 강제하지 않고, 글자 수만 보여 줍니다(`title_chars`, `body_chars`). 제목은 60자를 넘으면 줄입니다.
 - 이름·연락처·주소 같은 개인정보는 민원서에 넣지 않습니다.
 
+## 직접 고치기 (`apply_edits`)
+
+화면의 "민원서 고치기"에서 표준어본의 **제목·민원 내용·요청 사항**을 고칠 수 있습니다.
+
+- 근거 자료는 숫자·출처가 바뀌지 않게 잠겨 있습니다(고친 값이 들어와도 무시).
+- 고친 글도 개인정보를 가립니다. 빈 칸으로 두면 원래 글을 씁니다.
+- 제주어 화면의 원문("하신 말씀 그대로")은 바뀌지 않습니다.
+- 고친 섹션에는 "직접 고친 글" 표시가 붙고, 복사되는 제목·내용에도 바로 반영됩니다. "처음 글로 되돌리기"로 되돌립니다.
+
 ## 규칙
 
 | 항목 | 처리 |
@@ -107,10 +116,10 @@ Streamlit 과 무관한 함수라 다른 화면에서도 쓸 수 있습니다.
 
 | 파일 | 내용 |
 | --- | --- |
-| `draft.py` | `build_draft`, `plain_text`, `validate_draft` |
+| `draft.py` | `build_draft`, `apply_edits`, `plain_text`, `validate_draft` |
 | `templates.py` | 문장 틀, 판정 표시, 경고 문구 |
 | `view.py`, `view.html` | 토글 화면 HTML |
 | `flow.py` | 대화 흐름 (되묻기 → 뜻 고르기 → 최종 확인 → 초안) |
 | `app.py` | Streamlit 화면 (말로 시작하기 / 예시·파일로 보기) |
 | `samples/*.json` | 예시 handoff 3개 (수치·기준일은 실제 계산값 아님) |
-| `tests/` | pytest 33개 (`test_draft.py` 20, `test_flow.py` 13) |
+| `tests/` | pytest 37개 (`test_draft.py` 24, `test_flow.py` 13) |

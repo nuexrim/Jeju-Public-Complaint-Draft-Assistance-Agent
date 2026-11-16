@@ -17,13 +17,16 @@
 - 숫자·출처는 package.evidence[].value·sources 만 옮긴다. 표시할 때 소수점 둘째 자리까지만 줄인다.
 - 근거 자료에는 supported·partial 만 넣는다. contradicted·unverifiable·gaps 는 excluded 로 돌려 화면에서 안내한다.
 - 엔진이 mock 이면 경고를 붙이고 copy_allowed=False 로 둔다.
+- 사용자가 고칠 수 있는 것은 제목·민원 내용·요청 사항이다(apply_edits). 근거 자료는 잠근다.
 - 제출용 글은 창구(국민신문고 등)의 글 칸에 맞춰 submission.title(제목 칸)·submission.body(내용 칸)로 따로 만든다.
 """
 from __future__ import annotations
 
+import copy
 import csv
 import importlib.util
 import json
+import re
 from pathlib import Path
 
 from complaint_draft import templates as T
@@ -125,8 +128,7 @@ def _title(query: dict) -> str:
 
 
 def _content(query: dict) -> str:
-    place = query.get("location", {}).get("emd_name") or ""
-    lines = [T.CONTENT_INTRO.format(place=place) if place else T.CONTENT_INTRO_NO_PLACE]
+    lines = [T.CONTENT_INTRO]
     normalized = (query.get("normalized_text") or "").strip()
     if normalized:
         lines.append(normalized if normalized.endswith((".", "요", "다")) else normalized + ".")
@@ -227,7 +229,7 @@ def build_draft(handoff: dict, source_text: str | None = None) -> dict:
         warnings.append(T.RULES_WARNING)
     if not source:
         warnings.append(T.NO_SOURCE_WARNING)
-    notices = [n for n in handoff.get("notices") or [] if "mock" not in n]   # mock 안내는 위 경고로 대신한다
+    notices = [friendly(n) for n in handoff.get("notices") or [] if "mock" not in n]   # mock 안내는 위 경고로 대신한다
 
     return {
         "request_id": package.get("request_id") or query.get("request_id", ""),
@@ -243,28 +245,77 @@ def build_draft(handoff: dict, source_text: str | None = None) -> dict:
     }
 
 
+def _compose_body(place: str, standard: dict) -> str:
+    parts = [f"{T.BODY_PLACE_HEAD}\n{place}"] if place else []
+    for sid in ("content", "request", "evidence"):
+        parts.append(f"{T.BODY_HEADS[sid]}\n{standard[sid]}")
+    return "\n\n".join(parts)
+
+
 def _submission(query: dict, standard: dict) -> dict:
     """제출 창구(국민신문고 등)의 글 칸 두 개(제목·내용)에 그대로 붙여 넣을 글과 처리기관 안내.
     이름·연락처·주소는 창구 화면에서 본인이 직접 넣으므로 여기에 넣지 않는다."""
     emd = query.get("location", {}).get("emd_name") or ""
     sigungu = sigungu_of(emd)
     place = " ".join(x for x in (T.PROVINCE, sigungu, emd) if x) if emd else ""
-    parts = []
-    if place:
-        parts.append(f"{T.BODY_PLACE_HEAD}\n{place}")
-    for sid in ("content", "request", "evidence"):
-        parts.append(f"{T.BODY_HEADS[sid]}\n{standard[sid]}")
-    title, body = standard["title"], "\n\n".join(parts)
+    title, body = standard["title"], _compose_body(place, standard)
     return {
         "title": title,
         "body": body,
         "title_chars": len(title),
         "body_chars": len(body),
+        "place": place,
         "complaint_type": query.get("complaint_type") or "",
         "agency": " ".join(x for x in (T.PROVINCE, sigungu) if x),   # 처리기관 고를 때 참고(추천일 뿐)
         "portals": T.PORTALS,
         "steps": T.SUBMIT_STEPS,
     }
+
+
+def apply_edits(draft: dict, edits: dict | None) -> dict:
+    """사용자가 표준어본을 직접 고친 것을 반영한 새 초안. edits: {"title"|"content"|"request": 고친 글}
+
+    - 고칠 수 있는 것은 제목·민원 내용·요청 사항뿐이다. 근거 자료(숫자·출처)는 고칠 수 없다(들어와도 무시).
+    - 고친 글도 개인정보를 가린다. 빈 글이면 원래 글을 그대로 둔다.
+    - 제주어 화면: 원문을 보여 주는 섹션(original)은 그대로, 표준어를 보여 주던 섹션은 고친 글을 따라간다.
+    - 받은 draft 는 바꾸지 않는다.
+    """
+    d = copy.deepcopy(draft)
+    found = set(d.get("pii_masked") or [])
+    for sec in d["sections"]:
+        if sec["id"] not in T.EDITABLE:
+            continue
+        raw = (edits or {}).get(sec["id"])
+        if raw is None:
+            continue
+        lines = []
+        for line in str(raw).replace("\r\n", "\n").split("\n"):      # 줄바꿈은 살리고 줄마다 가린다
+            masked, pii = mask(line)
+            found.update(pii)
+            lines.append(masked)
+        text = "\n".join(lines).strip()
+        if sec["id"] == "title":
+            text = " ".join(text.split())
+        if not text or text == sec["standard"]:
+            continue
+        if sec["dialect_source"] == "standard_fallback":
+            sec["dialect"] = text
+        sec["standard"] = text
+        sec["edited"] = True
+    standard = {sec["id"]: sec["standard"] for sec in d["sections"]}
+    sub = d["submission"]
+    sub["title"], sub["body"] = standard["title"], _compose_body(sub.get("place", ""), standard)
+    sub["title_chars"], sub["body_chars"] = len(sub["title"]), len(sub["body"])
+    d["pii_masked"] = sorted(found)
+    return d
+
+
+_CODE_TAIL = re.compile(r"\s*\((?:[A-Za-z_][A-Za-z0-9_.]*)\)\s*$")
+
+
+def friendly(notice: str) -> str:
+    """알림 끝의 개발용 표시 '(PaidCallNotAllowed)' 등을 화면에 보이지 않게 뗀다. 원래 알림은 handoff 에 남아 있다."""
+    return _CODE_TAIL.sub("", notice or "")
 
 
 def plain_text(draft: dict, version: str = "standard") -> str:
