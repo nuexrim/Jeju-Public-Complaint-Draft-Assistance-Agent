@@ -17,6 +17,7 @@
 - 숫자·출처는 package.evidence[].value·sources 만 옮긴다. 표시할 때 소수점 둘째 자리까지만 줄인다.
 - 근거 자료에는 supported·partial 만 넣는다. contradicted·unverifiable·gaps 는 excluded 로 돌려 화면에서 안내한다.
 - 엔진이 mock 이면 경고를 붙이고 copy_allowed=False 로 둔다.
+- 표준어본은 격식체(합니다체)로 맞춘다(formal.py, 문장 끝만 규칙으로 바꿈). 방언본의 원문과 사용자가 직접 고친 글은 바꾸지 않는다.
 - 사용자가 고칠 수 있는 것은 제목·민원 내용·요청 사항이다(apply_edits). 근거 자료는 잠근다.
 - 제출용 글은 창구(국민신문고 등)의 글 칸에 맞춰 submission.title(제목 칸)·submission.body(내용 칸)로 따로 만든다.
 """
@@ -30,6 +31,7 @@ import re
 from pathlib import Path
 
 from complaint_draft import templates as T
+from complaint_draft.formal import formalize, has_informal
 
 ROOT = Path(__file__).resolve().parent.parent
 PRIVACY_PY = ROOT / "evidence_engine" / "package" / "privacy.py"
@@ -109,7 +111,7 @@ def _shorten(text: str, limit: int) -> str:
 def _title(query: dict) -> str:
     """제목: '장소 + 요청' 한 문장. 요구사항이 없으면 대상(targets)이나 첫 주장을 주제로 쓴다."""
     place = query.get("location", {}).get("emd_name") or ""
-    request = _shorten(query.get("user_request") or "", 30)
+    request = _shorten(formalize(query.get("user_request") or ""), 30)
     if request:
         title = f"{place} {request}" if request.endswith(T.REQUEST_ENDINGS) else \
             T.TITLE_REQUEST.format(place=place, user_request=request)
@@ -127,22 +129,34 @@ def _title(query: dict) -> str:
     return _shorten(title.strip(), T.TITLE_MAX)
 
 
+def _stop(text: str) -> str:
+    """문장 끝에 마침표가 없으면 붙인다."""
+    text = text.rstrip()
+    return text if not text or text[-1] in ".!?…" else text + "."
+
+
 def _content(query: dict) -> str:
+    """민원 내용. 표준어본은 격식체(합니다체)로 맞춘다: 이해한 문장은 해요체 끝을, 주장은 '-다' 끝도 바꾼다."""
     lines = [T.CONTENT_INTRO]
-    normalized = (query.get("normalized_text") or "").strip()
-    if normalized:
-        lines.append(normalized if normalized.endswith((".", "요", "다")) else normalized + ".")
-    claims = [c["text"].strip() for c in query.get("claims") or [] if c.get("text", "").strip()]
-    if claims and not (len(claims) == 1 and claims[0] == normalized):
+    raw = (query.get("normalized_text") or "").strip()
+    if raw:
+        lines.append(_stop(formalize(raw)))
+    raw_claims = [c["text"].strip() for c in query.get("claims") or [] if c.get("text", "").strip()]
+    if raw_claims and not (len(raw_claims) == 1 and raw_claims[0] == raw):
         lines.append("")
         lines.append(T.CONTENT_CLAIMS_HEAD)
-        lines.extend(f"- {c}" for c in claims)
+        lines.extend(f"- {_stop(formalize(c, plain=True))}" for c in raw_claims)
     return "\n".join(lines)
 
 
 def _request(query: dict) -> str:
-    req = (query.get("user_request") or "").strip()
-    return T.REQUEST.format(user_request=req) if req else T.REQUEST_DEFAULT
+    """요청 사항. 문장으로 쓴 요청('…해 주세요')은 격식체로 바꿔 그대로 쓰고, 낱말로 쓴 요청('버스 증차')은 틀에 넣는다."""
+    req = formalize((query.get("user_request") or "").strip())
+    if not req:
+        return T.REQUEST_DEFAULT
+    if req.rstrip(".").endswith(("니다", "시오")):
+        return _stop(req)
+    return T.REQUEST.format(user_request=req)
 
 
 def _split_evidence(package: dict, query: dict) -> tuple[list[dict], list[dict]]:
@@ -227,6 +241,8 @@ def build_draft(handoff: dict, source_text: str | None = None) -> dict:
         warnings.append(T.MOCK_WARNING)
     if handoff.get("structured_by") == "rules":
         warnings.append(T.RULES_WARNING)
+    if has_informal(standard["content"]) or has_informal(standard["request"]):
+        warnings.append(T.INFORMAL_WARNING)
     if not source:
         warnings.append(T.NO_SOURCE_WARNING)
     notices = [friendly(n) for n in handoff.get("notices") or [] if "mock" not in n]   # mock 안내는 위 경고로 대신한다

@@ -97,6 +97,7 @@ Streamlit 과 무관한 함수라 다른 화면에서도 쓸 수 있습니다.
 | 항목 | 처리 |
 | --- | --- |
 | 문장 | LLM 없이 `templates.py` 틀에 handoff 필드를 채움. 문장을 바꾸려면 이 파일만 고침 |
+| 문체 | 표준어본은 격식체(합니다체). `formal.py`가 문장 끝만 규칙으로 바꿈(힘들어요→힘듭니다, 줄었다→줄었습니다, 주세요→주시기 바랍니다). 애매한 끝(-네요, -거든요, 물음)은 그대로 두고 경고를 띄움. 방언 원문과 직접 고친 글은 바꾸지 않음 |
 | 제주어 화면 | 방언을 새로 만들지 않음. `민원 내용`만 원문 그대로(`original`), 나머지는 표준어(`standard_fallback`) |
 | 숫자·출처 | `package.evidence[].value`·`sources`만 옮김. 표시만 소수점 둘째 자리까지 |
 | 근거 자료 | `supported`·`partial`만 넣음. `partial`은 "일부만 확인된 근거" 표시 |
@@ -128,9 +129,10 @@ Streamlit 과 무관한 함수라 다른 화면에서도 쓸 수 있습니다.
 | --- | --- |
 | `draft.py` | `build_draft`, `apply_edits`, `plain_text`, `validate_draft` |
 | `templates.py` | 문장 틀, 판정 표시, 경고 문구 |
+| `formal.py` | 격식체 변환 (`formalize`, `has_informal`) |
 | `view.py`, `view.html` | 토글 화면 HTML |
 | `flow.py` | 대화 흐름 (되묻기 → 뜻 고르기 → 최종 확인 → 초안) |
 | `app.py` | Streamlit 화면 (말로 시작하기 / 예시·파일로 보기) |
 | `style.py` | 화면 꾸밈: 색·글자·감귤 캐릭터·단계 표시·카드 |
 | `samples/*.json` | 예시 handoff 3개 (수치·기준일은 실제 계산값 아님) |
-| `tests/` | pytest 39개 (`test_draft.py` 26, `test_flow.py` 13) |
+| `tests/` | pytest 108개 (`test_draft.py` 28, `test_flow.py` 13, `test_formal.py` 67) |

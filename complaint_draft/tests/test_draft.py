@@ -145,7 +145,9 @@ def test_title_without_request_uses_topic_and_stays_short():
     h = load_handoff(SAMPLES / "mixed.json")
     assert build_draft(h)["submission"]["title"] == "노형동 클린하우스·CCTV 관련 불편 개선 요청"
     h["query"]["user_request"] = "클린하우스를 더 설치해 주세요"
-    assert build_draft(h)["submission"]["title"] == "노형동 클린하우스를 더 설치해 주세요"      # 이미 요청으로 끝나면 덧붙이지 않음
+    d = build_draft(h)
+    assert d["submission"]["title"] == "노형동 클린하우스를 더 설치해 주시기 바랍니다"            # 이미 요청으로 끝나면 덧붙이지 않음
+    assert "[요청 사항]\n클린하우스를 더 설치해 주시기 바랍니다." in d["submission"]["body"]      # 문장 요청은 틀 없이 그대로
     h["query"]["user_request"] = "가" * 200
     assert len(build_draft(h)["submission"]["title"]) <= 61
 
@@ -217,3 +219,22 @@ def test_friendly_strips_developer_codes_only():
 def test_content_does_not_repeat_place_sentence():
     d = build_draft(load_handoff(SAMPLES / "supported.json"))
     assert d["submission"]["body"].count("구좌읍") == 3              # 발생 장소 1 + 주장 문장 2
+
+
+def test_standard_version_is_formal_and_dialect_is_untouched():
+    h = load_handoff(SAMPLES / "supported.json")
+    d = build_draft(h)
+    by = {s["id"]: s for s in d["sections"]}
+    std = by["content"]["standard"]
+    assert "매우 힘듭니다." in std and "힘들어요" not in std
+    assert "- 구좌읍 정류소에서 버스를 타는 사람이 1년 전보다 줄었습니다." in std
+    assert "- 구좌읍 어르신 수에 비해 의원이 적습니다." in std
+    assert by["content"]["dialect"] == h["source_text"]                 # 원문은 그대로
+    assert d["evidence"][0]["claim"].endswith("줄었다")                  # 자료(주장 원문)는 바꾸지 않는다
+    assert not any("격식체" in w for w in d["warnings"])
+
+
+def test_leftover_informal_ending_is_flagged():
+    h = load_handoff(SAMPLES / "supported.json")
+    h["query"]["normalized_text"] = "버스가 정말 안 오네요"
+    assert any("격식체" in w for w in build_draft(h)["warnings"])
