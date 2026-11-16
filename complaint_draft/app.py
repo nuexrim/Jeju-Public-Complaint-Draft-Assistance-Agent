@@ -2,9 +2,10 @@
 
     저장소 맨 위에서:  streamlit run complaint_draft/app.py
 
-말로 시작하기 : 1 말하기 → 2 뜻 확인(되묻기·뜻 고르기·최종 확인) → 3 민원서 초안.
+기본 화면      : 1 말하기 → 2 뜻 확인(되묻기·뜻 고르기·최종 확인) → 3 민원서 초안.
                complaint_agent 의 Agent 를 그대로 부른다. 흐름은 complaint_draft/flow.py, 꾸밈은 style.py.
-예시·파일로 보기 : 예시나 handoff JSON(python -m complaint_agent --out handoff.json "...")으로 초안만 본다(개발·시연용).
+예시·파일로 보기 : 주소 끝에 ?mode=file 을 붙이면 열린다(예: http://localhost:8501/?mode=file). 개발·시연용.
+               예시나 handoff JSON(python -m complaint_agent --out handoff.json "...")으로 초안만 본다.
 """
 from __future__ import annotations
 
@@ -28,7 +29,6 @@ SAMPLES = {
     "예시 2 · 일부 근거가 빠진 민원 (원문 없음)": "mixed.json",
     "예시 3 · 근거 DB 없이 만든 결과 (mock)": "mock.json",
 }
-MODE_TALK, MODE_FILE = "말로 시작하기", "예시·파일로 보기"
 HELP_TYPES = ["교통", "의료 접근", "환경·청소", "안전·재난", "생활물가"]     # 근거 엔진이 확인할 수 있는 민원 유형
 STEP_OF = {"input": 0, "questions": 1, "meanings": 1, "confirm": 1, "draft": 2, "stopped": 1}
 FOOTNOTE = "이 도우미는 민원서 작성만 돕습니다. 접수는 국민신문고나 읍·면·동 주민센터에서 직접 하셔야 합니다."
@@ -344,9 +344,8 @@ def page_talk() -> None:
 
 # ---------------------------------------------------------------- 화면
 st.html(style.css(font_size()))
-mode = st.sidebar.radio("시작 방법", [MODE_TALK, MODE_FILE])
 show_header()
-if mode == MODE_TALK:
-    page_talk()
-else:
+if st.query_params.get("mode") == "file":      # 시연·개발용: 주소 끝에 ?mode=file 을 붙이면 예시·파일로 보기
     page_file()
+else:
+    page_talk()

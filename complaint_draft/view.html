@@ -60,7 +60,7 @@
     body { background: #fff; font-size: 12pt; }
     .top, .notice, aside, .badge { display: none !important; }
     article { border: 0; padding: 0; }
-    body.dia .dia-only { display: none !important; }      /* 인쇄는 항상 표준어본 */
+    body.dia .dia-only { display: none !important; }      /* 인쇄는 항상 표준어 */
     body.dia .std-only { display: block !important; }
   }
 </style>
@@ -69,12 +69,12 @@
   <div class="top">
     <h1>민원서 초안이 준비됐어요</h1>
     <div class="toggle" role="group" aria-label="초안 보기 방식">
-      <button type="button" data-mode="std" aria-pressed="true">표준어본 (제출용)</button>
-      <button type="button" data-mode="dia" aria-pressed="false">내 말 그대로 (확인용)</button>
+      <button type="button" data-mode="std" aria-pressed="true">표준어</button>
+      <button type="button" data-mode="dia" aria-pressed="false">방언</button>
     </div>
   </div>
   <p class="notice std-only">행정기관에 내는 민원서입니다. 오른쪽 단추로 인쇄하거나 복사해서 쓰세요.</p>
-  <p class="notice dia-only">하신 말씀이 제대로 들어갔는지 확인하는 화면입니다. 제출은 표준어본으로 합니다.</p>
+  <p class="notice dia-only">하신 말씀이 제대로 들어갔는지 확인하는 화면입니다. 제출은 표준어로 합니다.</p>
   <div class="cols">
     <article id="doc"></article>
     <aside>
@@ -166,7 +166,7 @@
   function refresh(mode) {
     let off = false, msg = READY;
     if (!DRAFT.copy_allowed) { off = true; msg = "예시 결과라서 인쇄·복사할 수 없어요."; }
-    else if (mode === "dia") { off = true; msg = "확인용 화면이에요. 표준어본으로 바꾸면 인쇄·복사할 수 있어요."; }
+    else if (mode === "dia") { off = true; msg = "확인용 화면이에요. 표준어로 바꾸면 인쇄·복사할 수 있어요."; }
     for (const b of copyBtns) b.disabled = off;
     printBtn.disabled = off;
     hint.textContent = msg;
