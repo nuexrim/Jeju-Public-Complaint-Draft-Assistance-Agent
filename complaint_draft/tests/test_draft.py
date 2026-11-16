@@ -161,7 +161,20 @@ def test_seogwipo_and_unknown_place():
 
 def test_html_has_two_copy_buttons():
     html = render_html(build_draft(load_handoff(SAMPLES / "supported.json")))
-    assert 'id="copyTitle"' in html and 'id="copyBody"' in html
+    assert 'data-part="title"' in html and 'data-part="body"' in html and 'id="print"' in html
+
+
+def test_html_font_size_follows_setting():
+    d = build_draft(load_handoff(SAMPLES / "supported.json"))
+    assert 'style="font-size: 20px"' in render_html(d) and 'style="font-size: 17px"' in render_html(d, "보통")
+
+
+def test_style_escapes_user_text():
+    from complaint_draft import style
+    bad = '<script>alert(1)</script>'
+    for html in (style.said_card(bad), style.understood_card([("장소", bad, True)]), style.ask_head(bad), style.title(bad, bad)):
+        assert "<script>" not in html and "&lt;script&gt;" in html
+    assert style.stepper(1).count("aria-current") == 1
 
 
 def test_edits_change_standard_and_submission_but_not_evidence_or_original():

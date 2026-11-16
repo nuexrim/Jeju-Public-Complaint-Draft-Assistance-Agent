@@ -1,0 +1,13 @@
+# 민원서 작성 도우미 화면 색 (streamlit run complaint_draft/app.py 를 저장소 맨 위에서 실행할 때 적용)
+[theme]
+base = "light"
+primaryColor = "#F7941D"
+backgroundColor = "#FFF8EE"
+secondaryBackgroundColor = "#FFE9CC"
+textColor = "#1F2326"
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"      # 오른쪽 위 Deploy 단추를 숨긴다(머리의 단추와 겹치지 않게)

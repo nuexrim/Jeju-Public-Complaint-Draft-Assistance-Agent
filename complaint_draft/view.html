@@ -1,64 +1,102 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" style="font-size: __ROOT_PX__px">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap">
 <style>
+  /* 글자 크기는 html 의 font-size(보통 17px / 크게 20px)에 맞춰 rem 으로 따라간다. */
   :root {
-    --ink: #1d2433; --muted: #5a6475; --line: #d9dee7; --paper: #ffffff; --bg: #f4f6f9;
-    --std: #1f5fbf; --std-soft: #e8f0fc; --dia: #b4561c; --dia-soft: #fdf0e6;
+    --ink: #1F2326; --muted: #4A5157; --line: #B9BEC2; --paper: #FFFFFF; --bg: #FFF8EE; --grey: #ECEAE6;
+    --orange: #F7941D; --soft: #FFE9CC; --brown: #9A4100; --green: #2F6B2C; --green-soft: #E4F2E1;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--ink);
-    font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif; font-size: 20px; line-height: 1.7; }
-  .bar { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 14px 4px 12px; border-bottom: 1px solid var(--line); }
-  .toggle { display: flex; background: #e3e7ee; border-radius: 999px; padding: 5px; gap: 5px; }
-  .toggle button { flex: 1; border: 0; border-radius: 999px; padding: 14px 10px; font: inherit; font-weight: 700;
-    background: transparent; color: var(--muted); cursor: pointer; }
-  .toggle button[aria-pressed="true"].std { background: var(--std); color: #fff; }
-  .toggle button[aria-pressed="true"].dia { background: var(--dia); color: #fff; }
-  .toggle button:focus-visible, .copy:focus-visible { outline: 3px solid #111; outline-offset: 2px; }
-  .notice { margin-top: 10px; padding: 12px 16px; border-radius: 12px; font-size: 18px; }
-  body.std .notice { background: var(--std-soft); color: #173f7d; }
-  body.dia .notice { background: var(--dia-soft); color: #7a3a12; }
-  main { padding: 16px 4px 8px; }
-  section { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 18px 22px; margin-bottom: 16px; }
-  section h2 { margin: 0 0 8px; font-size: 20px; color: var(--muted); display: flex; align-items: center; gap: 10px; }
-  .badge { font-size: 15px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: #eceff4; color: var(--muted); }
-  .badge.edited { background: #e6f4ea; color: #1e6b3a; }
-  .text { white-space: pre-wrap; word-break: keep-all; font-size: 22px; margin: 0; }
+  body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.65;
+    font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 1.1rem; }
+  button { font: inherit; color: var(--ink); cursor: pointer; }
+  button:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 4px 2px 20px; }
+  .top h1 { margin: 0; font-size: 1.9rem; line-height: 1.3; }
+  .toggle { display: flex; flex-wrap: wrap; gap: 6px; background: var(--grey); border-radius: 18px; padding: 6px; }
+  .toggle button { border: 0; border-radius: 14px; padding: 0.6rem 1.3rem; min-height: 56px; font-size: 1.1rem; font-weight: 700;
+    background: transparent; color: var(--muted); }
+  .toggle button[aria-pressed="true"] { background: var(--orange); color: var(--ink); }
+  .notice { margin: 0 2px 20px; padding: 0.7rem 1.2rem; border-radius: 14px; font-size: 1rem; font-weight: 500; background: var(--grey); }
+  body.dia .notice { background: var(--soft); color: var(--brown); }
+  .cols { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; padding: 0 2px; }
+  article { flex: 1 1 560px; min-width: 280px; background: var(--paper); border: 2px solid var(--line); border-radius: 20px;
+    padding: clamp(24px, 3.2vw, 44px); display: flex; flex-direction: column; gap: 22px; }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+  .chip { font-size: 0.95rem; font-weight: 700; color: var(--brown); background: var(--soft); border-radius: 999px; padding: 0.35rem 1rem; }
+  .to { font-size: 0.95rem; font-weight: 500; color: var(--muted); }
+  .doc-title { margin: 0; font-size: 1.7rem; font-weight: 700; line-height: 1.35; padding-bottom: 20px; border-bottom: 2px solid var(--ink);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .sec { display: flex; flex-direction: column; gap: 8px; }
+  .sec h3 { margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--brown); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .text { margin: 0; white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; }
+  .badge { font-size: 0.8rem; font-weight: 700; padding: 1px 12px; border-radius: 999px; background: var(--grey); color: var(--muted); }
+  .badge.original { background: var(--soft); color: var(--brown); border: 2px solid var(--brown); }
+  .badge.edited { background: var(--green-soft); color: var(--green); }
   body.std .dia-only, body.dia .std-only { display: none; }
-  body.dia section.original { border-color: var(--dia); }
-  .actions { position: sticky; bottom: 0; background: var(--bg); padding: 10px 4px 16px; border-top: 1px solid var(--line); }
-  .copy { width: 100%; border: 0; border-radius: 14px; padding: 18px; font: inherit; font-size: 22px; font-weight: 700;
-    background: var(--std); color: #fff; cursor: pointer; }
-  .copies { display: flex; gap: 10px; }
-  .copy:disabled { background: #c3c9d3; color: #f4f6f9; cursor: not-allowed; }
-  .hint { text-align: center; font-size: 17px; color: var(--muted); margin-top: 6px; min-height: 1.5em; }
+  aside { flex: 0 1 400px; min-width: 280px; display: flex; flex-direction: column; gap: 20px; }
+  .ev { background: var(--green-soft); border: 2px solid var(--green); border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+  .ev h2 { margin: 0; font-size: 1.25rem; color: var(--green); }
+  .ev-card { background: var(--paper); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 4px; }
+  .ev-name { font-size: 0.95rem; font-weight: 700; line-height: 1.45; }
+  .ev-value { font-size: 1.5rem; font-weight: 700; }
+  .ev-src { font-size: 0.8rem; color: var(--muted); line-height: 1.5; }
+  .ev-partial { font-size: 0.8rem; font-weight: 700; color: var(--brown); }
+  .ev.none { background: var(--paper); border-color: var(--line); }
+  .ev.none h2 { color: var(--ink); }
+  .know { background: var(--paper); border: 2px solid var(--line); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 6px; }
+  .know h2 { margin: 0; font-size: 0.95rem; }
+  .know p { margin: 0; font-size: 0.9rem; line-height: 1.55; color: var(--muted); }
+  .actions { display: flex; flex-direction: column; gap: 12px; }
+  .act { border-radius: 16px; padding: 0.9rem 1.6rem; min-height: 72px; font-size: 1.3rem; font-weight: 700; background: var(--paper); border: 2px solid var(--ink); }
+  .act.main { background: var(--orange); border-color: var(--orange); }
+  .act:disabled { background: var(--grey); border-color: var(--grey); color: #6B7177; cursor: not-allowed; }
+  .hint { font-size: 0.9rem; color: var(--muted); min-height: 1.6em; text-align: center; }
+  @media print {
+    body { background: #fff; font-size: 12pt; }
+    .top, .notice, aside, .badge { display: none !important; }
+    article { border: 0; padding: 0; }
+    body.dia .dia-only { display: none !important; }      /* 인쇄는 항상 표준어본 */
+    body.dia .std-only { display: block !important; }
+  }
 </style>
 </head>
 <body class="std">
-  <div class="bar">
-    <div class="toggle" role="group" aria-label="보기 전환">
-      <button type="button" class="std" data-mode="std" aria-pressed="true">표준어 (제출용)</button>
-      <button type="button" class="dia" data-mode="dia" aria-pressed="false">제주어 (확인용)</button>
+  <div class="top">
+    <h1>민원서 초안이 준비됐어요</h1>
+    <div class="toggle" role="group" aria-label="초안 보기 방식">
+      <button type="button" data-mode="std" aria-pressed="true">표준어본 (제출용)</button>
+      <button type="button" data-mode="dia" aria-pressed="false">내 말 그대로 (확인용)</button>
     </div>
-    <div class="notice std-only">행정기관에 내는 민원서입니다. 아래 버튼으로 제목과 내용을 복사해서 쓰세요.</div>
-    <div class="notice dia-only">하신 말씀이 제대로 들어갔는지 확인하는 화면입니다. 제출은 표준어로 합니다.</div>
   </div>
-  <main id="sections"></main>
-  <div class="actions">
-    <div class="copies">
-      <button type="button" class="copy" id="copyTitle" data-part="title">① 제목 복사하기</button>
-      <button type="button" class="copy" id="copyBody" data-part="body">② 내용 복사하기</button>
-    </div>
-    <div class="hint" id="hint" aria-live="polite"></div>
+  <p class="notice std-only">행정기관에 내는 민원서입니다. 오른쪽 단추로 인쇄하거나 복사해서 쓰세요.</p>
+  <p class="notice dia-only">하신 말씀이 제대로 들어갔는지 확인하는 화면입니다. 제출은 표준어본으로 합니다.</p>
+  <div class="cols">
+    <article id="doc"></article>
+    <aside>
+      <section class="ev" id="ev"></section>
+      <section class="know">
+        <h2>알아두세요</h2>
+        <p id="know"></p>
+      </section>
+      <div class="actions">
+        <button type="button" class="act main" id="print">인쇄하기</button>
+        <button type="button" class="act copy" data-part="title">① 제목 복사하기</button>
+        <button type="button" class="act copy" data-part="body">② 내용 복사하기</button>
+        <div class="hint" id="hint" aria-live="polite"></div>
+      </div>
+    </aside>
   </div>
 <script>
   const DRAFT = __DRAFT_JSON__;
-  const root = document.getElementById("sections");
-  const copyBtns = [document.getElementById("copyTitle"), document.getElementById("copyBody")];
+  const doc = document.getElementById("doc");
   const hint = document.getElementById("hint");
+  const copyBtns = [...document.querySelectorAll(".copy")];
+  const printBtn = document.getElementById("print");
 
   function el(tag, cls, text) {
     const e = document.createElement(tag);
@@ -67,51 +105,82 @@
     return e;
   }
 
+  function badges(parent, s) {
+    parent.appendChild(el("span", "badge dia-only" + (s.dialect_source === "original" ? " original" : ""),
+                          s.dialect_source === "original" ? "하신 말씀 그대로" : "표준어로 표시"));
+    if (s.edited) parent.appendChild(el("span", "badge edited", "직접 고친 글"));
+  }
+
+  // ---- 문서
+  const sub = DRAFT.submission;
+  const meta = el("div", "meta");
+  if (sub.complaint_type) meta.appendChild(el("span", "chip", sub.complaint_type));
+  if (sub.agency) meta.appendChild(el("span", "to", "받는 곳(예상): " + sub.agency));
+  doc.appendChild(meta);
+
+  let n = 0;
   for (const s of DRAFT.sections) {
-    const sec = el("section", s.dialect_source === "original" ? "original" : "");
+    if (s.id === "title") {
+      const h = el("h2", "doc-title");
+      h.dataset.id = s.id;
+      h.appendChild(el("span", "std-only", s.standard));
+      h.appendChild(el("span", "dia-only", s.dialect));
+      badges(h, s);
+      doc.appendChild(h);
+      continue;
+    }
+    n += 1;
+    const sec = el("section", "sec");
     sec.dataset.id = s.id;
-    const h = el("h2", "", s.title);
-    if (s.dialect_source === "original") h.appendChild(el("span", "badge dia-only", "하신 말씀 그대로"));
-    else h.appendChild(el("span", "badge dia-only", "표준어로 표시"));
-    if (s.edited) h.appendChild(el("span", "badge edited", "직접 고친 글"));
+    const h = el("h3", "", n + ". " + s.title);
+    badges(h, s);
     sec.appendChild(h);
     sec.appendChild(el("p", "text std-only", s.standard));
     sec.appendChild(el("p", "text dia-only", s.dialect));
-    root.appendChild(sec);
+    doc.appendChild(sec);
   }
 
-  const READY = "제목과 내용을 차례로 복사해 민원 창구의 같은 이름 칸에 붙여 넣으세요.";
+  // ---- 근거 카드
+  const ev = document.getElementById("ev");
+  if (DRAFT.evidence.length) {
+    ev.appendChild(el("h2", "", "제주 데이터 근거 " + DRAFT.evidence.length + "건"));
+    for (const e of DRAFT.evidence) {
+      const card = el("div", "ev-card");
+      card.appendChild(el("div", "ev-name", e.indicator));
+      card.appendChild(el("div", "ev-value", e.value_text));
+      const srcs = (e.sources || []).map(x => x.publisher + " · 기준 " + x.as_of);
+      card.appendChild(el("div", "ev-src", "출처: " + (srcs.length ? [...new Set(srcs)].join(" / ") : "정보 없음")));
+      if (e.verdict === "partial") card.appendChild(el("div", "ev-partial", "일부만 확인된 근거"));
+      ev.appendChild(card);
+    }
+  } else {
+    ev.classList.add("none");
+    ev.appendChild(el("h2", "", "데이터로 확인된 근거가 없어요"));
+  }
+  let know = "수치는 공개 데이터 기준이며, 말씀하신 곳만 따로 조사한 값은 아닙니다.";
+  if (DRAFT.excluded.length) know += " 자료와 맞지 않거나 확인할 수 없는 내용 " + DRAFT.excluded.length + "건은 근거에서 뺐습니다(아래에서 볼 수 있어요).";
+  document.getElementById("know").textContent = know;
 
-  function refreshCopy(mode) {
+  // ---- 보기 전환
+  const READY = "제목과 내용을 차례로 복사해 민원 창구의 같은 이름 칸에 붙여 넣으세요.";
+  function refresh(mode) {
     let off = false, msg = READY;
-    if (!DRAFT.copy_allowed) { off = true; msg = "예시 결과라서 복사할 수 없어요."; }
-    else if (mode === "dia") { off = true; msg = "확인용 화면이에요. 표준어로 바꾸면 복사할 수 있어요."; }
+    if (!DRAFT.copy_allowed) { off = true; msg = "예시 결과라서 인쇄·복사할 수 없어요."; }
+    else if (mode === "dia") { off = true; msg = "확인용 화면이에요. 표준어본으로 바꾸면 인쇄·복사할 수 있어요."; }
     for (const b of copyBtns) b.disabled = off;
+    printBtn.disabled = off;
     hint.textContent = msg;
   }
-
-  // 전환해도 보던 섹션이 같은 자리에 남도록, 화면 맨 위에 걸친 섹션을 기준으로 스크롤을 맞춘다.
-  function anchor() {
-    const top = document.querySelector(".bar").getBoundingClientRect().bottom;
-    for (const sec of root.children) {
-      const r = sec.getBoundingClientRect();
-      if (r.bottom > top) return { sec, offset: r.top };
-    }
-    return null;
-  }
-
   function setMode(mode) {
-    const a = anchor();
     document.body.className = mode;
     for (const b of document.querySelectorAll(".toggle button"))
       b.setAttribute("aria-pressed", String(b.dataset.mode === mode));
-    if (a) window.scrollBy(0, a.sec.getBoundingClientRect().top - a.offset);
-    refreshCopy(mode);
+    refresh(mode);
   }
-
   for (const b of document.querySelectorAll(".toggle button"))
     b.addEventListener("click", () => setMode(b.dataset.mode));
 
+  // ---- 복사·인쇄
   async function copyText(text) {
     try { await navigator.clipboard.writeText(text); return true; } catch (e) {}
     const ta = document.createElement("textarea");
@@ -122,18 +191,18 @@
     ta.remove();
     return ok;
   }
-
   for (const b of copyBtns)
     b.addEventListener("click", async () => {
       if (b.disabled) return;
       const part = b.dataset.part;
-      const ok = await copyText(DRAFT.submission[part]);
+      const ok = await copyText(sub[part]);
       const name = part === "title" ? "제목" : "내용";
       hint.textContent = ok ? name + "을 복사했어요. 민원 창구의 '" + name + "' 칸에 붙여 넣으세요."
                             : "복사하지 못했어요. 아래 '글로 받기'를 써 주세요.";
     });
+  printBtn.addEventListener("click", () => { if (!printBtn.disabled) window.print(); });
 
-  refreshCopy("std");
+  refresh("std");
 </script>
 </body>
 </html>
