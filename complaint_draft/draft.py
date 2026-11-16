@@ -17,9 +17,11 @@
 - 숫자·출처는 package.evidence[].value·sources 만 옮긴다. 표시할 때 소수점 둘째 자리까지만 줄인다.
 - 근거 자료에는 supported·partial 만 넣는다. contradicted·unverifiable·gaps 는 excluded 로 돌려 화면에서 안내한다.
 - 엔진이 mock 이면 경고를 붙이고 copy_allowed=False 로 둔다.
+- 제출용 글은 창구(국민신문고 등)의 글 칸에 맞춰 submission.title(제목 칸)·submission.body(내용 칸)로 따로 만든다.
 """
 from __future__ import annotations
 
+import csv
 import importlib.util
 import json
 from pathlib import Path
@@ -28,6 +30,7 @@ from complaint_draft import templates as T
 
 ROOT = Path(__file__).resolve().parent.parent
 PRIVACY_PY = ROOT / "evidence_engine" / "package" / "privacy.py"
+EMD_CSV = ROOT / "evidence_engine" / "data" / "spatial" / "emd_codes.csv"   # emd_code, sigungu_name, emd_name
 PII_PLACEHOLDER = "○○"            # 대화 모듈(dialect_normalizer)과 같은 자리표시
 INCLUDED_VERDICTS = ("supported", "partial")
 SECTION_IDS = [sid for sid, _ in T.SECTIONS]
@@ -80,22 +83,45 @@ def _sources_text(sources: list[dict]) -> str:
 
 
 # ---------------------------------------------------------------- 섹션 만들기
+_sigungu = None
+
+
+def sigungu_of(emd_name: str) -> str:
+    """읍면동 이름 → 제주시/서귀포시 (근거 엔진의 행정동 코드표). 못 찾으면 빈 문자열."""
+    global _sigungu
+    if _sigungu is None:
+        _sigungu = {}
+        if EMD_CSV.exists():
+            with EMD_CSV.open(encoding="utf-8", newline="") as f:
+                for row in csv.DictReader(f):
+                    _sigungu[row["emd_name"]] = row["sigungu_name"]
+    return _sigungu.get(emd_name or "", "")
+
+
+def _shorten(text: str, limit: int) -> str:
+    text = " ".join(text.split()).rstrip(" .")
+    return text if len(text) <= limit else text[:limit].rstrip() + "…"
+
+
 def _title(query: dict) -> str:
-    """제목 주제: 대상(targets)이 있으면 그것을, 없으면 첫 주장에서 읍면동 이름을 뺀 문장."""
+    """제목: '장소 + 요청' 한 문장. 요구사항이 없으면 대상(targets)이나 첫 주장을 주제로 쓴다."""
     place = query.get("location", {}).get("emd_name") or ""
-    targets = [t for t in query.get("targets") or [] if t]
-    if targets:
-        topic = "·".join(targets[:3])
+    request = _shorten(query.get("user_request") or "", 30)
+    if request:
+        title = f"{place} {request}" if request.endswith(T.REQUEST_ENDINGS) else \
+            T.TITLE_REQUEST.format(place=place, user_request=request)
     else:
-        claims = query.get("claims") or []
-        topic = claims[0]["text"] if claims else query.get("normalized_text", "")
-        if place:
-            topic = topic.replace(place, "")
-        topic = " ".join(topic.split()).rstrip(" .")
-        if len(topic) > 25:
-            topic = topic[:25].rstrip() + "…"
-    tpl = T.TITLE if place else T.TITLE_NO_PLACE
-    return tpl.format(complaint_type=query.get("complaint_type") or "기타", place=place, topic=topic)
+        targets = [t for t in query.get("targets") or [] if t]
+        if targets:
+            topic = "·".join(targets[:3])
+        else:
+            claims = query.get("claims") or []
+            topic = claims[0]["text"] if claims else query.get("normalized_text", "")
+            if place:
+                topic = topic.replace(place, "")
+            topic = _shorten(topic, 25)
+        title = T.TITLE_TOPIC.format(place=place, topic=topic)
+    return _shorten(title.strip(), T.TITLE_MAX)
 
 
 def _content(query: dict) -> str:
@@ -206,6 +232,7 @@ def build_draft(handoff: dict, source_text: str | None = None) -> dict:
     return {
         "request_id": package.get("request_id") or query.get("request_id", ""),
         "sections": sections,
+        "submission": _submission(query, standard),
         "evidence": included,
         "excluded": excluded,
         "warnings": warnings,
@@ -216,8 +243,35 @@ def build_draft(handoff: dict, source_text: str | None = None) -> dict:
     }
 
 
+def _submission(query: dict, standard: dict) -> dict:
+    """제출 창구(국민신문고 등)의 글 칸 두 개(제목·내용)에 그대로 붙여 넣을 글과 처리기관 안내.
+    이름·연락처·주소는 창구 화면에서 본인이 직접 넣으므로 여기에 넣지 않는다."""
+    emd = query.get("location", {}).get("emd_name") or ""
+    sigungu = sigungu_of(emd)
+    place = " ".join(x for x in (T.PROVINCE, sigungu, emd) if x) if emd else ""
+    parts = []
+    if place:
+        parts.append(f"{T.BODY_PLACE_HEAD}\n{place}")
+    for sid in ("content", "request", "evidence"):
+        parts.append(f"{T.BODY_HEADS[sid]}\n{standard[sid]}")
+    title, body = standard["title"], "\n\n".join(parts)
+    return {
+        "title": title,
+        "body": body,
+        "title_chars": len(title),
+        "body_chars": len(body),
+        "complaint_type": query.get("complaint_type") or "",
+        "agency": " ".join(x for x in (T.PROVINCE, sigungu) if x),   # 처리기관 고를 때 참고(추천일 뿐)
+        "portals": T.PORTALS,
+        "steps": T.SUBMIT_STEPS,
+    }
+
+
 def plain_text(draft: dict, version: str = "standard") -> str:
-    """복사·저장용 글. version='standard'(제출용) | 'dialect'(확인용)"""
+    """복사·저장용 글. version='standard'(제출용: 제목 + 내용) | 'dialect'(확인용: 섹션 그대로)"""
+    if version == "standard" and draft.get("submission"):
+        sub = draft["submission"]
+        return f"제목: {sub['title']}\n\n{sub['body']}"
     return "\n\n".join(f"[{s['title']}]\n{s[version]}" for s in draft["sections"])
 
 
@@ -235,6 +289,9 @@ def validate_draft(draft: dict) -> list[str]:
             errs.append(f"{s.get('id')}: dialect_source 값이 잘못됨")
         if s.get("dialect_source") == "standard_fallback" and s.get("dialect") != s.get("standard"):
             errs.append(f"{s.get('id')}: 원문이 없는데 방언본이 표준어본과 다름")
+    sub = draft.get("submission") or {}
+    if not sub.get("title") or not sub.get("body"):
+        errs.append("submission: 제목이나 내용이 비어 있음")
     for e in draft.get("evidence", []):
         if e.get("verdict") not in INCLUDED_VERDICTS:
             errs.append(f"{e.get('claim_id')}: 근거 자료에 넣을 수 없는 판정 {e.get('verdict')}")

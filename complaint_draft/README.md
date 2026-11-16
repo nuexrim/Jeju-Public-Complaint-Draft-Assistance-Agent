@@ -58,12 +58,30 @@ Streamlit 과 무관한 함수라 다른 화면에서도 쓸 수 있습니다.
     {"id": "request",  "title": "요청 사항", "standard": "...", "dialect": "...", "dialect_source": "standard_fallback"},
     {"id": "evidence", "title": "근거 자료", "standard": "...", "dialect": "...", "dialect_source": "standard_fallback"}
   ],
+  "submission": {"title": "구좌읍 버스 증차 요청", "body": "[발생 장소]\n...\n\n[불편 사항]\n...\n\n[요청 사항]\n...\n\n[근거 자료]\n...",
+                 "title_chars": 12, "body_chars": 551, "complaint_type": "교통", "agency": "제주특별자치도 제주시",
+                 "portals": [], "steps": []},
   "evidence": [{"claim_id": "c1", "verdict": "supported", "indicator": "...", "value": -12.43, "unit": "%",
                 "value_text": "-12.43%", "region_compare": "...", "sources": [], "caveats": []}],
   "excluded": [{"kind": "evidence", "claim_id": "c2", "claim": "...", "label": "...", "reason": "자료와 다름"}],
   "warnings": ["..."], "notices": ["..."], "pii_masked": [], "engine": "hybrid", "copy_allowed": true
 }
 ```
+
+## 제출 창구에 맞춘 글 (`submission`)
+
+국민신문고와 제주도 누리집 '도지사에게 바란다'는 글 칸이 **제목**과 **내용** 두 개입니다
+(이름·연락처·주소·처리기관은 창구 화면에서 본인이 직접 넣고 고릅니다). 그래서 제출용 글은 두 덩어리로 만듭니다.
+
+| 칸 | 만드는 법 |
+| --- | --- |
+| 제목 (`submission.title`) | 국민신문고 작성 요령대로 "장소 + 요청" 한 문장. 예: `구좌읍 버스 증차 요청`. 요구사항이 없으면 `노형동 클린하우스·CCTV 관련 불편 개선 요청` |
+| 내용 (`submission.body`) | `[발생 장소]` → `[불편 사항]` → `[요청 사항]` → `[근거 자료]` 순서로 한 덩어리 (사실 → 요청 → 근거) |
+| 처리기관 참고 (`submission.agency`) | 읍면동으로 제주시·서귀포시를 찾아 `제주특별자치도 제주시`처럼 안내. 추천일 뿐이고 고르는 것은 사용자 |
+
+- 화면의 복사 버튼은 `① 제목 복사하기`, `② 내용 복사하기` 두 개입니다.
+- 글자 수 제한은 창구의 공식 수치를 확인하지 못해 강제하지 않고, 글자 수만 보여 줍니다(`title_chars`, `body_chars`). 제목은 60자를 넘으면 줄입니다.
+- 이름·연락처·주소 같은 개인정보는 민원서에 넣지 않습니다.
 
 ## 규칙
 
@@ -81,9 +99,9 @@ Streamlit 과 무관한 함수라 다른 화면에서도 쓸 수 있습니다.
 ## 화면
 
 - 두 버전을 한 페이지에 모두 그려 두고 CSS 클래스만 바꿉니다. 전환할 때 보던 섹션이 같은 자리에 남습니다.
-- 처음은 표준어. 복사 버튼은 표준어 화면에서만 동작합니다.
+- 처음은 표준어. 복사 버튼(제목·내용)은 표준어 화면에서만 동작합니다.
 - 제주어 화면에서는 섹션마다 "하신 말씀 그대로" / "표준어로 표시" 표시가 붙습니다.
-- 글자 20~22px, 버튼은 전환·복사 두 개.
+- 글자 20~22px, 버튼은 전환과 복사(제목·내용)뿐.
 
 ## 파일
 
@@ -95,4 +113,4 @@ Streamlit 과 무관한 함수라 다른 화면에서도 쓸 수 있습니다.
 | `flow.py` | 대화 흐름 (되묻기 → 뜻 고르기 → 최종 확인 → 초안) |
 | `app.py` | Streamlit 화면 (말로 시작하기 / 예시·파일로 보기) |
 | `samples/*.json` | 예시 handoff 3개 (수치·기준일은 실제 계산값 아님) |
-| `tests/` | pytest 29개 (`test_draft.py` 16, `test_flow.py` 13) |
+| `tests/` | pytest 33개 (`test_draft.py` 20, `test_flow.py` 13) |

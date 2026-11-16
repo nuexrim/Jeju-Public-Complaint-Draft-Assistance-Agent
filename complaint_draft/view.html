@@ -31,6 +31,7 @@
   .actions { position: sticky; bottom: 0; background: var(--bg); padding: 10px 4px 16px; border-top: 1px solid var(--line); }
   .copy { width: 100%; border: 0; border-radius: 14px; padding: 18px; font: inherit; font-size: 22px; font-weight: 700;
     background: var(--std); color: #fff; cursor: pointer; }
+  .copies { display: flex; gap: 10px; }
   .copy:disabled { background: #c3c9d3; color: #f4f6f9; cursor: not-allowed; }
   .hint { text-align: center; font-size: 17px; color: var(--muted); margin-top: 6px; min-height: 1.5em; }
 </style>
@@ -41,18 +42,21 @@
       <button type="button" class="std" data-mode="std" aria-pressed="true">표준어 (제출용)</button>
       <button type="button" class="dia" data-mode="dia" aria-pressed="false">제주어 (확인용)</button>
     </div>
-    <div class="notice std-only">행정기관에 내는 민원서입니다. 아래 버튼으로 복사해서 쓰세요.</div>
+    <div class="notice std-only">행정기관에 내는 민원서입니다. 아래 버튼으로 제목과 내용을 복사해서 쓰세요.</div>
     <div class="notice dia-only">하신 말씀이 제대로 들어갔는지 확인하는 화면입니다. 제출은 표준어로 합니다.</div>
   </div>
   <main id="sections"></main>
   <div class="actions">
-    <button type="button" class="copy" id="copy">표준어 민원서 복사하기</button>
+    <div class="copies">
+      <button type="button" class="copy" id="copyTitle" data-part="title">① 제목 복사하기</button>
+      <button type="button" class="copy" id="copyBody" data-part="body">② 내용 복사하기</button>
+    </div>
     <div class="hint" id="hint" aria-live="polite"></div>
   </div>
 <script>
   const DRAFT = __DRAFT_JSON__;
   const root = document.getElementById("sections");
-  const copyBtn = document.getElementById("copy");
+  const copyBtns = [document.getElementById("copyTitle"), document.getElementById("copyBody")];
   const hint = document.getElementById("hint");
 
   function el(tag, cls, text) {
@@ -74,21 +78,14 @@
     root.appendChild(sec);
   }
 
-  function standardText() {
-    return DRAFT.sections.map(s => "[" + s.title + "]\n" + s.standard).join("\n\n");
-  }
+  const READY = "제목과 내용을 차례로 복사해 민원 창구의 같은 이름 칸에 붙여 넣으세요.";
 
   function refreshCopy(mode) {
-    if (!DRAFT.copy_allowed) {
-      copyBtn.disabled = true;
-      hint.textContent = "예시 결과라서 복사할 수 없어요.";
-    } else if (mode === "dia") {
-      copyBtn.disabled = true;
-      hint.textContent = "확인용 화면이에요. 표준어로 바꾸면 복사할 수 있어요.";
-    } else {
-      copyBtn.disabled = false;
-      hint.textContent = "";
-    }
+    let off = false, msg = READY;
+    if (!DRAFT.copy_allowed) { off = true; msg = "예시 결과라서 복사할 수 없어요."; }
+    else if (mode === "dia") { off = true; msg = "확인용 화면이에요. 표준어로 바꾸면 복사할 수 있어요."; }
+    for (const b of copyBtns) b.disabled = off;
+    hint.textContent = msg;
   }
 
   // 전환해도 보던 섹션이 같은 자리에 남도록, 화면 맨 위에 걸친 섹션을 기준으로 스크롤을 맞춘다.
@@ -124,11 +121,15 @@
     return ok;
   }
 
-  copyBtn.addEventListener("click", async () => {
-    if (copyBtn.disabled) return;
-    const ok = await copyText(standardText());
-    hint.textContent = ok ? "복사했어요. 민원 창구에 붙여 넣으세요." : "복사하지 못했어요. 아래 '글로 받기'를 써 주세요.";
-  });
+  for (const b of copyBtns)
+    b.addEventListener("click", async () => {
+      if (b.disabled) return;
+      const part = b.dataset.part;
+      const ok = await copyText(DRAFT.submission[part]);
+      const name = part === "title" ? "제목" : "내용";
+      hint.textContent = ok ? name + "을 복사했어요. 민원 창구의 '" + name + "' 칸에 붙여 넣으세요."
+                            : "복사하지 못했어요. 아래 '글로 받기'를 써 주세요.";
+    });
 
   refreshCopy("std");
 </script>

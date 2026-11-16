@@ -56,6 +56,16 @@ def show_draft(draft: dict) -> None:
                        file_name=f"민원서_{draft['request_id'] or '초안'}.txt", mime="text/plain",
                        disabled=not draft["copy_allowed"])
 
+    sub = draft["submission"]
+    with st.expander("제출하는 방법", expanded=False):
+        for i, step in enumerate(sub["steps"], 1):
+            st.markdown(f"{i}. {step}")
+        if sub["agency"]:
+            st.markdown(f"**처리기관 고를 때 참고:** {sub['agency']} · 분야: {sub['complaint_type']}")
+        st.caption(f"제목 {sub['title_chars']}자 · 내용 {sub['body_chars']}자")
+        for portal in sub["portals"]:
+            st.markdown(f"- [{portal['name']}]({portal['url']}) — {portal['note']}")
+
     if draft["excluded"]:
         with st.expander(f"근거에서 뺀 내용 {len(draft['excluded'])}건", expanded=True):
             st.write("자료와 다르거나 자료로 확인할 수 없어 근거 자료에 넣지 않았어요. 민원 내용에는 하신 말씀이 그대로 남아 있어요.")

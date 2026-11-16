@@ -112,7 +112,7 @@ def test_title_does_not_repeat_place():
 
 def test_plain_text_versions():
     d = build_draft(load_handoff(SAMPLES / "supported.json"))
-    assert "[민원 내용]" in plain_text(d)
+    assert plain_text(d).startswith("제목: ") and "[불편 사항]" in plain_text(d)
     assert "줄어부난" in plain_text(d, "dialect") and "줄어부난" not in plain_text(d)
 
 
@@ -124,3 +124,41 @@ def test_html_embeds_draft_safely():
     assert "</script>" not in script and "<script>" not in script
     embedded = json.loads(script.rstrip(";"))
     assert embedded["sections"][1]["dialect"].startswith("</script>")
+
+
+def test_submission_has_title_and_body_for_the_two_form_fields():
+    h = load_handoff(SAMPLES / "supported.json")
+    d = build_draft(h)
+    sub = d["submission"]
+    assert sub["title"] == "구좌읍 버스 증차 요청" == d["sections"][0]["standard"]
+    order = [sub["body"].index(x) for x in ("[발생 장소]", "[불편 사항]", "[요청 사항]", "[근거 자료]")]
+    assert order == sorted(order)
+    assert "제주특별자치도 제주시 구좌읍" in sub["body"] and sub["agency"] == "제주특별자치도 제주시"
+    assert sub["title"] not in sub["body"]                     # 제목은 제목 칸에만
+    for sec in d["sections"][1:]:
+        assert sec["standard"] in sub["body"]                  # 화면에 보인 글과 붙여 넣는 글이 같다
+    assert sub["title_chars"] == len(sub["title"]) and sub["body_chars"] == len(sub["body"])
+    assert h["source_text"] not in sub["body"]                 # 제출 글에 방언 원문은 들어가지 않는다
+
+
+def test_title_without_request_uses_topic_and_stays_short():
+    h = load_handoff(SAMPLES / "mixed.json")
+    assert build_draft(h)["submission"]["title"] == "노형동 클린하우스·CCTV 관련 불편 개선 요청"
+    h["query"]["user_request"] = "클린하우스를 더 설치해 주세요"
+    assert build_draft(h)["submission"]["title"] == "노형동 클린하우스를 더 설치해 주세요"      # 이미 요청으로 끝나면 덧붙이지 않음
+    h["query"]["user_request"] = "가" * 200
+    assert len(build_draft(h)["submission"]["title"]) <= 61
+
+
+def test_seogwipo_and_unknown_place():
+    h = load_handoff(SAMPLES / "supported.json")
+    h["query"]["location"]["emd_name"] = "성산읍"
+    assert build_draft(h)["submission"]["agency"] == "제주특별자치도 서귀포시"
+    h["query"]["location"]["emd_name"] = ""
+    sub = build_draft(h)["submission"]
+    assert "[발생 장소]" not in sub["body"] and sub["agency"] == "제주특별자치도"
+
+
+def test_html_has_two_copy_buttons():
+    html = render_html(build_draft(load_handoff(SAMPLES / "supported.json")))
+    assert 'id="copyTitle"' in html and 'id="copyBody"' in html
