@@ -1,0 +1,35 @@
+{
+  "_note": "근거 DB 없이 엔진 mock 으로 만든 경우의 예시.",
+  "source_text": "학교 앞이 차가 막 쌩쌩 달령 아이덜 댕기기가 무서워마씸",
+  "query": {
+    "request_id": "sample-003",
+    "normalized_text": "학교 앞에 차가 매우 빨리 달려서 아이들이 다니기가 무서워요",
+    "complaint_type": "교통",
+    "claims": [{"id": "c1", "text": "학교 앞 통학로가 위험하다"}],
+    "location": {"emd_name": "애월읍", "emd_code": ""}
+  },
+  "package": {
+    "request_id": "sample-003",
+    "engine": "mock",
+    "evidence": [
+      {
+        "claim_id": "c1",
+        "verdict": "supported",
+        "indicator": "(MOCK) '학교 앞 통학로가 위험하다' 관련 지표 · 애월읍",
+        "value": -0.1,
+        "unit": "비율",
+        "region_compare": "(MOCK) 제주 읍면동 비교 자리",
+        "sources": [{"dataset": "(MOCK) 데이터셋 이름 자리", "publisher": "제주데이터허브", "as_of": "0000-00", "url": null}],
+        "found_by": "catalog",
+        "relation_path": null,
+        "chart": null,
+        "caveats": ["MOCK 응답: 실제 계산값이 아님"]
+      }
+    ],
+    "gaps": [{"concept": "(MOCK) 빈칸 개념 자리", "reason": "MOCK 응답: 실제 계산값이 아님", "detected_by": "catalog"}],
+    "meta": {"use_ontology": true, "snapshot": null, "elapsed_ms": 0}
+  },
+  "structured_by": "llm",
+  "notices": ["근거 DB가 없어 엔진 mock 결과(계산값 아님)"],
+  "pii_masked": []
+}

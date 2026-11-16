@@ -1,0 +1,54 @@
+{
+  "_note": "화면·테스트용 예시. 수치와 출처 기준일은 실제 계산값이 아니다.",
+  "source_text": "우리 동네 버스가 확 줄어부난 할망덜 병원 가기가 막 힘들어마씸",
+  "query": {
+    "request_id": "sample-001",
+    "normalized_text": "우리 동네 버스가 크게 줄어서 할머니들이 병원 가기가 매우 힘들어요",
+    "dialect_confidence": 0.86,
+    "complaint_type": "교통",
+    "claims": [
+      {"id": "c1", "text": "구좌읍 정류소에서 버스를 타는 사람이 1년 전보다 줄었다", "indicator_id": "bus_usage_change_pct"},
+      {"id": "c2", "text": "구좌읍 어르신 수에 비해 의원이 적다", "indicator_id": "clinic_per_1k_elderly"}
+    ],
+    "location": {"emd_name": "구좌읍", "emd_code": "50110256"},
+    "targets": ["버스", "병원", "노인"],
+    "user_request": "버스 증차"
+  },
+  "package": {
+    "request_id": "sample-001",
+    "engine": "hybrid",
+    "evidence": [
+      {
+        "claim_id": "c1",
+        "verdict": "supported",
+        "indicator": "버스 정류소 이용 인원 증감률(최근 12개월 vs 직전 12개월)",
+        "value": -12.4381,
+        "unit": "%",
+        "region_compare": "읍·면 12곳 중 2번째로 많이 줄어듦 (읍·면 중앙값 -3.1%)",
+        "sources": [{"dataset": "(예시) 버스 정류소별 이용자 유형별 승차 인원", "publisher": "제주데이터허브", "as_of": "2026-09", "url": null}],
+        "found_by": "both",
+        "relation_path": "버스 —이용 실적→ 정류소 이용 인원",
+        "chart": null,
+        "caveats": ["운행 횟수가 아니라 정류소 이용 인원으로 본 대리 지표", "기간: 2025-10~2026-09 (비교: 2024-10~2025-09)"]
+      },
+      {
+        "claim_id": "c2",
+        "verdict": "partial",
+        "indicator": "노인(65세 이상) 1천 명당 의원 수",
+        "value": 1.27,
+        "unit": "곳/노인 1천 명",
+        "region_compare": "읍·면 12곳 중 5번째로 적음",
+        "sources": [{"dataset": "(예시) 병·의원 정보", "publisher": "제주데이터허브", "as_of": "2026-06", "url": null}, {"dataset": "(예시) 법정동별 주민등록 인구", "publisher": "행정안전부", "as_of": "2026-09", "url": null}],
+        "found_by": "catalog",
+        "relation_path": null,
+        "chart": null,
+        "caveats": ["간접 지표: 거리·이용 어려움을 시설 수로 봄"]
+      }
+    ],
+    "gaps": [],
+    "meta": {"use_ontology": true, "snapshot": "2026-11-14", "elapsed_ms": 812}
+  },
+  "structured_by": "llm",
+  "notices": [],
+  "pii_masked": []
+}

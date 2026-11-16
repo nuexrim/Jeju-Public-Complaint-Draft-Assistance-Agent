@@ -1,0 +1,65 @@
+{
+  "_note": "화면·테스트용 예시. 수치와 출처 기준일은 실제 계산값이 아니다. 원문(source_text)이 없는 경우.",
+  "query": {
+    "request_id": "sample-002",
+    "normalized_text": "동네에 클린하우스가 부족하고 밤에 길이 어두워서 위험해요",
+    "complaint_type": "환경·청소",
+    "claims": [
+      {"id": "c1", "text": "노형동 클린하우스 한 곳이 맡는 인구가 많다"},
+      {"id": "c2", "text": "노형동에 공공 CCTV가 적다"},
+      {"id": "c3", "text": "밤길이 어둡다"}
+    ],
+    "location": {"emd_name": "노형동", "emd_code": ""},
+    "targets": ["클린하우스", "CCTV"]
+  },
+  "package": {
+    "request_id": "sample-002",
+    "engine": "catalog",
+    "evidence": [
+      {
+        "claim_id": "c1",
+        "verdict": "supported",
+        "indicator": "클린하우스 1곳당 인구",
+        "value": 412,
+        "unit": "명",
+        "region_compare": "동 31곳 중 3번째로 많음",
+        "sources": [{"dataset": "(예시) 클린하우스 현황", "publisher": "제주데이터허브", "as_of": "2026-03", "url": null}],
+        "found_by": "catalog",
+        "relation_path": null,
+        "chart": null,
+        "caveats": []
+      },
+      {
+        "claim_id": "c2",
+        "verdict": "contradicted",
+        "indicator": "인구 1만 명당 공공 CCTV 카메라 대수(공개 목록 기준)",
+        "value": 38.2,
+        "unit": "대/1만 명",
+        "region_compare": "동 31곳 중 많은 편",
+        "sources": [{"dataset": "(예시) CCTV 설치 현황", "publisher": "제주데이터허브", "as_of": "2025-12", "url": null}],
+        "found_by": "catalog",
+        "relation_path": null,
+        "chart": null,
+        "caveats": []
+      },
+      {
+        "claim_id": "c3",
+        "verdict": "unverifiable",
+        "indicator": "밤길 밝기 관련 지표 없음",
+        "value": null,
+        "unit": null,
+        "region_compare": null,
+        "sources": [],
+        "found_by": "catalog",
+        "relation_path": null,
+        "chart": null,
+        "caveats": []
+      }
+    ],
+    "gaps": [{"concept": "가로등·보안등", "reason": "읍면동별 가로등 자료가 적재되어 있지 않음", "detected_by": "catalog"}],
+    "meta": {"use_ontology": false, "snapshot": "2026-11-14", "elapsed_ms": 640}
+  },
+  "structured_by": "rules",
+  "notices": ["Claude 구조화를 쓰지 못해 규칙으로 정리했어요 (PaidCallNotAllowed)"],
+  "pii_masked": []
+}

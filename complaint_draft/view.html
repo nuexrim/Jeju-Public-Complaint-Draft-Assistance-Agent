@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --ink: #1d2433; --muted: #5a6475; --line: #d9dee7; --paper: #ffffff; --bg: #f4f6f9;
+    --std: #1f5fbf; --std-soft: #e8f0fc; --dia: #b4561c; --dia-soft: #fdf0e6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif; font-size: 20px; line-height: 1.7; }
+  .bar { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 14px 4px 12px; border-bottom: 1px solid var(--line); }
+  .toggle { display: flex; background: #e3e7ee; border-radius: 999px; padding: 5px; gap: 5px; }
+  .toggle button { flex: 1; border: 0; border-radius: 999px; padding: 14px 10px; font: inherit; font-weight: 700;
+    background: transparent; color: var(--muted); cursor: pointer; }
+  .toggle button[aria-pressed="true"].std { background: var(--std); color: #fff; }
+  .toggle button[aria-pressed="true"].dia { background: var(--dia); color: #fff; }
+  .toggle button:focus-visible, .copy:focus-visible { outline: 3px solid #111; outline-offset: 2px; }
+  .notice { margin-top: 10px; padding: 12px 16px; border-radius: 12px; font-size: 18px; }
+  body.std .notice { background: var(--std-soft); color: #173f7d; }
+  body.dia .notice { background: var(--dia-soft); color: #7a3a12; }
+  main { padding: 16px 4px 8px; }
+  section { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 18px 22px; margin-bottom: 16px; }
+  section h2 { margin: 0 0 8px; font-size: 20px; color: var(--muted); display: flex; align-items: center; gap: 10px; }
+  .badge { font-size: 15px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: #eceff4; color: var(--muted); }
+  .text { white-space: pre-wrap; word-break: keep-all; font-size: 22px; margin: 0; }
+  body.std .dia-only, body.dia .std-only { display: none; }
+  body.dia section.original { border-color: var(--dia); }
+  .actions { position: sticky; bottom: 0; background: var(--bg); padding: 10px 4px 16px; border-top: 1px solid var(--line); }
+  .copy { width: 100%; border: 0; border-radius: 14px; padding: 18px; font: inherit; font-size: 22px; font-weight: 700;
+    background: var(--std); color: #fff; cursor: pointer; }
+  .copy:disabled { background: #c3c9d3; color: #f4f6f9; cursor: not-allowed; }
+  .hint { text-align: center; font-size: 17px; color: var(--muted); margin-top: 6px; min-height: 1.5em; }
+</style>
+</head>
+<body class="std">
+  <div class="bar">
+    <div class="toggle" role="group" aria-label="보기 전환">
+      <button type="button" class="std" data-mode="std" aria-pressed="true">표준어 (제출용)</button>
+      <button type="button" class="dia" data-mode="dia" aria-pressed="false">제주어 (확인용)</button>
+    </div>
+    <div class="notice std-only">행정기관에 내는 민원서입니다. 아래 버튼으로 복사해서 쓰세요.</div>
+    <div class="notice dia-only">하신 말씀이 제대로 들어갔는지 확인하는 화면입니다. 제출은 표준어로 합니다.</div>
+  </div>
+  <main id="sections"></main>
+  <div class="actions">
+    <button type="button" class="copy" id="copy">표준어 민원서 복사하기</button>
+    <div class="hint" id="hint" aria-live="polite"></div>
+  </div>
+<script>
+  const DRAFT = __DRAFT_JSON__;
+  const root = document.getElementById("sections");
+  const copyBtn = document.getElementById("copy");
+  const hint = document.getElementById("hint");
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;   // 글은 textContent 로만 넣는다
+    return e;
+  }
+
+  for (const s of DRAFT.sections) {
+    const sec = el("section", s.dialect_source === "original" ? "original" : "");
+    sec.dataset.id = s.id;
+    const h = el("h2", "", s.title);
+    if (s.dialect_source === "original") h.appendChild(el("span", "badge dia-only", "하신 말씀 그대로"));
+    else h.appendChild(el("span", "badge dia-only", "표준어로 표시"));
+    sec.appendChild(h);
+    sec.appendChild(el("p", "text std-only", s.standard));
+    sec.appendChild(el("p", "text dia-only", s.dialect));
+    root.appendChild(sec);
+  }
+
+  function standardText() {
+    return DRAFT.sections.map(s => "[" + s.title + "]\n" + s.standard).join("\n\n");
+  }
+
+  function refreshCopy(mode) {
+    if (!DRAFT.copy_allowed) {
+      copyBtn.disabled = true;
+      hint.textContent = "예시 결과라서 복사할 수 없어요.";
+    } else if (mode === "dia") {
+      copyBtn.disabled = true;
+      hint.textContent = "확인용 화면이에요. 표준어로 바꾸면 복사할 수 있어요.";
+    } else {
+      copyBtn.disabled = false;
+      hint.textContent = "";
+    }
+  }
+
+  // 전환해도 보던 섹션이 같은 자리에 남도록, 화면 맨 위에 걸친 섹션을 기준으로 스크롤을 맞춘다.
+  function anchor() {
+    const top = document.querySelector(".bar").getBoundingClientRect().bottom;
+    for (const sec of root.children) {
+      const r = sec.getBoundingClientRect();
+      if (r.bottom > top) return { sec, offset: r.top };
+    }
+    return null;
+  }
+
+  function setMode(mode) {
+    const a = anchor();
+    document.body.className = mode;
+    for (const b of document.querySelectorAll(".toggle button"))
+      b.setAttribute("aria-pressed", String(b.dataset.mode === mode));
+    if (a) window.scrollBy(0, a.sec.getBoundingClientRect().top - a.offset);
+    refreshCopy(mode);
+  }
+
+  for (const b of document.querySelectorAll(".toggle button"))
+    b.addEventListener("click", () => setMode(b.dataset.mode));
+
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) {}
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) {}
+    ta.remove();
+    return ok;
+  }
+
+  copyBtn.addEventListener("click", async () => {
+    if (copyBtn.disabled) return;
+    const ok = await copyText(standardText());
+    hint.textContent = ok ? "복사했어요. 민원 창구에 붙여 넣으세요." : "복사하지 못했어요. 아래 '글로 받기'를 써 주세요.";
+  });
+
+  refreshCopy("std");
+</script>
+</body>
+</html>
