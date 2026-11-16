@@ -13,11 +13,27 @@ streamlit run complaint_draft/app.py                 # 브라우저가 열림 (�
 python -m pytest -q complaint_draft/tests            # 테스트 (네트워크·유료 호출 없음)
 ```
 
-실제 민원으로 보려면 먼저 연결 실행으로 handoff 파일을 만든 뒤 화면에서 올립니다.
+화면 왼쪽에서 시작 방법을 고릅니다.
 
-```bash
-python -m complaint_agent --out handoff.json "우리 동네 버스가 확 줄어부난 ..."
-```
+- **말로 시작하기** (기본): 불편한 점을 쓰면 되묻기 → 뜻 고르기 → 최종 확인 → 민원서 초안까지 한 화면에서 이어집니다.
+  `complaint_agent` 의 `Agent` 를 그대로 부르므로 루트 `requirements.txt` 설치가 필요합니다.
+  Claude 를 쓰려면 실행하는 셸에서 `ALLOW_PAID_CALLS=1` 을 켭니다(없으면 규칙 구조화). 근거 DB가 없으면 엔진 mock 으로 돌고 복사가 막힙니다.
+- **예시·파일로 보기**: 예시 3개나 handoff 파일(`python -m complaint_agent --out handoff.json "..."`)로 초안만 봅니다.
+
+## 대화 흐름 (`flow.py`)
+
+`complaint_agent/conversation.py` 의 터미널 흐름과 같은 순서·같은 횟수 제한을, 화면이 한 단계씩 부를 수 있게 나눈 것입니다.
+Streamlit 과 무관한 함수라 다른 화면에서도 쓸 수 있습니다.
+
+| 단계(`state["stage"]`) | 보여 줄 것 | 답 넣기 |
+| --- | --- | --- |
+| `questions` | `question_view(state)` 질문 하나 | `answer_question(agent, state, text=..., yes=...)` |
+| `meanings` | `meaning_view(state)` 주장별 선택지 | `submit_meanings(agent, state, picks)` |
+| `confirm` | `state["summary"]` | `confirm(agent, state, yes)` |
+| `draft` | `state["draft"]`, `state["handoff"]` | — |
+| `stopped` | `state["stop_reason"]` | 처음부터 다시 |
+
+제주어 화면의 원문은 처음 쓴 말과 "더 자세히" 질문에 덧붙인 말을 그대로 씁니다(`state["said"]`).
 
 ## 입력
 
@@ -76,6 +92,7 @@ python -m complaint_agent --out handoff.json "우리 동네 버스가 확 줄어
 | `draft.py` | `build_draft`, `plain_text`, `validate_draft` |
 | `templates.py` | 문장 틀, 판정 표시, 경고 문구 |
 | `view.py`, `view.html` | 토글 화면 HTML |
-| `app.py` | Streamlit 화면 |
+| `flow.py` | 대화 흐름 (되묻기 → 뜻 고르기 → 최종 확인 → 초안) |
+| `app.py` | Streamlit 화면 (말로 시작하기 / 예시·파일로 보기) |
 | `samples/*.json` | 예시 handoff 3개 (수치·기준일은 실제 계산값 아님) |
-| `tests/test_draft.py` | pytest 16개 |
+| `tests/` | pytest 29개 (`test_draft.py` 16, `test_flow.py` 13) |
