@@ -41,10 +41,10 @@
   "주장 수(정답)": 35,
   "이해(규칙 구조화)": {
    "읍면동 인식(없으면 고르기 목록 제시)": "32/32 (100%)",
-   "주제 인식(자료 없는 민원은 '주제 없음'이 정답)": "31/32 (97%)",
-   "측면 인식(자료 있는 민원)": "24/28 (86%)",
-   "정답 뜻이 선택지에 있음(주장 기준)": "30/31 (97%)",
-   "추천 1순위가 정답": "29/32 (91%)",
+   "주제 인식(자료 없는 민원은 '주제 없음'이 정답)": "32/32 (100%)",
+   "측면 인식(자료 있는 민원)": "28/28 (100%)",
+   "정답 뜻이 선택지에 있음(주장 기준)": "31/31 (100%)",
+   "추천 1순위가 정답": "30/32 (94%)",
    "자료 없는 민원에 선택지를 내지 않음": "4/4 (100%)",
    "주장이 둘 이상인 민원(규칙은 하나로 묶음)": 3
   },
@@ -59,8 +59,8 @@
     "contradicted": 7
    },
    "범용 틀 사용 민원": 1,
-   "출처 수(근거당 평균)": 2.03,
-   "교차 확인 수(근거당 평균)": 0.47,
+   "출처 수(근거당 평균)": 2.0,
+   "교차 확인 수(근거당 평균)": 0.44,
    "오래된 자료 주의가 붙은 근거": 14
   },
   "근거: 엔진에 맡김(뜻 고르기 없음)": {
@@ -106,7 +106,7 @@
    "standard": {
     "민원": 24,
     "읍면동": "24/24 (100%)",
-    "주제": "23/24 (96%)",
+    "주제": "24/24 (100%)",
     "근거 정답(뜻 고른 뒤)": "26/26 (100%)"
    }
   }
@@ -133,24 +133,12 @@
    "g09 한림읍 여름 폭염 때 어르신들이 더위를 피할 대피시설이 부족합니다 — 엔진: 없음",
    "g19 중문동은 주말 진료 하는 병원이 없어요 — 엔진: clinic_per_1k_pop"
   ],
-  "측면(부족·거리·위험 등)을 못 읽음": [
-   "g07 이도2동 클린하우스가 항상 넘쳐서 쓰레기가 길에 쌓여 있습니다",
-   "g11 노형 사는데 밤길이 너무 어두워요 가로등 좀 달아 주세요",
-   "g16 우도면에 병원이 하나도 어서마씸",
-   "g29 삼도2동이랑 용담1동 클린하우스가 넘쳐요"
-  ],
   "근거 값이 하나도 계산되지 않음": [
    "g09 한림읍 여름 폭염 때 어르신들이 더위를 피할 대피시설이 부족합니다 — 판정: {'unverifiable': 1}",
    "g11 노형 사는데 밤길이 너무 어두워요 가로등 좀 달아 주세요 — 판정: {'unverifiable': 1}",
    "g18 동홍동 버스 배차 간격이 너무 길어졌어요 — 판정: {'unverifiable': 1}",
    "g19 중문동은 주말 진료 하는 병원이 없어요 — 판정: {'unverifiable': 1}",
    "g31 버스가 줄어서 장 보러 가기 힘들어요 — 판정: {'unverifiable': 1}"
-  ],
-  "주제를 잘못 알아들음": [
-   "g32 봉개동 아이들 학교 가는 길이 위험해요 — 인식: 없음"
-  ],
-  "정답 뜻이 선택지에 없음": [
-   "g32 봉개동 아이들 학교 가는 길이 위험해요"
   ]
  },
  "items": [
@@ -187,12 +175,12 @@
      "partial": 1
     },
     "template": false,
-    "sources": 5,
-    "cross_checks": 2,
+    "sources": 4,
+    "cross_checks": 1,
     "stale": 1,
     "indicators": [
      "bus_usage_change_pct",
-     "clinic_per_1k_pop"
+     "clinic_per_1k_elderly"
     ],
     "gaps": [],
     "correct": [
@@ -541,7 +529,7 @@
     "waste"
    ],
    "topic_ok": true,
-   "aspect": null,
+   "aspect": "supply",
    "out_of_scope": false,
    "no_evidence_question": false,
    "gold_claims": 1,
@@ -781,7 +769,7 @@
     "safety"
    ],
    "topic_ok": true,
-   "aspect": null,
+   "aspect": "supply",
    "out_of_scope": false,
    "no_evidence_question": false,
    "gold_claims": 1,
@@ -1081,7 +1069,7 @@
     "medical"
    ],
    "topic_ok": true,
-   "aspect": null,
+   "aspect": "supply",
    "out_of_scope": false,
    "no_evidence_question": false,
    "gold_claims": 1,
@@ -1843,7 +1831,7 @@
     "waste"
    ],
    "topic_ok": true,
-   "aspect": null,
+   "aspect": "supply",
    "out_of_scope": false,
    "no_evidence_question": false,
    "gold_claims": 1,
@@ -2023,17 +2011,19 @@
    "emd_ok": true,
    "picker_offered": false,
    "confirm_asked": false,
-   "topics_found": [],
-   "topic_ok": false,
+   "topics_found": [
+    "traffic_safety"
+   ],
+   "topic_ok": true,
    "aspect": "risk",
    "out_of_scope": false,
-   "no_evidence_question": true,
+   "no_evidence_question": false,
    "gold_claims": 1,
    "rule_claims": 1,
    "in_options": [
-    false
+    true
    ],
-   "recommended_ok": false,
+   "recommended_ok": true,
    "wrong_options": false,
    "picked": {
     "evidence": 1,

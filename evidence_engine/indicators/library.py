@@ -114,6 +114,26 @@ def cue_in(word: str, text: str) -> bool:
     return word in text
 
 
+def _spans(word: str, text: str):
+    if word.endswith("-") and len(word) > 1:
+        yield from (m.span() for m in _stem_re(word[:-1]).finditer(text))
+        return
+    i = text.find(word)
+    while i >= 0:
+        yield i, i + len(word)
+        i = text.find(word, i + 1)
+
+
+# 부정: '멀지 않아요', '부족하지는 않아요', '안 멀어요' 처럼 단서를 부정하면 그 단서는 주장의 측면으로 보지 않는다
+_NEG_AFTER = re.compile(r"^(?:하)?(?:지|진|지는|지도)?\s?않")
+_NEG_BEFORE = re.compile(r"(?:^|\s)안\s$")
+
+
+def cue_affirmed(word: str, text: str) -> bool:
+    """단서가 문장에 있고, 적어도 한 번은 부정되지 않은 채로 쓰였는지."""
+    return any(not _NEG_AFTER.match(text[e:]) and not _NEG_BEFORE.search(text[:s]) for s, e in _spans(word, text))
+
+
 def _has(text: str, words: list[str] | None) -> list[str]:
     return [w for w in words or [] if cue_in(w, text)]
 
@@ -162,9 +182,15 @@ def claim_aspect(claim_text: str, registry: dict | None = None) -> str | None:
     """주장이 말하는 측면(usage/service/risk/access/supply). 단서가 없으면 None(판단 보류)."""
     registry = registry or load_registry()
     for a in registry.get("aspects", []):
-        if _has(claim_text, a["cues"]):
+        if any(cue_affirmed(c, claim_text) for c in a["cues"]):     # '멀지 않아요'처럼 부정한 단서는 빼고
             return a["id"]
     return None
+
+
+def positive_tone(text: str, registry: dict | None = None) -> bool:
+    """불편이 아니라 칭찬·감사로 들리는지: 긍정 단서가 있고, 불편 측면 단서는 없을 때."""
+    registry = registry or load_registry()
+    return bool(_has(text, registry.get("positive_cues"))) and claim_aspect(text, registry) is None
 
 
 def aspect_name(aspect_id: str | None, registry: dict | None = None) -> str | None:

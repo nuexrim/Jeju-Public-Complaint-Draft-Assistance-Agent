@@ -45,7 +45,7 @@ import llm                                   # noqa: E402  (dialect_normalizer)
 import structure as S                        # noqa: E402
 from normalize import ResourceMissing        # noqa: E402
 import run_engine                            # noqa: E402  (evidence_engine)
-from indicators.library import claim_topics, cue_in, load_registry   # noqa: E402
+from indicators.library import claim_topics, cue_in, load_registry, positive_tone   # noqa: E402
 from package.builder import resolve_emd      # noqa: E402
 from package.privacy import mask_query       # noqa: E402
 
@@ -131,6 +131,8 @@ class Agent:
             r, by = self._by_rules(text), "rules"
             notices.append(f"Claude 구조화를 쓰지 못해 규칙으로 정리했어요 ({type(e).__name__})")
         r["structured_by"] = by
+        if positive_tone(r["query"]["normalized_text"]):
+            notices.append("불편보다는 칭찬·감사 말씀으로 들려요. 불편한 점이 있으면 더 말씀해 주세요")
         r["notices"] = notices
         r["source_text"] = S.mask_pii(" ".join(text.split()))[0]   # 다시 이해할 때 쓰는 가린 원문
         r["places"] = [r["query"]["location"]["emd_name"]] if r["query"]["location"]["emd_name"] else []
