@@ -172,6 +172,8 @@ def is_stale(as_of: str | None, today: date | None = None) -> bool:
         return False
     today = today or date.today()
     year, month = int(m.group(1)), int(m.group(2) or 12)
+    if year < 1900 or not 1 <= month <= 12:     # '0000-00' 같은 자리표시·잘못된 날짜는 판단하지 않는다
+        return False
     return (today.year * 12 + today.month) - (year * 12 + month) > T.STALE_MONTHS
 
 

@@ -53,6 +53,7 @@
   mark.dia-word { background: var(--soft); color: var(--ink); font-weight: 700; border-bottom: 3px solid var(--brown); padding: 0 3px; }
   .ev.none { background: var(--paper); border-color: var(--line); }
   .ev.none h2 { color: var(--ink); }
+  .ev-none-note { margin: 0; font-size: 0.95rem; line-height: 1.55; }
   .know { background: var(--paper); border: 2px solid var(--line); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 6px; }
   .know h2 { margin: 0; font-size: 0.95rem; }
   .know p { margin: 0; font-size: 0.9rem; line-height: 1.55; color: var(--muted); }
@@ -188,6 +189,7 @@
   } else {
     ev.classList.add("none");
     ev.appendChild(el("h2", "", "데이터로 확인된 근거가 없어요"));
+    ev.appendChild(el("p", "ev-none-note", "근거 없이도 민원서는 낼 수 있어요. 불편한 점과 바라는 점이 그대로 들어갑니다."));
   }
   let know = "수치는 공개 데이터 기준이며, 말씀하신 곳만 따로 조사한 값은 아닙니다.";
   if (DRAFT.excluded.length) know += " 직접 뺐거나 자료와 맞지 않는·확인할 수 없는 내용 " + DRAFT.excluded.length + "건은 근거에서 뺐습니다(아래에서 볼 수 있어요).";

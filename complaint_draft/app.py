@@ -410,25 +410,34 @@ def step_confirm(s: dict) -> None:
 # ---------------------------------------------------------------- 5. 근거 고르기
 def step_evidence(s: dict) -> None:
     items = s["evidence_items"]
-    st.html(style.bubble("민원서에 넣을 근거를 골라 주세요.", "필요 없는 것은 빼셔도 됩니다. 자료와 맞지 않는 근거는 넣을 수 없어요."))
+    usable = [it for it in items if it["usable"]]
+    if usable:
+        st.html(style.bubble("민원서에 넣을 근거를 골라 주세요.", "필요 없는 것은 빼셔도 됩니다. 자료와 맞지 않는 근거는 넣을 수 없어요."))
+        box = st.container()
+    else:                                       # 넣을 수 있는 근거가 없으면: 안내를 먼저, 찾아본 자료는 접어 둔다
+        st.html(style.bubble("자료로 뒷받침되는 근거를 찾지 못했어요."))
+        st.html(style.no_evidence_note(items))
+        box = st.expander(f"찾아본 자료 {len(items)}건 보기")
     picked = []
     per_row = 3
-    for start in range(0, len(items), per_row):
-        cols = st.container(key=f"row_ev_{start}").columns(per_row, gap="medium")
-        for col, it in zip(cols, items[start:start + per_row]):
-            on_now = it["usable"] and it["index"] in s["picked"]
-            with col.container(key=f"card_ev_{'on_' if on_now else ''}{it['index']}"):
-                if it["usable"]:
-                    if st.checkbox("민원서에 넣기", value=on_now, key=f"ev_{s['confirm_tries']}_{it['index']}"):
-                        picked.append(it["index"])
-                else:
-                    st.checkbox("넣을 수 없음", value=False, disabled=True, key=f"ev_off_{it['index']}")
-                st.html(style.evidence_card(it))
-    if any(it["stale"] for it in items):
-        st.caption("기준일이 2년 넘은 자료는 '오래된 자료'로 표시됩니다. 넣을지 말지는 직접 정하실 수 있습니다.")
+    with box:
+        for start in range(0, len(items), per_row):
+            cols = st.container(key=f"row_ev_{start}").columns(per_row, gap="medium")
+            for col, it in zip(cols, items[start:start + per_row]):
+                on_now = it["usable"] and it["index"] in s["picked"]
+                with col.container(key=f"card_ev_{'on_' if on_now else ''}{it['index']}"):
+                    if it["usable"]:
+                        if st.checkbox("민원서에 넣기", value=on_now, key=f"ev_{s['confirm_tries']}_{it['index']}"):
+                            picked.append(it["index"])
+                    else:
+                        st.checkbox("넣을 수 없음", value=False, disabled=True, key=f"ev_off_{it['index']}")
+                    st.html(style.evidence_card(it))
+        if any(it["stale"] for it in items):
+            st.caption("기준일이 2년 넘은 자료는 '오래된 자료'로 표시됩니다. 넣을지 말지는 직접 정하실 수 있습니다.")
+    label = f"고른 근거 {len(picked)}건으로 민원서 만들기 →" if picked else "근거 없이 민원서 만들기 →"
     c1, c2 = st.columns(2)
     c1.button("← 이전", on_click=go, args=(flow.back_to_confirm,), use_container_width=True)
-    if c2.button(f"고른 근거 {len(picked)}건으로 민원서 만들기 →", type="primary", use_container_width=True):
+    if c2.button(label, type="primary", use_container_width=True):
         call(flow.choose_evidence, s, picked)
 
 

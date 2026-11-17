@@ -337,3 +337,39 @@ def test_real_agent_rules_and_mock_engine_end_to_end(monkeypatch):
         assert "줄어부난" in next(x for x in s["draft"]["sections"] if x["id"] == "content")["dialect"]
     finally:
         agent.close()
+
+
+# ---------------------------------------------------------------- 되묻기에 직접 쓴 글의 표준어 변환
+def test_typed_request_with_dialect_is_standardized(monkeypatch):
+    import sys, types
+    sent = []
+    fake = types.ModuleType("normalize")
+    fake.ResourceMissing = FileNotFoundError
+    fake.normalize = lambda text, use_rag=True: (sent.append(text), {"standard": "의자를 놓아 주세요"})[1]
+    monkeypatch.setitem(sys.modules, "normalize", fake)
+    monkeypatch.setattr(flow, "leftover_dialect", lambda t: ["놔줍서"] if "놔줍서" in t else [])
+    a = FakeAgent(questions=[Q_REQ])
+    s = flow.start(a, "구좌읍 정류장에 의자가 없어요")
+    s = flow.answer_question(a, s, text="의자 좀 놔줍서 010-1234-5678")
+    assert s["query"]["user_request"] == "의자를 놓아 주세요"
+    assert "010-1234-5678" not in sent[0]                      # 보내기 전에 가린다
+
+
+def test_standard_text_is_not_sent_to_normalizer(monkeypatch):
+    import sys, types
+    fake = types.ModuleType("normalize")
+    fake.ResourceMissing = FileNotFoundError
+    fake.normalize = lambda *a, **k: (_ for _ in ()).throw(AssertionError("호출하면 안 됨"))
+    monkeypatch.setitem(sys.modules, "normalize", fake)
+    monkeypatch.setattr(flow, "leftover_dialect", lambda t: [])
+    assert flow.standardize("버스를 늘려 주세요") == "버스를 늘려 주세요"
+
+
+def test_failed_conversion_keeps_text(monkeypatch):
+    import sys, types
+    fake = types.ModuleType("normalize")
+    fake.ResourceMissing = FileNotFoundError
+    fake.normalize = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("키 없음"))
+    monkeypatch.setitem(sys.modules, "normalize", fake)
+    monkeypatch.setattr(flow, "leftover_dialect", lambda t: ["놔줍서"])
+    assert flow.standardize("의자 놔줍서") == "의자 놔줍서"

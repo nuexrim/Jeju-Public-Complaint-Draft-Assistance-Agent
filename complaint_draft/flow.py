@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import copy
 
-from complaint_draft.draft import build_draft, evidence_choices, friendly
+from complaint_draft.draft import build_draft, evidence_choices, friendly, leftover_dialect, mask
 
 MAX_QUESTION_ROUNDS = 4       # conversation.py 와 같음: 같은 빈 칸을 끝없이 묻지 않는다
 MAX_CONFIRM_TRIES = 2         # 최종 확인에서 '아니요'를 받을 수 있는 횟수
@@ -55,6 +55,27 @@ def _note(s: dict, notices: list[str]) -> None:
 def _sync_places(s: dict) -> None:
     if "places" in (s["result"] or {}):
         s["places"] = list(s["result"]["places"] or [])
+
+
+def standardize(text: str) -> str:
+    """되묻기에 직접 쓴 글(바라는 점·고쳐 쓴 문장)을 표준어본에 넣기 전에 표준어로 바꾼다.
+
+    Agent 는 이 두 답을 제주어 변환 없이 그대로 쓰므로, 방언 사전으로 제주어 낱말이 보일 때만
+    제주어 변환 모듈(dialect_normalizer/normalize.py, Claude 호출)을 한 번 부른다. 안 보이면 호출하지 않는다.
+    변환하지 못하면(키 없음·오류) 그대로 두고, 초안의 '남은 제주어' 경고가 알려 준다. 보내기 전에 개인정보를 가린다."""
+    text = (text or "").strip()
+    if not text or not leftover_dialect(text):
+        return text
+    masked, _ = mask(text)
+    try:
+        import normalize as N                 # dialect_normalizer (Agent 를 불러오면 경로가 잡힌다)
+        try:
+            out = N.normalize(masked)
+        except (N.ResourceMissing, ModuleNotFoundError):   # 사전·예문 색인이 없으면 예문 없이 변환
+            out = N.normalize(masked, use_rag=False)
+        return (out.get("standard") or "").strip() or text
+    except Exception:                         # noqa: BLE001  변환 실패는 원문 그대로(경고로 알림)
+        return text
 
 
 # ------------------------------------------------------------------ 1. 불편 쓰기
@@ -146,7 +167,7 @@ def answer_question(agent, state: dict, *, text: str = "", yes: bool | None = No
     text = (text or "").strip()
     before = len(r.get("notices", []))
     if kind == "dialect":
-        r = agent.answer(r, corrected_sentence=text) if text else agent.answer(r, accept_sentence=True)
+        r = agent.answer(r, corrected_sentence=standardize(text)) if text else agent.answer(r, accept_sentence=True)
     elif kind == "confirm_emd":
         r = agent.answer(r, confirm_emd=bool(yes))
     elif kind == "emd":
@@ -157,9 +178,9 @@ def answer_question(agent, state: dict, *, text: str = "", yes: bool | None = No
             s["said"].append(text)                   # 덧붙인 말도 '쓰신 글'이다
         r = agent.answer(r, detail=text)
     elif kind == "request_suggest":
-        r = agent.answer(r, user_request=view["suggestion"] if yes else text)
+        r = agent.answer(r, user_request=view["suggestion"] if yes else standardize(text))
     else:
-        r = agent.answer(r, user_request=text)
+        r = agent.answer(r, user_request=standardize(text))
     _note(s, r.get("notices", [])[before:])
     s["result"] = r
     s["q_rounds"] += 1

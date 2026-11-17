@@ -199,6 +199,25 @@ def evidence_card(item: dict) -> str:
             f'</div></div>')
 
 
+_NO_EVIDENCE_REASON = {
+    "contradicted": "자료와 다름: 자료로 보면 이 지역이 다른 곳보다 나쁜 편은 아니에요.",
+    "unverifiable": "확인 불가: 확인할 자료가 부족해요.",
+}
+
+
+def no_evidence_note(items: list[dict]) -> str:
+    """넣을 수 있는 근거가 없을 때: 근거 없이도 민원서를 낼 수 있다는 안내 + 찾아본 결과를 한 줄씩."""
+    reasons = [r for r in dict.fromkeys(_NO_EVIDENCE_REASON.get(it.get("verdict"), "") for it in items) if r]
+    lines = "".join(f'<li style="margin:0">{esc(r)}</li>' for r in reasons)
+    found = (f'<ul style="margin:6px 0 0;padding-left:22px;font-size:0.95rem;line-height:1.6;color:{MUTED}">{lines}</ul>'
+             if lines else "")
+    return (f'<section style="background:#FFFFFF;border:2px solid {INK};border-radius:20px;padding:18px 24px;'
+            f'display:flex;flex-direction:column;gap:4px">'
+            f'<p style="margin:0;font-size:1.15rem;font-weight:700;color:{INK}">근거 없이도 민원서는 만들 수 있어요.</p>'
+            f'<p style="margin:0;font-size:1rem;line-height:1.55;color:{INK}">불편한 점과 바라는 점만으로도 접수됩니다. '
+            f'근거 자료 칸에는 숫자를 넣지 않아요.</p>{found}</section>')
+
+
 def said_card(text: str) -> str:
     return (f'<h2 style="margin:0 0 10px;font-size:1rem;font-weight:700;color:{BROWN}">쓰신 글</h2>'
             f'<p style="margin:0;font-size:1.05rem;line-height:1.6;color:{INK}">“{esc(text)}”</p>')

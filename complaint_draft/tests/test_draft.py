@@ -246,7 +246,7 @@ def test_is_stale_reads_common_date_shapes():
     from complaint_draft.draft import is_stale
     today = date(2026, 11, 17)
     assert is_stale("2024-10", today) and is_stale("2023", today) and is_stale("2024-01-31", today)
-    assert not is_stale("2024-12", today) and not is_stale("2026-09", today) and not is_stale("모름", today)
+    assert not is_stale("2024-12", today) and not is_stale("2026-09", today) and not is_stale("모름", today) and not is_stale("0000-00", today)
 
 
 def test_exclude_moves_picked_out_evidence_to_excluded():
@@ -316,3 +316,16 @@ def test_style_evidence_card_escapes_and_shows_stale():
 def test_html_font_size_has_three_steps():
     d = build_draft(load_handoff(SAMPLES / "supported.json"))
     assert 'style="font-size: 15px"' in render_html(d, "작게")
+
+
+def test_no_evidence_note_says_draft_is_still_possible():
+    from complaint_draft import style
+    html = style.no_evidence_note([{"verdict": "contradicted"}, {"verdict": "contradicted"}, {"verdict": "unverifiable"}])
+    assert "근거 없이도 민원서는 만들 수 있어요" in html
+    assert html.count("자료와 다름") == 1 and "확인 불가" in html
+
+
+def test_html_no_evidence_card_reassures():
+    h = load_handoff(SAMPLES / "supported.json")
+    h["package"]["evidence"] = []
+    assert "근거 없이도 민원서는 낼 수 있어요" in render_html(build_draft(h))
