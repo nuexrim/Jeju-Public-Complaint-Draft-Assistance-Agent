@@ -1,0 +1,2076 @@
+{
+ "dataset": {
+  "기준일": "2026-11-14",
+  "적재 표(핵심)": 56,
+  "적재 표 종류": {
+   "hub_file": 29,
+   "hub_api": 6,
+   "datagokr_file": 18,
+   "external_api": 2,
+   "external_file": 1
+  },
+  "읍면동 키 70% 이상 표": 33,
+  "기준일 2년 넘은 표": 27,
+  "판정 지표": 17,
+  "맥락 지표": 3,
+  "주제": [
+   "버스·대중교통",
+   "병원·약국",
+   "쓰레기·재활용",
+   "교통사고·보행 안전",
+   "재난 대피시설",
+   "방범·CCTV",
+   "경로당"
+  ],
+  "등록 빈칸(자료 없음)": [
+   "무더위쉼터(폭염 대피시설)",
+   "버스 운행 횟수·배차 간격",
+   "가로등·보안등",
+   "야간·휴일 진료 병원"
+  ],
+  "미리 받은 표": 602,
+  "미리 받은 데이터셋": 511,
+  "미리 받은 표 중 읍면동 키": 231,
+  "미리 받은 표 중 시설 목록": 162,
+  "범용 틀로 쓸 수 있는 시설 목록": 158,
+  "데이터허브 목록": 1259,
+  "받은 데이터허브 데이터셋(핵심+미리 받기)": "559/1259 (44%)"
+ },
+ "summary": {
+  "민원 수": 32,
+  "주장 수(정답)": 35,
+  "이해(규칙 구조화)": {
+   "읍면동 인식(없으면 고르기 목록 제시)": "32/32 (100%)",
+   "주제 인식(자료 없는 민원은 '주제 없음'이 정답)": "31/32 (97%)",
+   "측면 인식(자료 있는 민원)": "24/28 (86%)",
+   "정답 뜻이 선택지에 있음(주장 기준)": "30/31 (97%)",
+   "추천 1순위가 정답": "29/32 (91%)",
+   "자료 없는 민원에 선택지를 내지 않음": "4/4 (100%)",
+   "주장이 둘 이상인 민원(규칙은 하나로 묶음)": 3
+  },
+  "근거: 사용자가 정답 뜻을 고름": {
+   "정답 뜻으로 근거를 냄(주장 기준)": "35/35 (100%)",
+   "근거 수(합계)": 36,
+   "값이 계산된 근거": "28/36 (78%)",
+   "판정 분포": {
+    "supported": 7,
+    "partial": 13,
+    "unverifiable": 9,
+    "contradicted": 7
+   },
+   "범용 틀 사용 민원": 1,
+   "출처 수(근거당 평균)": 2.03,
+   "교차 확인 수(근거당 평균)": 0.47,
+   "오래된 자료 주의가 붙은 근거": 14
+  },
+  "근거: 엔진에 맡김(뜻 고르기 없음)": {
+   "정답 뜻으로 근거를 냄(주장 기준)": "30/35 (86%)",
+   "근거 수(합계)": 33,
+   "값이 계산된 근거": "27/33 (82%)",
+   "판정 분포": {
+    "partial": 13,
+    "unverifiable": 7,
+    "supported": 4,
+    "contradicted": 9
+   },
+   "범용 틀 사용 민원": 1,
+   "출처 수(근거당 평균)": 2.12,
+   "교차 확인 수(근거당 평균)": 0.52,
+   "오래된 자료 주의가 붙은 근거": 15
+  },
+  "말투·장소 유형별": {
+   "dialect": {
+    "민원": 3,
+    "읍면동": "3/3 (100%)",
+    "주제": "3/3 (100%)",
+    "근거 정답(뜻 고른 뒤)": "4/4 (100%)"
+   },
+   "multi_place": {
+    "민원": 1,
+    "읍면동": "1/1 (100%)",
+    "주제": "1/1 (100%)",
+    "근거 정답(뜻 고른 뒤)": "1/1 (100%)"
+   },
+   "no_place": {
+    "민원": 2,
+    "읍면동": "2/2 (100%)",
+    "주제": "2/2 (100%)",
+    "근거 정답(뜻 고른 뒤)": "2/2 (100%)"
+   },
+   "short_place": {
+    "민원": 2,
+    "읍면동": "2/2 (100%)",
+    "주제": "2/2 (100%)",
+    "근거 정답(뜻 고른 뒤)": "2/2 (100%)"
+   },
+   "standard": {
+    "민원": 24,
+    "읍면동": "24/24 (100%)",
+    "주제": "23/24 (96%)",
+    "근거 정답(뜻 고른 뒤)": "26/26 (100%)"
+   }
+  }
+ },
+ "limits": {
+  "오래된 자료가 근거에 들어감": [
+   "g01 우리 동네 버스가 확 줄어부난 할망덜 병원 가기가 막 힘들어마씸",
+   "g03 노형동 학교 앞 교차로에서 교통사고가 자주 나서 아이들 등하교가 위험합니다",
+   "g04 성산읍 마을에서 버스 정류소까지 너무 멀어서 어르신들이 버스를 타기 힘듭니다",
+   "g07 이도2동 클린하우스가 항상 넘쳐서 쓰레기가 길에 쌓여 있습니다",
+   "g10 남원읍 태풍이 올 때 대피할 임시주거시설이 마을에서 너무 멉니다",
+   "g15 화북동 횡단보도 건너다 차에 치일 뻔한 적이 많아요 너무 위험해요",
+   "g21 아라동 버스 정류장이 너무 적어요",
+   "g22 한림읍 사거리에서 교통사고가 자주 나요",
+   "g23 외도동에 쓰레기 버릴 클린하우스가 부족해요",
+   "g24 구좌읍에 치매안심센터가 부족해서 부모님 모시기 힘들어요",
+   "g29 삼도2동이랑 용담1동 클린하우스가 넘쳐요",
+   "g32 봉개동 아이들 학교 가는 길이 위험해요"
+  ],
+  "뜻을 고르지 않으면 엔진이 다른 지표를 고름(뜻 고르기가 필요한 이유)": [
+   "g01 우리 동네 버스가 확 줄어부난 할망덜 병원 가기가 막 힘들어마씸 — 엔진: bus_usage_change_pct",
+   "g04 성산읍 마을에서 버스 정류소까지 너무 멀어서 어르신들이 버스를 타기 힘듭니다 — 엔진: elderly_bus_use_per_capita",
+   "g06 한경면은 밤에 아프면 갈 수 있는 약국이나 응급실이 근처에 없습니다 — 엔진: night_pharmacy_count",
+   "g09 한림읍 여름 폭염 때 어르신들이 더위를 피할 대피시설이 부족합니다 — 엔진: 없음",
+   "g19 중문동은 주말 진료 하는 병원이 없어요 — 엔진: clinic_per_1k_pop"
+  ],
+  "측면(부족·거리·위험 등)을 못 읽음": [
+   "g07 이도2동 클린하우스가 항상 넘쳐서 쓰레기가 길에 쌓여 있습니다",
+   "g11 노형 사는데 밤길이 너무 어두워요 가로등 좀 달아 주세요",
+   "g16 우도면에 병원이 하나도 어서마씸",
+   "g29 삼도2동이랑 용담1동 클린하우스가 넘쳐요"
+  ],
+  "근거 값이 하나도 계산되지 않음": [
+   "g09 한림읍 여름 폭염 때 어르신들이 더위를 피할 대피시설이 부족합니다 — 판정: {'unverifiable': 1}",
+   "g11 노형 사는데 밤길이 너무 어두워요 가로등 좀 달아 주세요 — 판정: {'unverifiable': 1}",
+   "g18 동홍동 버스 배차 간격이 너무 길어졌어요 — 판정: {'unverifiable': 1}",
+   "g19 중문동은 주말 진료 하는 병원이 없어요 — 판정: {'unverifiable': 1}",
+   "g31 버스가 줄어서 장 보러 가기 힘들어요 — 판정: {'unverifiable': 1}"
+  ],
+  "주제를 잘못 알아들음": [
+   "g32 봉개동 아이들 학교 가는 길이 위험해요 — 인식: 없음"
+  ],
+  "정답 뜻이 선택지에 없음": [
+   "g32 봉개동 아이들 학교 가는 길이 위험해요"
+  ]
+ },
+ "items": [
+  {
+   "id": "g01",
+   "style": "dialect",
+   "text": "우리 동네 버스가 확 줄어부난 할망덜 병원 가기가 막 힘들어마씸",
+   "structured_by": "rules",
+   "emd_detected": "",
+   "emd_ok": true,
+   "picker_offered": true,
+   "confirm_asked": false,
+   "topics_found": [
+    "bus",
+    "medical"
+   ],
+   "topic_ok": true,
+   "aspect": "access",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 2,
+   "rule_claims": 1,
+   "in_options": [
+    true,
+    true
+   ],
+   "recommended_ok": false,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 2,
+    "computed": 2,
+    "verdicts": {
+     "supported": 1,
+     "partial": 1
+    },
+    "template": false,
+    "sources": 5,
+    "cross_checks": 2,
+    "stale": 1,
+    "indicators": [
+     "bus_usage_change_pct",
+     "clinic_per_1k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true,
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 2,
+    "cross_checks": 1,
+    "stale": 1,
+    "indicators": [
+     "bus_usage_change_pct"
+    ],
+    "gaps": [],
+    "correct": [
+     true,
+     false
+    ]
+   }
+  },
+  {
+   "id": "g02",
+   "style": "standard",
+   "text": "애월읍 저녁에 집으로 가는 버스가 거의 없어서 학생들이 귀가하기 어렵습니다",
+   "structured_by": "rules",
+   "emd_detected": "애월읍",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "bus"
+   ],
+   "topic_ok": true,
+   "aspect": "access",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "unverifiable": 1
+    },
+    "template": false,
+    "sources": 1,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [
+     "evening_bus_share_jeju"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "unverifiable": 1
+    },
+    "template": false,
+    "sources": 1,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [
+     "evening_bus_share_jeju"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g03",
+   "style": "standard",
+   "text": "노형동 학교 앞 교차로에서 교통사고가 자주 나서 아이들 등하교가 위험합니다",
+   "structured_by": "rules",
+   "emd_detected": "노형동",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "traffic_safety"
+   ],
+   "topic_ok": true,
+   "aspect": "risk",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "supported": 1
+    },
+    "template": false,
+    "sources": 1,
+    "cross_checks": 1,
+    "stale": 1,
+    "indicators": [
+     "accident_hotspot_occurrences"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "supported": 1
+    },
+    "template": false,
+    "sources": 1,
+    "cross_checks": 1,
+    "stale": 1,
+    "indicators": [
+     "accident_hotspot_occurrences"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g04",
+   "style": "standard",
+   "text": "성산읍 마을에서 버스 정류소까지 너무 멀어서 어르신들이 버스를 타기 힘듭니다",
+   "structured_by": "rules",
+   "emd_detected": "성산읍",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "bus"
+   ],
+   "topic_ok": true,
+   "aspect": "access",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 2,
+   "rule_claims": 1,
+   "in_options": [
+    true,
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 2,
+    "computed": 2,
+    "verdicts": {
+     "partial": 2
+    },
+    "template": false,
+    "sources": 6,
+    "cross_checks": 2,
+    "stale": 2,
+    "indicators": [
+     "bus_stop_per_1k_pop",
+     "elderly_bus_use_per_capita"
+    ],
+    "gaps": [],
+    "correct": [
+     true,
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 1,
+    "stale": 1,
+    "indicators": [
+     "elderly_bus_use_per_capita"
+    ],
+    "gaps": [],
+    "correct": [
+     false,
+     true
+    ]
+   }
+  },
+  {
+   "id": "g05",
+   "style": "standard",
+   "text": "표선면에 의원이 부족해서 어르신들이 진료를 받으려면 서귀포 시내까지 나가야 합니다",
+   "structured_by": "rules",
+   "emd_detected": "표선면",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "medical"
+   ],
+   "topic_ok": true,
+   "aspect": "supply",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "contradicted": 1
+    },
+    "template": false,
+    "sources": 2,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [
+     "clinic_per_1k_elderly"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "contradicted": 1
+    },
+    "template": false,
+    "sources": 2,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [
+     "clinic_per_1k_elderly"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g06",
+   "style": "standard",
+   "text": "한경면은 밤에 아프면 갈 수 있는 약국이나 응급실이 근처에 없습니다",
+   "structured_by": "rules",
+   "emd_detected": "한경면",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "medical"
+   ],
+   "topic_ok": true,
+   "aspect": "supply",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 2,
+   "rule_claims": 1,
+   "in_options": [
+    true,
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 2,
+    "computed": 2,
+    "verdicts": {
+     "supported": 2
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [
+     "emergency_distance_km",
+     "night_pharmacy_count"
+    ],
+    "gaps": [],
+    "correct": [
+     true,
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "supported": 1
+    },
+    "template": false,
+    "sources": 1,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [
+     "night_pharmacy_count"
+    ],
+    "gaps": [],
+    "correct": [
+     true,
+     false
+    ]
+   }
+  },
+  {
+   "id": "g07",
+   "style": "standard",
+   "text": "이도2동 클린하우스가 항상 넘쳐서 쓰레기가 길에 쌓여 있습니다",
+   "structured_by": "rules",
+   "emd_detected": "이도2동",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "waste"
+   ],
+   "topic_ok": true,
+   "aspect": null,
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 4,
+    "cross_checks": 1,
+    "stale": 1,
+    "indicators": [
+     "clean_house_pop_per_site"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 4,
+    "cross_checks": 1,
+    "stale": 1,
+    "indicators": [
+     "clean_house_pop_per_site"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g08",
+   "style": "standard",
+   "text": "대정읍 재활용도움센터가 멀어서 재활용품을 버리기가 불편합니다",
+   "structured_by": "rules",
+   "emd_detected": "대정읍",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "waste"
+   ],
+   "topic_ok": true,
+   "aspect": "access",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "contradicted": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [
+     "recycling_center_per_10k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "contradicted": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [
+     "recycling_center_per_10k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g09",
+   "style": "standard",
+   "text": "한림읍 여름 폭염 때 어르신들이 더위를 피할 대피시설이 부족합니다",
+   "structured_by": "rules",
+   "emd_detected": "한림읍",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "disaster"
+   ],
+   "topic_ok": true,
+   "aspect": "supply",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 0,
+    "verdicts": {
+     "unverifiable": 1
+    },
+    "template": false,
+    "sources": 0,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [],
+    "gaps": [
+     "무더위쉼터(폭염 대피시설)"
+    ],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 0,
+    "verdicts": {
+     "unverifiable": 1
+    },
+    "template": false,
+    "sources": 0,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [],
+    "gaps": [
+     "무더위쉼터"
+    ],
+    "correct": [
+     false
+    ]
+   }
+  },
+  {
+   "id": "g10",
+   "style": "standard",
+   "text": "남원읍 태풍이 올 때 대피할 임시주거시설이 마을에서 너무 멉니다",
+   "structured_by": "rules",
+   "emd_detected": "남원읍",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "disaster"
+   ],
+   "topic_ok": true,
+   "aspect": "access",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "supported": 1
+    },
+    "template": false,
+    "sources": 4,
+    "cross_checks": 0,
+    "stale": 1,
+    "indicators": [
+     "refugee_facility_per_10k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 4,
+    "cross_checks": 0,
+    "stale": 1,
+    "indicators": [
+     "refugee_facility_per_10k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g11",
+   "style": "short_place",
+   "text": "노형 사는데 밤길이 너무 어두워요 가로등 좀 달아 주세요",
+   "structured_by": "rules",
+   "emd_detected": "노형동",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": true,
+   "topics_found": [
+    "safety"
+   ],
+   "topic_ok": true,
+   "aspect": null,
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 0,
+    "verdicts": {
+     "unverifiable": 1
+    },
+    "template": false,
+    "sources": 0,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [],
+    "gaps": [
+     "가로등·보안등"
+    ],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 0,
+    "verdicts": {
+     "unverifiable": 1
+    },
+    "template": false,
+    "sources": 0,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [],
+    "gaps": [
+     "가로등·보안등"
+    ],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g12",
+   "style": "standard",
+   "text": "연동 골목에 CCTV가 없어서 밤에 무서워요",
+   "structured_by": "rules",
+   "emd_detected": "연동",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "safety"
+   ],
+   "topic_ok": true,
+   "aspect": "supply",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [
+     "cctv_cameras_per_10k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [
+     "cctv_cameras_per_10k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g13",
+   "style": "standard",
+   "text": "조천읍에 경로당이 부족해서 어르신들이 모일 데가 없어요",
+   "structured_by": "rules",
+   "emd_detected": "조천읍",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "elderly_welfare"
+   ],
+   "topic_ok": true,
+   "aspect": "supply",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 2,
+    "cross_checks": 1,
+    "stale": 0,
+    "indicators": [
+     "senior_center_per_1k_elderly"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 2,
+    "cross_checks": 1,
+    "stale": 0,
+    "indicators": [
+     "senior_center_per_1k_elderly"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g14",
+   "style": "short_place",
+   "text": "구좌 쪽에 편의점이 없어서 밤에 감기약 살 데가 없어요",
+   "structured_by": "rules",
+   "emd_detected": "구좌읍",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": true,
+   "topics_found": [
+    "medical"
+   ],
+   "topic_ok": true,
+   "aspect": "supply",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [
+     "otc_store_per_10k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [
+     "otc_store_per_10k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g15",
+   "style": "standard",
+   "text": "화북동 횡단보도 건너다 차에 치일 뻔한 적이 많아요 너무 위험해요",
+   "structured_by": "rules",
+   "emd_detected": "화북동",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "traffic_safety"
+   ],
+   "topic_ok": true,
+   "aspect": "risk",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "contradicted": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 1,
+    "stale": 1,
+    "indicators": [
+     "pedestrian_accident_per_10k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "contradicted": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 1,
+    "stale": 1,
+    "indicators": [
+     "pedestrian_accident_per_10k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g16",
+   "style": "dialect",
+   "text": "우도면에 병원이 하나도 어서마씸",
+   "structured_by": "rules",
+   "emd_detected": "우도면",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "medical"
+   ],
+   "topic_ok": true,
+   "aspect": null,
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "supported": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 1,
+    "stale": 0,
+    "indicators": [
+     "clinic_per_1k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "supported": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 1,
+    "stale": 0,
+    "indicators": [
+     "clinic_per_1k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g17",
+   "style": "dialect",
+   "text": "안덕면 하르방덜 경로당이 너미 멀어마씸",
+   "structured_by": "rules",
+   "emd_detected": "안덕면",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "elderly_welfare"
+   ],
+   "topic_ok": true,
+   "aspect": "access",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 2,
+    "cross_checks": 1,
+    "stale": 0,
+    "indicators": [
+     "senior_center_per_1k_elderly"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 2,
+    "cross_checks": 1,
+    "stale": 0,
+    "indicators": [
+     "senior_center_per_1k_elderly"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g18",
+   "style": "standard",
+   "text": "동홍동 버스 배차 간격이 너무 길어졌어요",
+   "structured_by": "rules",
+   "emd_detected": "동홍동",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "bus"
+   ],
+   "topic_ok": true,
+   "aspect": "service",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 0,
+    "verdicts": {
+     "unverifiable": 1
+    },
+    "template": false,
+    "sources": 0,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [],
+    "gaps": [
+     "버스 운행 횟수·배차 간격"
+    ],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "contradicted": 1
+    },
+    "template": false,
+    "sources": 2,
+    "cross_checks": 1,
+    "stale": 1,
+    "indicators": [
+     "bus_usage_change_pct"
+    ],
+    "gaps": [
+     "버스 운행 횟수·배차 간격"
+    ],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g19",
+   "style": "standard",
+   "text": "중문동은 주말 진료 하는 병원이 없어요",
+   "structured_by": "rules",
+   "emd_detected": "중문동",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "medical"
+   ],
+   "topic_ok": true,
+   "aspect": "supply",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": false,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 0,
+    "verdicts": {
+     "unverifiable": 1
+    },
+    "template": false,
+    "sources": 0,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [],
+    "gaps": [
+     "야간·휴일 진료 병원"
+    ],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "contradicted": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 1,
+    "stale": 0,
+    "indicators": [
+     "clinic_per_1k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     false
+    ]
+   }
+  },
+  {
+   "id": "g20",
+   "style": "standard",
+   "text": "삼양동은 응급실이 너무 멀어서 아이가 아플 때 걱정돼요",
+   "structured_by": "rules",
+   "emd_detected": "삼양동",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "medical"
+   ],
+   "topic_ok": true,
+   "aspect": "access",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "supported": 1
+    },
+    "template": false,
+    "sources": 2,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [
+     "emergency_distance_km"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "supported": 1
+    },
+    "template": false,
+    "sources": 2,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [
+     "emergency_distance_km"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g21",
+   "style": "standard",
+   "text": "아라동 버스 정류장이 너무 적어요",
+   "structured_by": "rules",
+   "emd_detected": "아라동",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "bus"
+   ],
+   "topic_ok": true,
+   "aspect": "supply",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 1,
+    "stale": 1,
+    "indicators": [
+     "bus_stop_per_1k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 1,
+    "stale": 1,
+    "indicators": [
+     "bus_stop_per_1k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g22",
+   "style": "standard",
+   "text": "한림읍 사거리에서 교통사고가 자주 나요",
+   "structured_by": "rules",
+   "emd_detected": "한림읍",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "traffic_safety"
+   ],
+   "topic_ok": true,
+   "aspect": "risk",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 1,
+    "cross_checks": 1,
+    "stale": 1,
+    "indicators": [
+     "accident_hotspot_occurrences"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 1,
+    "cross_checks": 1,
+    "stale": 1,
+    "indicators": [
+     "accident_hotspot_occurrences"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g23",
+   "style": "standard",
+   "text": "외도동에 쓰레기 버릴 클린하우스가 부족해요",
+   "structured_by": "rules",
+   "emd_detected": "외도동",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "waste"
+   ],
+   "topic_ok": true,
+   "aspect": "supply",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 4,
+    "cross_checks": 1,
+    "stale": 1,
+    "indicators": [
+     "clean_house_pop_per_site"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 4,
+    "cross_checks": 1,
+    "stale": 1,
+    "indicators": [
+     "clean_house_pop_per_site"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g24",
+   "style": "standard",
+   "text": "구좌읍에 치매안심센터가 부족해서 부모님 모시기 힘들어요",
+   "structured_by": "rules",
+   "emd_detected": "구좌읍",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [],
+   "topic_ok": true,
+   "aspect": "access",
+   "out_of_scope": true,
+   "no_evidence_question": true,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": true,
+    "sources": 3,
+    "cross_checks": 0,
+    "stale": 1,
+    "indicators": [],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": true,
+    "sources": 3,
+    "cross_checks": 0,
+    "stale": 1,
+    "indicators": [],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g25",
+   "style": "standard",
+   "text": "대정읍 공영주차장이 부족해요",
+   "structured_by": "rules",
+   "emd_detected": "대정읍",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [],
+   "topic_ok": true,
+   "aspect": "supply",
+   "out_of_scope": true,
+   "no_evidence_question": true,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 0,
+    "verdicts": {
+     "unverifiable": 1
+    },
+    "template": false,
+    "sources": 0,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [],
+    "gaps": [
+     "claim c1 관련 지표"
+    ],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 0,
+    "verdicts": {
+     "unverifiable": 1
+    },
+    "template": false,
+    "sources": 0,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [],
+    "gaps": [
+     "claim c1 관련 지표"
+    ],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g26",
+   "style": "standard",
+   "text": "애월읍 물가가 너무 올랐어요",
+   "structured_by": "rules",
+   "emd_detected": "애월읍",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [],
+   "topic_ok": true,
+   "aspect": null,
+   "out_of_scope": true,
+   "no_evidence_question": true,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 0,
+    "verdicts": {
+     "unverifiable": 1
+    },
+    "template": false,
+    "sources": 0,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [],
+    "gaps": [
+     "claim c1 관련 지표"
+    ],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 0,
+    "verdicts": {
+     "unverifiable": 1
+    },
+    "template": false,
+    "sources": 0,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [],
+    "gaps": [
+     "claim c1 관련 지표"
+    ],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g27",
+   "style": "standard",
+   "text": "노형동 놀이터가 부족해요",
+   "structured_by": "rules",
+   "emd_detected": "노형동",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [],
+   "topic_ok": true,
+   "aspect": "supply",
+   "out_of_scope": true,
+   "no_evidence_question": true,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 0,
+    "verdicts": {
+     "unverifiable": 1
+    },
+    "template": false,
+    "sources": 0,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [],
+    "gaps": [
+     "claim c1 관련 지표"
+    ],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 0,
+    "verdicts": {
+     "unverifiable": 1
+    },
+    "template": false,
+    "sources": 0,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [],
+    "gaps": [
+     "claim c1 관련 지표"
+    ],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g28",
+   "style": "no_place",
+   "text": "병원이 너무 부족해요",
+   "structured_by": "rules",
+   "emd_detected": "",
+   "emd_ok": true,
+   "picker_offered": true,
+   "confirm_asked": false,
+   "topics_found": [
+    "medical"
+   ],
+   "topic_ok": true,
+   "aspect": "supply",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "contradicted": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 1,
+    "stale": 0,
+    "indicators": [
+     "clinic_per_1k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "contradicted": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 1,
+    "stale": 0,
+    "indicators": [
+     "clinic_per_1k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g29",
+   "style": "multi_place",
+   "text": "삼도2동이랑 용담1동 클린하우스가 넘쳐요",
+   "structured_by": "rules",
+   "emd_detected": "",
+   "emd_ok": true,
+   "picker_offered": true,
+   "confirm_asked": false,
+   "topics_found": [
+    "waste"
+   ],
+   "topic_ok": true,
+   "aspect": null,
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 2,
+    "computed": 2,
+    "verdicts": {
+     "contradicted": 2
+    },
+    "template": false,
+    "sources": 8,
+    "cross_checks": 2,
+    "stale": 2,
+    "indicators": [
+     "clean_house_pop_per_site"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 2,
+    "computed": 2,
+    "verdicts": {
+     "contradicted": 2
+    },
+    "template": false,
+    "sources": 8,
+    "cross_checks": 2,
+    "stale": 2,
+    "indicators": [
+     "clean_house_pop_per_site"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g30",
+   "style": "standard",
+   "text": "추자면은 응급 상황 때 갈 병원이 없어서 불안합니다",
+   "structured_by": "rules",
+   "emd_detected": "추자면",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [
+    "medical"
+   ],
+   "topic_ok": true,
+   "aspect": "supply",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "contradicted": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 1,
+    "stale": 0,
+    "indicators": [
+     "clinic_per_1k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "contradicted": 1
+    },
+    "template": false,
+    "sources": 3,
+    "cross_checks": 1,
+    "stale": 0,
+    "indicators": [
+     "clinic_per_1k_pop"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g31",
+   "style": "no_place",
+   "text": "버스가 줄어서 장 보러 가기 힘들어요",
+   "structured_by": "rules",
+   "emd_detected": "",
+   "emd_ok": true,
+   "picker_offered": true,
+   "confirm_asked": false,
+   "topics_found": [
+    "bus"
+   ],
+   "topic_ok": true,
+   "aspect": "service",
+   "out_of_scope": false,
+   "no_evidence_question": false,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    true
+   ],
+   "recommended_ok": true,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 0,
+    "verdicts": {
+     "unverifiable": 1
+    },
+    "template": false,
+    "sources": 0,
+    "cross_checks": 0,
+    "stale": 0,
+    "indicators": [],
+    "gaps": [
+     "버스 운행 횟수·배차 간격",
+     "읍면동 코드(제주 전체)"
+    ],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 0,
+    "verdicts": {
+     "unverifiable": 1
+    },
+    "template": false,
+    "sources": 0,
+    "cross_checks": 0,
+    "stale": 1,
+    "indicators": [
+     "bus_usage_change_pct"
+    ],
+    "gaps": [
+     "버스 운행 횟수·배차 간격",
+     "읍면동 코드(제주 전체)"
+    ],
+    "correct": [
+     true
+    ]
+   }
+  },
+  {
+   "id": "g32",
+   "style": "standard",
+   "text": "봉개동 아이들 학교 가는 길이 위험해요",
+   "structured_by": "rules",
+   "emd_detected": "봉개동",
+   "emd_ok": true,
+   "picker_offered": false,
+   "confirm_asked": false,
+   "topics_found": [],
+   "topic_ok": false,
+   "aspect": "risk",
+   "out_of_scope": false,
+   "no_evidence_question": true,
+   "gold_claims": 1,
+   "rule_claims": 1,
+   "in_options": [
+    false
+   ],
+   "recommended_ok": false,
+   "wrong_options": false,
+   "picked": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 1,
+    "cross_checks": 0,
+    "stale": 1,
+    "indicators": [
+     "school_risk_points"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   },
+   "auto": {
+    "evidence": 1,
+    "computed": 1,
+    "verdicts": {
+     "partial": 1
+    },
+    "template": false,
+    "sources": 1,
+    "cross_checks": 0,
+    "stale": 1,
+    "indicators": [
+     "school_risk_points"
+    ],
+    "gaps": [],
+    "correct": [
+     true
+    ]
+   }
+  }
+ ]
+}
