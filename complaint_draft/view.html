@@ -23,7 +23,7 @@
   .toggle button[aria-pressed="true"] { background: var(--orange); color: var(--ink); }
   .notice { margin: 0 2px 20px; padding: 0.7rem 1.2rem; border-radius: 14px; font-size: 1rem; font-weight: 500; background: var(--grey); }
   body.dia .notice { background: var(--soft); color: var(--brown); }
-  .cols { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; padding: 0 2px; }
+  .cols { display: flex; flex-wrap: wrap; gap: 28px; align-items: stretch; padding: 0 2px; }   /* 민원서와 오른쪽 칸의 아래를 맞춘다 */
   article { flex: 1 1 560px; min-width: 280px; background: var(--paper); border: 2px solid var(--line); border-radius: 20px;
     padding: clamp(24px, 3.2vw, 44px); display: flex; flex-direction: column; gap: 22px; }
   .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
@@ -57,11 +57,12 @@
   .know { background: var(--paper); border: 2px solid var(--line); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 6px; }
   .know h2 { margin: 0; font-size: 0.95rem; }
   .know p { margin: 0; font-size: 0.9rem; line-height: 1.55; color: var(--muted); }
-  .actions { display: flex; flex-direction: column; gap: 12px; }
+  .actions { display: flex; flex-direction: column; gap: 12px; margin-top: auto; }   /* 단추는 오른쪽 칸 맨 아래로 */
   .act { border-radius: 16px; padding: 0.9rem 1.6rem; min-height: 72px; font-size: 1.3rem; font-weight: 700; background: var(--paper); border: 2px solid var(--ink); }
   .act.main { background: var(--orange); border-color: var(--orange); }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .act.done { background: var(--green-soft); border-color: var(--green); }
   .act:disabled { background: var(--grey); border-color: var(--grey); color: #6B7177; cursor: not-allowed; }
-  .hint { font-size: 0.9rem; color: var(--muted); min-height: 1.6em; text-align: center; }
   @media print {
     body { background: #fff; font-size: 12pt; }
     .top, .notice, aside, .badge { display: none !important; }
@@ -93,7 +94,7 @@
         <button type="button" class="act main" id="print">인쇄하기</button>
         <button type="button" class="act copy" data-part="title">① 제목 복사하기</button>
         <button type="button" class="act copy" data-part="body">② 내용 복사하기</button>
-        <div class="hint" id="hint" aria-live="polite"></div>
+        <div class="sr-only" id="hint" aria-live="polite"></div>
       </div>
     </aside>
   </div>
@@ -198,13 +199,12 @@
   document.getElementById("know").textContent = know;
 
   // ---- 보기 전환
-  const READY = "제목과 내용을 차례로 복사해 민원 창구의 같은 이름 칸에 붙여 넣으세요.";
+  // 단추 아래 안내 글은 두지 않는다. 막힌 이유는 단추에 마우스를 올리면(title) 보이고, 화면 읽기 프로그램에는 hint 로 알린다.
   function refresh(mode) {
-    let off = false, msg = READY;
+    let off = false, msg = "";
     if (!DRAFT.copy_allowed) { off = true; msg = "예시 결과라서 인쇄·복사할 수 없어요."; }
     else if (mode === "dia") { off = true; msg = "확인용 화면이에요. 표준어로 바꾸면 인쇄·복사할 수 있어요."; }
-    for (const b of copyBtns) b.disabled = off;
-    printBtn.disabled = off;
+    for (const b of [...copyBtns, printBtn]) { b.disabled = off; b.title = msg; }
     hint.textContent = msg;
   }
   function setMode(mode) {
@@ -233,8 +233,12 @@
       const part = b.dataset.part;
       const ok = await copyText(sub[part]);
       const name = part === "title" ? "제목" : "내용";
-      hint.textContent = ok ? name + "을 복사했어요. 민원 창구의 '" + name + "' 칸에 붙여 넣으세요."
-                            : "복사하지 못했어요. 아래 '글로 받기'를 써 주세요.";
+      // 복사 결과는 단추 글자로 잠깐 보여 준다(아래 안내 글 없이)
+      const label = b.dataset.label || (b.dataset.label = b.textContent);
+      b.textContent = ok ? "✓ " + name + " 복사했어요" : "복사하지 못했어요";
+      b.classList.toggle("done", ok);
+      hint.textContent = ok ? name + "을 복사했어요." : "복사하지 못했어요. 아래 '글로 받기'를 써 주세요.";
+      setTimeout(() => { b.textContent = label; b.classList.remove("done"); }, 2500);
     });
   printBtn.addEventListener("click", () => { if (!printBtn.disabled) window.print(); });
 

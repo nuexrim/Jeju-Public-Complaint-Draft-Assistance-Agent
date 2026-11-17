@@ -400,12 +400,12 @@ def step_meanings(s: dict) -> None:
 # ---------------------------------------------------------------- 4. 최종 확인
 def step_confirm(s: dict) -> None:
     st.html(style.bubble("제가 이렇게 알아들었어요. 맞나요?"))
-    left, right = st.columns([4, 6], gap="medium")
+    left, right = st.container(key="row_confirm").columns([4, 6], gap="medium")
     with left.container(key="card_said"):
         st.html(style.said_card(" ".join(s["said"])))
         show_messages(s)
     right.html(style.understood_card([(k, v, False) for k, v in flow.confirm_rows(s)]))
-    c1, c2 = st.columns(2)
+    c1, c2 = st.columns([4, 6], gap="medium")          # 단추 넓이를 위 두 카드(쓰신 글 / 이렇게 이해했어요)와 맞춘다
     if c1.button("아니요, 다시 답할게요", use_container_width=True):
         call(flow.confirm, s, False)
     if c2.button("맞아요", type="primary", use_container_width=True):

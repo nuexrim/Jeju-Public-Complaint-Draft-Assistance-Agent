@@ -88,7 +88,18 @@ button[data-testid="stBaseButton-primary"], button[data-testid="stBaseButton-pri
   background: #FFFFFF; border: 2px solid {LINE}; border-radius: 20px; padding: 1rem 1.2rem; }}
 [class*="st-key-card_ev_"] {{ background: #FFFFFF; border: 2px solid {LINE}; border-radius: 20px; padding: 1rem 1.2rem; height: 100%; }}
 [class*="st-key-card_ev_on_"] {{ border-color: {INK}; }}
-.st-key-row_topic [data-testid="stHorizontalBlock"], .st-key-row_ev [data-testid="stHorizontalBlock"] {{ align-items: stretch; }}
+/* 한 줄에 놓인 카드끼리 높이 맞추기: 열 안의 감싸는 칸들을 모두 늘려 카드가 열 높이를 채우게 한다 */
+.st-key-row_topic [data-testid="stHorizontalBlock"], .st-key-row_confirm [data-testid="stHorizontalBlock"],
+[class*="st-key-row_ev_"] [data-testid="stHorizontalBlock"] {{ align-items: stretch; }}
+.st-key-row_topic [data-testid="stColumn"], .st-key-row_confirm [data-testid="stColumn"],
+[class*="st-key-row_ev_"] [data-testid="stColumn"] {{ display: flex; flex-direction: column; }}
+.st-key-row_topic [data-testid="stColumn"] div:has(.st-key-card_place, .st-key-card_topic),
+.st-key-row_confirm [data-testid="stColumn"] div:has(.st-key-card_said, [data-testid="stHtml"]),
+[class*="st-key-row_ev_"] [data-testid="stColumn"] div:has([class*="st-key-card_ev_"]) {{
+  flex: 1 1 auto; display: flex; flex-direction: column; }}
+.st-key-card_place, .st-key-card_topic, .st-key-card_said, [class*="st-key-card_ev_"] {{ flex: 1 1 auto; }}
+.st-key-row_confirm [data-testid="stHtml"] {{ flex: 1 1 auto; display: flex; flex-direction: column; }}
+.st-key-row_confirm [data-testid="stHtml"] > section {{ flex: 1 1 auto; }}
 /* 알약 단추(지역·주제 고르기) */
 [data-testid="stButtonGroup"] button {{ min-height: 44px; border-radius: 999px; border: 2px solid {LINE}; background: #FFFFFF;
   color: {INK}; padding: 0.25rem 1rem; }}
