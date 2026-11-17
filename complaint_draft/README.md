@@ -18,6 +18,7 @@ python -m pytest -q complaint_draft/tests            # 테스트 (네트워크·
 - **기본 화면** (`http://localhost:8501`): 불편 쓰기(지역·주제 고르기) → 되묻기 → 뜻 고르기 → 최종 확인 → 근거 고르기 → 민원서 초안까지 한 화면에서 이어집니다.
   `complaint_agent` 의 `Agent` 를 그대로 부르므로 루트 `requirements.txt` 설치가 필요합니다.
   Claude 를 쓰려면 실행하는 셸에서 `ALLOW_PAID_CALLS=1` 을 켭니다(없으면 규칙 구조화). 근거 DB가 없으면 엔진 mock 으로 돌고 복사가 막힙니다.
+- **개발용 정보** (`http://localhost:8501/?mode=dev`): 기본 화면은 어르신용이라 엔진 알림(예: "Claude 구조화를 쓰지 못해…")과 `handoff.json 받기` 단추를 숨깁니다. 주소 끝에 `?mode=dev`를 붙이면 보입니다.
 - **예시·파일로 보기** (`http://localhost:8501/?mode=file`): 개발·시연용. 예시 3개나 handoff 파일(`python -m complaint_agent --out handoff.json "..."`)로 초안만 봅니다.
 
 ## 대화 흐름 (`flow.py`)

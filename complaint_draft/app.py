@@ -6,6 +6,7 @@
                complaint_agent 의 Agent 를 그대로 부른다. 흐름은 complaint_draft/flow.py, 꾸밈은 style.py.
 예시·파일로 보기 : 주소 끝에 ?mode=file 을 붙이면 열린다(예: http://localhost:8501/?mode=file). 개발·시연용.
                예시나 handoff JSON(python -m complaint_agent --out handoff.json "...")으로 초안만 본다.
+개발용 정보     : 주소 끝에 ?mode=dev 를 붙이면 엔진 알림·handoff.json 받기가 보인다. 기본 화면(어르신용)에서는 숨긴다.
 """
 from __future__ import annotations
 
@@ -35,6 +36,8 @@ STEP_OF = {"input": 0, "questions": 1, "meanings": 1, "confirm": 1, "stopped": 1
 ORDINAL = ["첫째", "둘째", "셋째", "넷째", "다섯째", "여섯째"]
 FOOTNOTE = "이 도우미는 민원서 작성만 돕습니다. 접수는 국민신문고나 읍·면·동 주민센터에서 직접 하셔야 합니다."
 ALL_NOTE = "제주 전체를 고르면 지역끼리 비교하는 근거는 나오지 않습니다."
+
+DEV = st.query_params.get("mode") == "dev"   # 개발용 정보(엔진 알림, handoff.json)는 ?mode=dev 에서만 보인다
 
 st.set_page_config(page_title="제주 민원 도우미", page_icon="🍊", layout="wide", initial_sidebar_state="collapsed")
 
@@ -105,8 +108,9 @@ def show_draft(base: dict) -> None:
     draft = edited_draft(base)
     for w in draft["warnings"]:
         st.warning(w)
-    for n in draft["notices"]:
-        st.caption(f"알림: {n}")
+    if DEV:
+        for n in draft["notices"]:
+            st.caption(f"알림: {n}")
     if draft["pii_masked"]:
         st.caption("개인정보를 ○○로 가렸어요: " + ", ".join(draft["pii_masked"]))
 
@@ -227,8 +231,10 @@ def go(fn) -> None:
 
 
 def show_messages(s: dict) -> None:
+    """엔진 알림('알림: ...')은 개발용이라 ?mode=dev 에서만 보인다. 되묻기와 관련된 안내는 늘 보인다."""
     for m in s["messages"]:
-        st.caption(m)
+        if DEV or not m.startswith("알림:"):
+            st.caption(m)
 
 
 def place_picker(choices: dict, current: list[str], key: str) -> tuple[list[str], bool]:
@@ -470,8 +476,9 @@ def page_talk() -> None:
         if s["evidence_items"]:
             st.button("← 근거 다시 고르기", on_click=go, args=(flow.back_to_evidence,))
         show_draft(s["draft"])
-        st.download_button("handoff.json 받기 (개발·확인용)", json.dumps(s["handoff"], ensure_ascii=False, indent=2),
-                           file_name="handoff.json", mime="application/json")
+        if DEV:
+            st.download_button("handoff.json 받기 (개발·확인용)", json.dumps(s["handoff"], ensure_ascii=False, indent=2),
+                               file_name="handoff.json", mime="application/json")
     else:                                       # stopped
         st.html(style.bubble("여기서 멈출게요."))
         st.warning(s["stop_reason"])
