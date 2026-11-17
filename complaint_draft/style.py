@@ -9,7 +9,7 @@ import html
 
 INK, MUTED, LINE, GREY = "#1F2326", "#4A5157", "#B9BEC2", "#ECEAE6"
 BG, ORANGE, SOFT, BROWN, GREEN = "#FFF8EE", "#F7941D", "#FFE9CC", "#9A4100", "#2F6B2C"
-ROOT_PX = {"보통": 17, "크게": 20}
+ROOT_PX = {"작게": 15, "보통": 17, "크게": 20}
 
 esc = html.escape
 

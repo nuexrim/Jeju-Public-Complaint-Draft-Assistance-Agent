@@ -57,15 +57,14 @@ def set_size(size: str) -> None:
 # ---------------------------------------------------------------- 머리: 캐릭터·글자 크기·처음으로
 def show_header() -> None:
     with st.container(key="hdr"):
-        left, right = st.columns([3, 2], vertical_alignment="center")
+        left, right = st.columns([5, 4], vertical_alignment="center")
         left.html(style.header())
-        c0, c1, c2, c3 = right.columns([1.1, 1.1, 1.1, 1.5], vertical_alignment="center")
+        c0, c1, c2, c3, c4 = right.columns([1.1, 1, 1, 1, 1.4], vertical_alignment="center")
         c0.markdown("글자 크기")
-        c1.button("보통", key="size_normal", type="primary" if font_size() == "보통" else "secondary",
-                  on_click=set_size, args=("보통",), use_container_width=True)
-        c2.button("크게", key="size_big", type="primary" if font_size() == "크게" else "secondary",
-                  on_click=set_size, args=("크게",), use_container_width=True)
-        c3.button("처음으로", key="go_home", on_click=restart, use_container_width=True)
+        for col, (size, key) in zip((c1, c2, c3), (("작게", "size_small"), ("보통", "size_normal"), ("크게", "size_big"))):
+            col.button(size, key=key, type="primary" if font_size() == size else "secondary",
+                       on_click=set_size, args=(size,), use_container_width=True)
+        c4.button("처음으로", key="go_home", on_click=restart, use_container_width=True)
 
 
 # ---------------------------------------------------------------- 초안 (3단계 / 예시 보기 공통)

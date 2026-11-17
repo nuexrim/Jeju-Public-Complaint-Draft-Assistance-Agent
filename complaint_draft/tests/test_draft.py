@@ -311,3 +311,8 @@ def test_style_evidence_card_escapes_and_shows_stale():
     card = style.evidence_card({"verdict": "partial", "verdict_ko": "일부만 확인됨", "indicator": "<b>x</b>", "value_text": "3 곳",
                                 "region_compare": None, "claim": "", "sources": [], "as_of": "2021-12", "stale": True})
     assert "&lt;b&gt;" in card and "오래된 자료" in card
+
+
+def test_html_font_size_has_three_steps():
+    d = build_draft(load_handoff(SAMPLES / "supported.json"))
+    assert 'style="font-size: 15px"' in render_html(d, "작게")

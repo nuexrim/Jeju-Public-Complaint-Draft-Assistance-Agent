@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 TEMPLATE = Path(__file__).resolve().parent / "view.html"
-ROOT_PX = {"보통": 17, "크게": 20}       # 글자 크기 단추. view.html 의 글자는 모두 rem 이라 이 값에 따라 커진다.
+ROOT_PX = {"작게": 15, "보통": 17, "크게": 20}       # 글자 크기 단추. view.html 의 글자는 모두 rem 이라 이 값에 따라 커진다.
 
 
 def render_html(draft: dict, size: str = "크게") -> str:
