@@ -29,7 +29,7 @@ DOCS = ONTO / "rag_docs" / "generated"
 DB = ENGINE_ROOT / "data" / "jeju.duckdb"
 CARDS = ENGINE_ROOT / "catalog" / "cards.parquet"
 
-SKIP_TABLES = {"dataset", "bus_station_emd", "pop_tongban", "pop_emd_monthly"}          # 메타·기술용 테이블
+SKIP_TABLES = {"dataset", "bus_station_emd", "pop_tongban", "pop_emd_monthly", "prefetch_profile"}   # 메타·기술용 테이블
 SKIP_COLUMNS = {"emd_method", "period"}               # 적재 과정에서 붙인 기술 컬럼
 TYPE_MAP = {
     "VARCHAR": "TEXT", "BIGINT": "INTEGER", "INTEGER": "INTEGER", "SMALLINT": "INTEGER", "TINYINT": "INTEGER",
@@ -74,7 +74,7 @@ def build_schema(con, names: dict[str, str]) -> tuple[dict, dict, list[str]]:
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main' ORDER BY 1").fetchall()]
     schema, colmap, dropped = {}, {}, []
     for t in tables:
-        if t in SKIP_TABLES:
+        if t in SKIP_TABLES or t.startswith("pf_"):     # pf_: 미리 받은 표(data/prefetch.py). 범용 틀로만 쓴다
             continue
         cols, cmap, seen = {}, {}, set()
         for name, dtype, *_ in con.execute(f'DESCRIBE "{t}"').fetchall():

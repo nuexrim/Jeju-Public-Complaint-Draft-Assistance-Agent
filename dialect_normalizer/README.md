@@ -81,7 +81,7 @@ Windows (PowerShell):
 py -3.11 -m pip install -r requirements.txt
 copy .env.example .env
 ```
-(Windows에서는 아래 명령의 `python3`를 `py -3.11`로 바꿔 실행)
+(아래 명령은 가상환경을 켠 뒤 기준입니다. 가상환경 없이 Windows에서 실행하면 `python`을 `py -3.11`로 바꿉니다)
 
 ### 2. 데이터 준비
 AI Hub에서 **라벨링데이터만** 내려받아 이 폴더 안에 압축을 풉니다.
@@ -90,23 +90,23 @@ AI Hub에서 **라벨링데이터만** 내려받아 이 폴더 안에 압축을 
 
 ### 3. 전처리 (처음 한 번)
 ```bash
-python3 preprocess.py               # → processed/ 폴더 생성
-python3 normalize.py --build-index  # → processed/example_index.pkl 생성 (1~3분)
+python preprocess.py               # → processed/ 폴더 생성
+python normalize.py --build-index  # → processed/example_index.pkl 생성 (1~3분)
 ```
 
 ### 4. 변환
 ```bash
-python3 normalize.py "고냉이 허고 강생이들 왕 막 파불민 농사도 잘 안 돼요"
-python3 normalize.py --zero-shot "..."   # 비교용: 사전·예문 없이 LLM만
-python3 normalize.py                     # 대화형 모드
-python3 normalize.py --json "..."        # 결과를 JSON으로 출력
+python normalize.py "고냉이 허고 강생이들 왕 막 파불민 농사도 잘 안 돼요"
+python normalize.py --zero-shot "..."   # 비교용: 사전·예문 없이 LLM만
+python normalize.py                     # 대화형 모드
+python normalize.py --json "..."        # 결과를 JSON으로 출력
 ```
 
 ### 5. 평가
 ```bash
-python3 evaluate.py --limit 20     # 먼저 평가셋마다 20문장만 (비용·오류 확인)
-python3 evaluate.py                # 전체: 평가셋 2개(일상대화·어르신) × 방법 2개
-python3 evaluate.py --report       # API 호출 없이 저장된 결과로 점수만 다시 계산
+python evaluate.py --limit 20     # 먼저 평가셋마다 20문장만 (비용·오류 확인)
+python evaluate.py                # 전체: 평가셋 2개(일상대화·어르신) × 방법 2개
+python evaluate.py --report       # API 호출 없이 저장된 결과로 점수만 다시 계산
 ```
 - 결과는 `results/`에 저장되며, 중간에 끊겨도 다시 실행하면 이어서 진행합니다.
 - 지표: ERR(메인), 재현율, FPR, 단어 정확도, LAI 정확도, CER, BLEU, chrF 등 — 계산식과 근거는 아래 [평가 지표](#평가-지표) 참고
@@ -114,15 +114,15 @@ python3 evaluate.py --report       # API 호출 없이 저장된 결과로 점�
 
 ### 6. 구조화
 ```bash
-python3 structure.py "우리 동네 버스가 확 줄어부난 할망덜 병원 가기가 막 힘들어마씸 구좌읍"
-python3 structure.py --out q.json "..."       # 엔진에 넣을 질의 파일 저장
-python3 structure.py --check-fixtures         # 팀원 예시 10개로 유형·읍면동 정확도 확인 (Claude 10회 호출)
+python structure.py "우리 동네 버스가 확 줄어부난 할망덜 병원 가기가 막 힘들어마씸 구좌읍"
+python structure.py --out q.json "..."       # 엔진에 넣을 질의 파일 저장
+python structure.py --check-fixtures         # 팀원 예시 10개로 유형·읍면동 정확도 확인 (Claude 10회 호출)
 ```
 엔진과 연결: `cd ../evidence_engine && python run_engine.py --query ../dialect_normalizer/q.json`
 
 ### 7. 테스트
 ```bash
-python3 -m pytest -q          # 네트워크·유료 호출 없이 실행
+python -m pytest -q          # 네트워크·유료 호출 없이 실행
 ```
 
 다른 코드에서:

@@ -45,7 +45,7 @@ import llm                                   # noqa: E402  (dialect_normalizer)
 import structure as S                        # noqa: E402
 from normalize import ResourceMissing        # noqa: E402
 import run_engine                            # noqa: E402  (evidence_engine)
-from indicators.library import claim_topics, load_registry   # noqa: E402
+from indicators.library import claim_topics, cue_in, load_registry   # noqa: E402
 from package.builder import resolve_emd      # noqa: E402
 from package.privacy import mask_query       # noqa: E402
 
@@ -131,25 +131,31 @@ class Agent:
         r["source_text"] = S.mask_pii(" ".join(text.split()))[0]   # 다시 이해할 때 쓰는 가린 원문
         return r
 
-    def _resolve_place(self, text: str) -> str:
-        """43개 행정동 이름, 또는 리·법정동 이름(예: 세화리 → 구좌읍)이 하나로 정해질 때만."""
+    def _resolve_place(self, text: str) -> tuple[str, str]:
+        """(읍면동, 확인할 말). 43개 행정동 이름, 리·법정동 이름(예: 세화리 → 구좌읍), 줄인 이름(노형 → 노형동)
+        순서로 찾고 하나로 정해질 때만 쓴다. 줄인 이름은 글자만 보고 고른 것이라 확인할 말을 함께 돌려준다."""
         name = S.find_emd_in_text(text)
         if name:
-            return name
+            return name, ""
         found = set()
         for word in re.findall(r"[가-힣]{1,6}(?:리|동)(?![가-힣])", text):
             code, _ = resolve_emd({"emd_name": word}, self._emd_csv)
             if code in self._emd_by_code:
                 found.add(self._emd_by_code[code])
-        return found.pop() if len(found) == 1 else ""
+        if len(found) == 1:
+            return found.pop(), ""
+        if found:
+            return "", ""
+        return S.find_short_emd_in_text(text)
 
     def _by_rules(self, text: str) -> dict:
         """Claude 없이 만드는 비상 구조화. 원문(가림)을 주장 하나로 쓰고, 빈 칸은 structure.py 와 같은 질문으로 묻는다."""
         masked, pii = S.mask_pii(" ".join(text.split()))
         topics = claim_topics(masked)
         ctype = next((TOPIC_TO_TYPE[t] for t in topics if t in TOPIC_TO_TYPE), "기타")
-        cues = [c for t in load_registry().get("topics", []) if t["id"] in topics for c in t["cues"] if c in masked]
-        emd = self._resolve_place(masked)
+        cues = [c.rstrip("-") for t in load_registry().get("topics", []) if t["id"] in topics
+                for c in t["cues"] if cue_in(c, masked)]
+        emd, short_mention = self._resolve_place(masked)
         query = {
             "request_id": S.new_request_id(),
             "normalized_text": masked,
@@ -160,6 +166,8 @@ class Agent:
             "targets": list(dict.fromkeys(cues)),
         }
         questions = S._questions(query, "", "", None, "", emd_in_text=bool(emd))
+        if short_mention:
+            questions = S.add_short_name_question(questions, short_mention, emd)
         return {"status": S._status(query, questions), "query": query, "questions": questions,
                 "schema_errors": S.validate(query), "pii_masked": pii, "location_mention": "", "normalize": None}
 
@@ -184,7 +192,7 @@ class Agent:
 
         if emd_name is not None and emd_name.strip():
             name = emd_name.strip()
-            resolved = name if name in S.EMD_NAMES else (S.guess_emd(name) or self._resolve_place(name))
+            resolved = name if name in S.EMD_NAMES else (S.guess_emd(name) or self._resolve_place(name)[0])
             if resolved:
                 r = self._update(r, emd_name=resolved)
             else:
@@ -227,31 +235,64 @@ class Agent:
         return run_engine.interpret(query, self.config, mock=self.mock_engine, engine=self.engine)
 
     @staticmethod
-    def choose(query: dict, interpretation: dict, picks: dict[str, str | dict]) -> tuple[dict, list[str]]:
-        """picks: {claim_id: option_id} 또는 {claim_id: {"other": "직접 쓴 문장"}}.
-        (새 질의, 다시 해석해야 할 claim_id 목록) — '기타'를 고른 주장은 다시 선택지를 받는다."""
+    def choose(query: dict, interpretation: dict, picks: dict[str, str | dict | list]) -> tuple[dict, list[str]]:
+        """사용자가 고른 뜻을 질의에 넣는다. (새 질의, 다시 해석해야 할 claim_id 목록)
+
+        picks[claim_id] 는 셋 중 하나:
+          "c1-o2"                    뜻 하나
+          ["c1-o1", "c1-o3"]         뜻 여러 개(최대 max_picks). 고른 뜻마다 주장이 하나씩 생긴다(c1, c1-2, ...)
+          {"other": "직접 쓴 문장"}   기타. 목록 안에 넣어도 된다. 이 주장은 다시 선택지를 받는다
+        """
         q = copy.deepcopy(query)
         by_claim = {c["claim_id"]: c for c in interpretation["claims"]}
-        again = []
+        used_ids = {c["id"] for c in q["claims"]}
+        out, again = [], []
         for claim in q["claims"]:
             pick = picks.get(claim["id"])
             if pick is None:
+                out.append(claim)
                 continue
-            if isinstance(pick, dict):
-                text = S.mask_pii(pick.get("other", ""))[0]
-                if text:
-                    claim["text"] = text
-                    claim.pop("indicator_id", None)
-                    again.append(claim["id"])
+            items = pick if isinstance(pick, list) else [pick]
+            info = by_claim.get(claim["id"])
+            if info is None:
+                raise ValueError(f"{claim['id']}: 해석 선택지가 없는 주장")
+            limit = info.get("max_picks", 1)
+            if not items or len(items) > limit:
+                raise ValueError(f"{claim['id']}: 뜻은 1~{limit}개 고른다 (받은 수 {len(items)})")
+            made, seen = [], set()
+            for item in items:
+                if isinstance(item, dict):
+                    text = S.mask_pii(item.get("other", ""))[0].strip()
+                    if text:
+                        made.append(({"text": text}, True))
+                    continue
+                opt = next((o for o in info["options"] if o["option_id"] == item), None)
+                if opt is None:
+                    raise ValueError(f"{claim['id']}: 선택지에 없는 option_id '{item}'")
+                if opt["kind"] == "other":
+                    raise ValueError(f"{claim['id']}: 기타는 {{'other': 문장}} 으로 고른다")
+                if opt["indicator_id"] in seen:
+                    continue
+                seen.add(opt["indicator_id"])
+                made.append(({"text": opt["text"], "indicator_id": opt["indicator_id"]}, False))
+            if not made:                      # 기타 문장이 비었음 → 원래 주장 그대로
+                out.append(claim)
                 continue
-            opt = next((o for o in by_claim[claim["id"]]["options"] if o["option_id"] == pick), None)
-            if opt is None:
-                raise ValueError(f"{claim['id']}: 선택지에 없는 option_id '{pick}'")
-            if opt["kind"] == "other":
-                raise ValueError(f"{claim['id']}: 기타는 {{'other': 문장}} 으로 고른다")
-            claim["text"] = opt["text"]
-            claim["indicator_id"] = opt["indicator_id"]
+            for n, (fields, is_other) in enumerate(made, 1):
+                cid = claim["id"] if n == 1 else Agent._next_id(claim["id"], used_ids)
+                used_ids.add(cid)
+                out.append({"id": cid, **fields})
+                if is_other:
+                    again.append(cid)
+        q["claims"] = out
         return q, again
+
+    @staticmethod
+    def _next_id(base: str, used: set[str]) -> str:
+        n = 2
+        while f"{base}-{n}" in used:
+            n += 1
+        return f"{base}-{n}"
 
     # ------------------------------------------------------------------ 4. 최종 확인
     @staticmethod

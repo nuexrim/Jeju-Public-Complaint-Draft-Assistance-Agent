@@ -54,6 +54,17 @@ def ask_questions(agent: Agent, r: dict, ask: Callable[[str], str], say: Callabl
     return r
 
 
+def parse_picks(ans: str, n_options: int, max_picks: int) -> list[int] | None:
+    """'1', '1,3', '1 3' → 0부터 센 번호 목록. 빈 답은 [] (추천), 잘못된 답은 None."""
+    parts = [x for x in ans.replace(",", " ").split() if x]
+    if not parts:
+        return []
+    if not all(x.isdigit() and 1 <= int(x) <= n_options for x in parts):
+        return None
+    idx = list(dict.fromkeys(int(x) - 1 for x in parts))
+    return idx if len(idx) <= max_picks else None
+
+
 def choose_meanings(agent: Agent, query: dict, ask: Callable[[str], str], say: Callable[[str], None]) -> dict:
     pending = [c["id"] for c in query["claims"]]
     rounds = 0
@@ -64,22 +75,31 @@ def choose_meanings(agent: Agent, query: dict, ask: Callable[[str], str], say: C
             if c["claim_id"] not in pending:
                 continue
             text = next(x["text"] for x in query["claims"] if x["id"] == c["claim_id"])
-            lines = [f"\n'{text}' — 어떤 뜻인가요?"]
-            for i, o in enumerate(c["options"], 1):
+            opts = c["options"]
+            if all(o["kind"] == "other" for o in opts):
+                continue        # 고를 뜻이 없음(엔진 주제 밖) → 문장 그대로 (범용 틀이나 빈칸으로 처리된다)
+            limit = c.get("max_picks", 1)
+            lines = [f"\n'{text}' — 어떤 뜻인가요?" + (f" (해당하는 것을 {limit}개까지 고를 수 있어요)" if limit > 1 else "")]
+            for i, o in enumerate(opts, 1):
                 mark = " (추천)" if o["option_id"] == c["recommended"] else ""
                 note = f"  · {o['note']}" if o.get("note") and o["kind"] == "no_data" else ""
                 lines.append(f"  {i}. {o['text']}{mark}{note}")
-            ans = ask("\n".join(lines) + "\n번호 (Enter=추천): ").strip()
-            opts = c["options"]
-            idx = int(ans) - 1 if ans.isdigit() and 1 <= int(ans) <= len(opts) else \
-                next(i for i, o in enumerate(opts) if o["option_id"] == c["recommended"])
-            if opts[idx]["kind"] == "other":
-                if rounds >= MAX_OTHER_ROUNDS:
+            prompt = "\n".join(lines) + "\n번호 (여러 개는 1,3 처럼 / Enter=추천): "
+            idx = parse_picks(ask(prompt), len(opts), limit)
+            if idx is None:
+                idx = parse_picks(ask(f"1~{len(opts)} 사이 번호를 {limit}개까지 써 주세요: "), len(opts), limit) or []
+            if not idx:
+                idx = [next(i for i, o in enumerate(opts) if o["option_id"] == c["recommended"])]
+            chosen: list[str | dict] = []
+            for i in idx:
+                if opts[i]["kind"] != "other":
+                    chosen.append(opts[i]["option_id"])
+                elif rounds >= MAX_OTHER_ROUNDS:
                     say("직접 쓴 문장 그대로 근거를 찾을게요.")
-                    continue
-                picks[c["claim_id"]] = {"other": ask("직접 써 주세요: ")}
-            else:
-                picks[c["claim_id"]] = opts[idx]["option_id"]
+                else:
+                    chosen.append({"other": ask("직접 써 주세요: ")})
+            if chosen:
+                picks[c["claim_id"]] = chosen
         query, pending = agent.choose(query, interp, picks)
         rounds += 1
         if rounds > MAX_OTHER_ROUNDS:

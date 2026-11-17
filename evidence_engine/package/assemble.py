@@ -56,6 +56,9 @@ class Engine:
         self.tables = {r[0] for r in self.runner.con.execute("SELECT table_name FROM information_schema.tables").fetchall()}
         self.emd_names = dict(self.runner.con.execute("SELECT emd_code, emd_name FROM dim_emd").fetchall())
         self.emd_codes_path = ENGINE_ROOT / config["paths"]["emd_codes"]
+        from package.template import load_place_tables
+        # 범용 틀에 쓸 수 있는 미리 받은 시설 목록 (data/prefetch.py). 없으면 빈 dict → 예전과 같이 동작
+        self.place_tables = load_place_tables(self.runner.con, self.tables, config["thresholds"]["max_missing_ratio"])
         self.today = date.fromisoformat(config["snapshot"]) if config.get("snapshot") else date.today()
         from ontology.paths import load_graph
         ttl = ENGINE_ROOT / config["paths"]["ontology_ttl"]
@@ -143,6 +146,9 @@ class Engine:
             if g not in gaps:
                 gaps.append(g)
         if indicator is None:
+            tpl = self._template(claim, cands, emd_code, emd_label, empty)
+            if tpl:
+                return tpl
             if exp.gaps:
                 return {**empty, "found_by": "ontology", "verdict": "unverifiable", "indicator": "해당 지표 없음",
                         "caveats": ["온톨로지 개념은 있으나 연결된 데이터가 없어 판정하지 않음"]}
@@ -218,6 +224,23 @@ class Engine:
             "sources": sources if result.value is not None else [],
             "caveats": caveats,
         }
+
+    def _template(self, claim: dict, cands: list, emd_code: str | None, emd_label: str, empty: dict) -> dict | None:
+        """등록 지표가 없을 때 범용 틀(미리 받은 시설 목록 → 인구 1만 명당 개수). 쓸 수 없으면 None."""
+        from package.template import evaluate, pick
+        info = pick(claim["text"], cands, self.place_tables)
+        if not info:
+            return None
+        out = evaluate(info, emd_code, emd_label, self.runner, self.emd_names, self.config.get("verdict"), claim["text"])
+        th = self.config["thresholds"]
+        as_of = out["sources"][0]["as_of"] if out["sources"] else None
+        if as_of and freshness(as_of, self.today, th["max_staleness_years"]) == 0:
+            out["caveats"].append(f"{info['title']}: 기준일 {as_of}로 {th['max_staleness_years']:.0f}년 넘게 지난 자료")
+        pop_sources, pop_caveats = self._sources(["pop_emd"])
+        if out["value"] is not None:
+            out["sources"] += pop_sources
+        out["caveats"] += pop_caveats
+        return {**empty, **out, "found_by": "catalog"}
 
     def _cross_checks_by_agent(self, claim: dict, indicator: dict, verdict: str, region_compare: str | None,
                                emd_code: str | None, emd_label: str) -> list[str]:

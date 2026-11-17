@@ -11,10 +11,10 @@
     ALLOW_PAID_CALLS=1               ← 사람이 직접 적어야 실제 호출됨 (팀 규칙)
 
 사용법
-  python3 normalize.py --build-index           예문 검색 색인 만들기 (처음 한 번, 1~3분)
-  python3 normalize.py "고냉이가 막 울엄수다"      한 문장 변환
-  python3 normalize.py --zero-shot "..."        사전·예문 없이 LLM만 (비교용 A방법)
-  python3 normalize.py                          대화형 모드 (여러 문장 연속 입력)
+  python normalize.py --build-index           예문 검색 색인 만들기 (처음 한 번, 1~3분)
+  python normalize.py "고냉이가 막 울엄수다"      한 문장 변환
+  python normalize.py --zero-shot "..."        사전·예문 없이 LLM만 (비교용 A방법)
+  python normalize.py                          대화형 모드 (여러 문장 연속 입력)
 
 다른 코드에서 쓰기
   from normalize import normalize
@@ -297,9 +297,9 @@ class ResourceMissing(FileNotFoundError):
 def _load(use_rag):
     if use_rag and "dict" not in _res:
         if not DICT_PATH.exists():
-            raise ResourceMissing(f"방언 사전이 없어요: {DICT_PATH} (먼저 python3 preprocess.py)")
+            raise ResourceMissing(f"방언 사전이 없어요: {DICT_PATH} (먼저 python preprocess.py)")
         if not INDEX_PATH.exists():
-            raise ResourceMissing("예문 색인이 없어요. 먼저 실행하세요:  python3 normalize.py --build-index")
+            raise ResourceMissing("예문 색인이 없어요. 먼저 실행하세요:  python normalize.py --build-index")
         _res["dict"] = DialectDict()
         _res["index"] = ExampleIndex()
     return _res.get("dict"), _res.get("index")
@@ -351,6 +351,8 @@ def pretty(r):
 
 
 def main():
+    from win_console import safe_output
+    safe_output()
     llm.load_env()
     ap = argparse.ArgumentParser()
     ap.add_argument("text", nargs="?")

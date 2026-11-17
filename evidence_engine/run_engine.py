@@ -91,7 +91,17 @@ def interpret(query: dict, config: dict | None = None, *, mock: bool = False, en
             engine.close()
 
 
+def _safe_output() -> None:
+    """한국어 Windows에서 출력을 파일·파이프로 보낼 때(CP949) 없는 글자로 멈추지 않게 '?'로 바꿔 쓴다.
+    대화 모듈의 dialect_normalizer/win_console.py 와 같은 처리(근거 엔진은 혼자서도 돌아야 해서 따로 둔다)."""
+    for stream in (sys.stdout, sys.stderr):
+        enc = (getattr(stream, "encoding", "") or "").lower().replace("-", "")
+        if enc and enc != "utf8" and hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
+
+
 def main(argv: list[str] | None = None) -> int:
+    _safe_output()
     parser = argparse.ArgumentParser(description="근거 패키지 엔진")
     parser.add_argument("--query", required=True, type=Path, help="구조화 질의 JSON 파일")
     parser.add_argument("--out", type=Path, help="근거 패키지를 저장할 파일 (없으면 표준 출력)")

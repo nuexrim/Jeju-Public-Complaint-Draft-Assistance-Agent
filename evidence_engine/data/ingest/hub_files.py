@@ -3,6 +3,7 @@
     python data/ingest/hub_files.py               # datasets.yaml의 hub_files (large 제외)
     python data/ingest/hub_files.py --large       # large 표시된 것도 받음
     python data/ingest/hub_files.py --ids 512 549
+    python data/ingest/hub_files.py --small 10    # 카탈로그의 모든 FILE 데이터 중 10MB 이하 표(csv·xlsx) 파일 (미리 받기)
 
 누리집 상세 화면의 첨부파일 내려받기 주소를 그대로 부른다(로그인·키 불필요, 과금 없음).
 받은 파일은 raw/jejudatahub/files/<id>/ 에 두고, 출처·기준일·해시를 manifest.json에 남긴다.
@@ -54,19 +55,33 @@ def download(info: dict, dest: Path) -> str:
     return digest.hexdigest()
 
 
+TABLE_EXT = (".csv", ".xlsx")
+
+
+def _small_table(info: dict, max_mb: float) -> bool:
+    return info["fileName"].strip().lower().endswith(TABLE_EXT) and info["fileSize"] <= max_mb * 1e6
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--ids", type=int, nargs="*")
     parser.add_argument("--large", action="store_true")
+    parser.add_argument("--small", type=float, metavar="MB",
+                        help="datasets.yaml 과 상관없이 카탈로그의 모든 FILE 데이터에서 이 크기 이하 표 파일(csv·xlsx)만 받는다")
     args = parser.parse_args(argv)
 
     targets = yaml.safe_load((HERE / "datasets.yaml").read_text(encoding="utf-8"))["hub_files"]
-    if args.ids:
+    catalog = load_catalog()
+    if args.small:
+        known = {t["id"] for t in targets}
+        targets = [{"id": i, "small": True} for i, row in sorted(catalog.items())
+                   if i not in known and row.get("dataFile") and any(_small_table(f, args.small)
+                                                                      for f in row["dataFile"]["fileInfos"])]
+    elif args.ids:
         targets = [t for t in targets if t["id"] in args.ids]
     elif not args.large:
         targets = [t for t in targets if not t.get("large")]
 
-    catalog = load_catalog()
     FILES.mkdir(parents=True, exist_ok=True)
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8")) if MANIFEST.exists() else {}
 
@@ -79,12 +94,18 @@ def main(argv: list[str] | None = None) -> None:
         folder.mkdir(exist_ok=True)
         files = []
         for info in row["dataFile"]["fileInfos"]:
+            if target.get("small") and not _small_table(info, args.small):
+                continue
             dest = folder / info["fileName"].strip()
             known = next((f for f in manifest.get(str(row["id"]), {}).get("files", []) if f["name"] == dest.name), None)
             if dest.exists() and known and dest.stat().st_size == info["fileSize"]:
                 files.append(known)
                 continue
-            sha = download(info, dest)
+            try:
+                sha = download(info, dest)
+            except (OSError, ValueError) as exc:          # 한 파일 실패로 전체를 멈추지 않는다 (다시 실행하면 이어 받음)
+                print(f"실패 {row['id']} {dest.name}: {type(exc).__name__}")
+                continue
             files.append({"name": dest.name, "size": info["fileSize"], "sha256": sha})
             print(f"받음 {row['id']} {dest.name} ({info['fileSize'] / 1e6:.2f}MB)")
             time.sleep(1)
@@ -94,6 +115,7 @@ def main(argv: list[str] | None = None) -> None:
             "owner": row.get("owner"),
             "category": row.get("categoryName"),
             "complaint": target.get("complaint"),
+            "prefetch": bool(target.get("small")),          # 민원 주제와 상관없이 미리 받은 것
             "period_start": row.get("startDate"),
             "period_end": row.get("endDate"),
             "updated_at": row.get("updateAt"),

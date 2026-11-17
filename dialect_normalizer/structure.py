@@ -9,10 +9,10 @@
   ⑤ 계약 스키마 검증 (evidence_engine/contracts/query.schema.json 이 있으면)
 
 사용법
-  python3 structure.py "우리 동네 버스가 확 줄어부난 할망덜 병원 가기가 막 힘들어마씸 구좌읍"
-  python3 structure.py --no-normalize "표준어 문장"      방언 변환 없이 구조화만
-  python3 structure.py --out q.json "문장"               질의 JSON을 파일로 저장 (엔진 --query 에 바로 넣기)
-  python3 structure.py --check-fixtures                  팀원 예시 질의 10개로 구조화 정확도 확인
+  python structure.py "우리 동네 버스가 확 줄어부난 할망덜 병원 가기가 막 힘들어마씸 구좌읍"
+  python structure.py --no-normalize "표준어 문장"      방언 변환 없이 구조화만
+  python structure.py --out q.json "문장"               질의 JSON을 파일로 저장 (엔진 --query 에 바로 넣기)
+  python structure.py --check-fixtures                  팀원 예시 질의 10개로 구조화 정확도 확인
 
 다른 코드에서
   from structure import structure, update
@@ -69,6 +69,20 @@ if str(_ENGINE) not in _sys.path:
 from package.privacy import mask_with_labels  # noqa: E402
 
 PII_PLACEHOLDER = "○○"
+
+
+def topic_names() -> list[str]:
+    """근거 엔진이 자료를 가진 주제 이름 (registry.yaml topics[].name). 화면의 주제 안내도 이것을 쓴다."""
+    from indicators.library import load_registry
+    return [t.get("name", t["id"]) for t in load_registry().get("topics", [])]
+
+
+def evidence_topics(query: dict) -> list[str]:
+    """질의의 주장·본문·대상에서 근거 엔진 주제 id 를 찾는다(없으면 [] → 근거 자료 없음)."""
+    from indicators.library import claim_topics
+    claims = " ".join(c["text"] for c in query.get("claims", []))
+    context = " ".join([query.get("normalized_text", ""), " ".join(query.get("targets", []))])
+    return claim_topics(claims, context)
 
 
 def mask_pii(text: str) -> tuple[str, list[str]]:
@@ -184,6 +198,37 @@ def find_emd_in_text(text: str) -> str:
     return found.pop() if len(found) == 1 else ""
 
 
+# 줄여 부른 읍면동(노형, 구좌). '읍·면·동'과 숫자를 뗀 이름이 한 곳만 가리킬 때만 쓴다(일도 → 일도1동·2동은 못 정함).
+# 흔한 낱말과 같은 것은 뺀다: 중앙(가운데), 천지(온 세상·천지연), 오라('오라는' 명령형), 외도(바람피움).
+_SHORT_NOT_PLACE = {"중앙", "천지", "오라", "외도"}
+
+
+def _short_names() -> dict[str, str]:
+    by: dict[str, list[str]] = {}
+    for e in EMD_NAMES:
+        s = re.sub(r"\d", "", e[:-1])
+        if len(s) >= 2 and s not in _SHORT_NOT_PLACE:
+            by.setdefault(s, []).append(e)
+    return {s: es[0] for s, es in by.items() if len(es) == 1}
+
+
+SHORT_EMD = _short_names()
+
+
+def find_short_emd_in_text(text: str) -> tuple[str, str]:
+    """문장 속 줄인 이름(예: '노형에 사는데') → (읍면동, 문장에 쓰인 말). 하나로 정해질 때만, 아니면 ("", "").
+    LLM 없이 글자만 보고 고른 것이므로 부르는 쪽에서 '맞나요?' 확인 질문을 붙인다."""
+    found = {(e, s) for s, e in SHORT_EMD.items() if re.search(rf"(?<![가-힣]){s}{_PLACE_END}", text)}
+    return found.pop() if len({e for e, _ in found}) == 1 and len(found) == 1 else ("", "")
+
+
+def add_short_name_question(questions: list[dict], mention: str, emd: str) -> list[dict]:
+    """줄인 이름 확인 질문을 다른 읍면동 질문과 같은 자리(제주어 뜻 확인 바로 뒤)에 넣는다."""
+    q = {"field": "emd_name", "question": f"말씀하신 '{mention}'은(는) '{emd}'이(가) 맞나요?", "confirm": True}
+    i = next((k for k, x in enumerate(questions) if x["field"] != "dialect"), len(questions))
+    return questions[:i] + [q] + questions[i:]
+
+
 def guess_emd(mention: str) -> str:
     """'노형' → '노형동', '구좌' → '구좌읍'처럼 줄여 말한 읍면동 찾기 (하나로 정해질 때만)."""
     m = re.sub(r"\s", "", mention or "")
@@ -233,10 +278,12 @@ def _questions(query: dict, mention: str, emd_from_llm: str, norm: dict | None,
         else:
             qs.append({"field": "user_request", "question": "어떻게 바뀌었으면 하시나요? (예: 버스 증차, 시설 설치)",
                        "optional": True})
-    if query.get("complaint_type") == "기타":
+    if query.get("claims") and not evidence_topics(query):
+        # 유형 이름이 아니라 근거 엔진이 실제로 자료를 가진 주제로 판단한다
+        # (예: '생활물가' 유형은 있지만 물가 지표는 없음, '기타'로 나와도 경로당 민원은 자료가 있음)
         qs.append({"field": "complaint_type",
-                   "question": "현재 근거 확인은 교통, 의료 접근, 환경·청소, 안전·재난, 생활물가 민원만 가능해요. "
-                               "근거 없이 민원서만 작성할까요?", "optional": True})
+                   "question": f"지금 자료로 근거를 확인할 수 있는 주제는 {', '.join(topic_names())}이에요. "
+                               "이 민원은 근거 자료가 없어 근거 없이 민원서만 작성할까요?", "optional": True})
     return qs
 
 
@@ -308,6 +355,9 @@ def structure(text: str, *, use_normalize: bool = True, include_raw: bool = Fals
     emd = text_emd \
         or (out["emd_name"] if out["emd_name"] in EMD_NAMES else "") \
         or guess_emd(out["location_mention"])                         # ④
+    short_mention = ""
+    if not emd:                                                        # ⑤ 줄인 이름(노형·구좌) → 확인 질문
+        emd, short_mention = find_short_emd_in_text(normalized)
     claims = [c["text"].strip() for c in out["claims"] if c["text"].strip()][:MAX_CLAIMS]
 
     query = {
@@ -336,6 +386,8 @@ def structure(text: str, *, use_normalize: bool = True, include_raw: bool = Fals
 
     questions = _questions(query, out["location_mention"], out["emd_name"], norm, suggested,
                            emd_in_text=bool(text_emd))   # 문장에 읍면동이 직접 있으면 확인 질문 생략
+    if short_mention:
+        questions = add_short_name_question(questions, short_mention, emd)
     result = {
         "status": "",
         "query": query,
@@ -426,6 +478,8 @@ def pretty(r: dict):
 
 
 def main():
+    from win_console import safe_output
+    safe_output()
     llm.load_env()
     ap = argparse.ArgumentParser()
     ap.add_argument("text", nargs="?")
