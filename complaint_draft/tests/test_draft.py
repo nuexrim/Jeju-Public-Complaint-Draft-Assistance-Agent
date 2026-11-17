@@ -238,3 +238,76 @@ def test_leftover_informal_ending_is_flagged():
     h = load_handoff(SAMPLES / "supported.json")
     h["query"]["normalized_text"] = "버스가 정말 안 오네요"
     assert any("격식체" in w for w in build_draft(h)["warnings"])
+
+
+# ---------------------------------------------------------------- 근거 고르기 · 오래된 자료 · 글자 수 · 남은 제주어
+def test_is_stale_reads_common_date_shapes():
+    from datetime import date
+    from complaint_draft.draft import is_stale
+    today = date(2026, 11, 17)
+    assert is_stale("2024-10", today) and is_stale("2023", today) and is_stale("2024-01-31", today)
+    assert not is_stale("2024-12", today) and not is_stale("2026-09", today) and not is_stale("모름", today)
+
+
+def test_exclude_moves_picked_out_evidence_to_excluded():
+    h = load_handoff(SAMPLES / "supported.json")
+    d = build_draft(h, exclude=[0])
+    assert [e["index"] for e in d["evidence"]] == list(range(1, len(h["package"]["evidence"])))
+    assert any(x["kind"] == "user" and x["reason"] == "직접 뺀 근거" for x in d["excluded"])
+    assert validate_draft(d) == []
+
+
+def test_evidence_choices_marks_usable_and_keeps_numbers():
+    from complaint_draft.draft import evidence_choices
+    h = load_handoff(SAMPLES / "mixed.json")
+    items = evidence_choices(h["package"], h["query"])
+    assert [it["usable"] for it in items] == [e["verdict"] in ("supported", "partial") and e["value"] is not None
+                                              for e in h["package"]["evidence"]]
+    assert all(it["value"] == e["value"] for it, e in zip(items, h["package"]["evidence"]))
+
+
+def test_submission_carries_portal_limits():
+    sub = build_draft(load_handoff(SAMPLES / "supported.json"))["submission"]
+    assert sub["title_limit"] == 200 and sub["body_limit"] == 40000
+
+
+def test_title_over_limit_is_warned_after_edit():
+    d = build_draft(load_handoff(SAMPLES / "supported.json"))
+    d2 = apply_edits(d, {"title": "가" * 201})
+    assert any("제목 글자 수" in w for w in d2["warnings"])
+
+
+def test_leftover_dialect_words_are_flagged_and_cleared_by_edit(monkeypatch):
+    from complaint_draft import draft as D
+    monkeypatch.setattr(D, "_dialect", {"줄어부난", "할망덜"})
+    h = load_handoff(SAMPLES / "supported.json")
+    h["query"]["normalized_text"] = "버스가 확 줄어부난 할망덜이 병원 가기가 힘들어요."
+    d = build_draft(h)
+    assert d["dialect_words"] == ["줄어부난", "할망덜"]
+    assert any(w.startswith("표준어로 바뀌지 않은 제주어 낱말") for w in d["warnings"])
+    content = next(s for s in d["sections"] if s["id"] == "content")["standard"]
+    fixed = apply_edits(d, {"content": content.replace("줄어부난", "줄어서").replace("할망덜이", "할머니들이")})
+    assert fixed["dialect_words"] == [] and not any(w.startswith("표준어로 바뀌지 않은") for w in fixed["warnings"])
+
+
+def test_no_dialect_dictionary_means_no_check(monkeypatch, tmp_path):
+    from complaint_draft import draft as D
+    monkeypatch.setattr(D, "_dialect", None)
+    monkeypatch.setattr(D, "DIALECT_DICT", tmp_path / "없음.json")
+    assert D.leftover_dialect("버스가 확 줄어부난") == []
+
+
+def test_html_shows_counts_and_marks_dialect_words(monkeypatch):
+    from complaint_draft import draft as D
+    monkeypatch.setattr(D, "_dialect", {"줄어부난"})
+    h = load_handoff(SAMPLES / "supported.json")
+    h["query"]["normalized_text"] = "버스가 확 줄어부난 힘들어요."
+    html = render_html(build_draft(h))
+    assert '"dialect_words": ["줄어부난"]' in html and "dia-word" in html and "title_limit" in html
+
+
+def test_style_evidence_card_escapes_and_shows_stale():
+    from complaint_draft import style
+    card = style.evidence_card({"verdict": "partial", "verdict_ko": "일부만 확인됨", "indicator": "<b>x</b>", "value_text": "3 곳",
+                                "region_compare": None, "claim": "", "sources": [], "as_of": "2021-12", "stale": True})
+    assert "&lt;b&gt;" in card and "오래된 자료" in card

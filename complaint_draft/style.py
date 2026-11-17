@@ -22,8 +22,6 @@ _MASCOT_SVG = (
     '<path d="M26 44Q32 50 38 44" stroke="#1F2326" stroke-width="2.8" stroke-linecap="round"/>'
     '<circle cx="17" cy="44" r="3.5" fill="#F26B4E" fill-opacity="0.6"/><circle cx="47" cy="44" r="3.5" fill="#F26B4E" fill-opacity="0.6"/></svg>'
 )
-_MIC_SVG = ('<svg xmlns="http://www.w3.org/2000/svg" width="68" height="68" viewBox="0 0 24 24" fill="none"><rect x="9" y="3" width="6" height="11" rx="3" fill="#1F2326"/>'
-            '<path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" stroke="#1F2326" stroke-width="2" stroke-linecap="round"/></svg>')
 _CHECK_SVG = ('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">'
               '<path d="M5 12.5l4.5 4.5L19 7.5" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>')
 
@@ -38,7 +36,6 @@ def mascot(size: int, alt: str = "감귤 캐릭터") -> str:
     return _img(_MASCOT_SVG, size, alt)
 
 
-MIC = _img(_MIC_SVG, 68, "")
 CHECK = _img(_CHECK_SVG, 24, "완료")
 
 
@@ -86,14 +83,24 @@ button[data-testid="stBaseButton-primary"], button[data-testid="stBaseButton-pri
 .st-key-card_write, .st-key-card_said, .st-key-card_edit {{ background: #FFFFFF; border: 2px solid {LINE}; border-radius: 24px; padding: 1.3rem; }}
 .st-key-card_ask {{ background: {SOFT}; border: 2px solid {BROWN}; border-radius: 20px; padding: 1.1rem 1.3rem; }}
 .st-key-card_ask .stTextInput [data-testid="stTextInputRootElement"] {{ background: #FFFFFF; }}
-/* 1단계: '말로 하기' 카드와 '글로 쓰기' 카드의 높이를 맞춘다 */
-.st-key-row_input [data-testid="stHorizontalBlock"] {{ align-items: stretch; }}
-.st-key-row_input [data-testid="stColumn"] {{ display: flex; flex-direction: column; }}
-.st-key-row_input [data-testid="stColumn"] > [data-testid="stVerticalBlock"] {{ flex: 1; }}
-.st-key-row_input [data-testid="stColumn"]:first-child [data-testid="stElementContainer"],
-.st-key-row_input [data-testid="stColumn"]:first-child [data-testid="stHtml"] {{ flex: 1; display: flex; flex-direction: column; height: 100%; }}
-.st-key-row_input [data-testid="stColumn"]:first-child section {{ flex: 1; }}
-.st-key-row_input .st-key-card_write {{ flex: 1; }}
+/* 1단계: 지역·주제 카드, 3단계: 뜻 카드, 5단계: 근거 카드 */
+.st-key-card_place, .st-key-card_topic, [class*="st-key-card_claim_"] {{
+  background: #FFFFFF; border: 2px solid {LINE}; border-radius: 20px; padding: 1rem 1.2rem; }}
+[class*="st-key-card_ev_"] {{ background: #FFFFFF; border: 2px solid {LINE}; border-radius: 20px; padding: 1rem 1.2rem; height: 100%; }}
+[class*="st-key-card_ev_on_"] {{ border-color: {INK}; }}
+.st-key-row_topic [data-testid="stHorizontalBlock"], .st-key-row_ev [data-testid="stHorizontalBlock"] {{ align-items: stretch; }}
+/* 알약 단추(지역·주제 고르기) */
+[data-testid="stButtonGroup"] button {{ min-height: 44px; border-radius: 999px; border: 2px solid {LINE}; background: #FFFFFF;
+  color: {INK}; padding: 0.25rem 1rem; }}
+[data-testid="stButtonGroup"] button p {{ font-size: 1rem; font-weight: 500; }}
+[data-testid="stButtonGroup"] button[kind="pillsActive"], [data-testid="stButtonGroup"] button[data-testid="stBaseButton-pillsActive"] {{
+  background: {ORANGE}; border-color: {INK}; }}
+[data-testid="stButtonGroup"] button[kind="pillsActive"] p,
+[data-testid="stButtonGroup"] button[data-testid="stBaseButton-pillsActive"] p {{ font-weight: 700; }}
+.stPills label p, .stCheckbox label p {{ font-size: 1.05rem; }}
+.stCheckbox label {{ min-height: 44px; align-items: center; }}
+.stCheckbox label p {{ font-weight: 500; }}
+[data-testid="stDialog"] [role="dialog"] {{ border: 2px solid {INK}; border-radius: 24px; }}
 [data-testid="stExpander"] details {{ background: #FFFFFF; border: 2px solid {LINE}; border-radius: 16px; }}
 [data-testid="stExpander"] summary p {{ font-size: 1.1rem; font-weight: 700; }}
 </style>"""
@@ -104,10 +111,10 @@ def header() -> str:
     return (f'<div style="display:flex;align-items:center;gap:14px">{face}'
             f'<div style="display:flex;flex-direction:column;gap:2px">'
             f'<div style="font-family:\'Jua\',sans-serif;font-size:1.4rem;line-height:1.2;color:{INK}">제주 민원 도우미</div>'
-            f'<div style="font-size:0.78rem;font-weight:500;color:{MUTED}">제주말로 말해도 알아듣는 민원서 작성 도우미</div></div></div>')
+            f'<div style="font-size:0.78rem;font-weight:500;color:{MUTED}">제주말로 써도 알아듣는 민원서 작성 도우미</div></div></div>')
 
 
-STEPS = ["말하기", "뜻 확인", "민원서 초안"]
+STEPS = ["불편 쓰기", "내용 확인", "민원서 만들기"]   # 큰 틀 3단계 (되묻기·뜻 고르기·최종 확인 = 내용 확인)
 
 
 def stepper(now: int) -> str:
@@ -138,34 +145,62 @@ def title(text: str, sub: str = "") -> str:
             f'<h1 style="margin:0;font-size:1.8rem;font-weight:700;line-height:1.3;color:{INK}">{esc(text)}</h1>{sub_html}</div>')
 
 
-def bubble(text: str) -> str:
-    """감귤 캐릭터가 말하는 말풍선."""
-    face = mascot(64, "")          # 꾸밈 그림(말풍선 글이 내용이다)
+def bubble(text: str, sub: str = "") -> str:
+    """감귤 캐릭터가 말하는 말풍선. sub: 말풍선 아래 설명 한 줄."""
+    face = mascot(60, "")          # 꾸밈 그림(말풍선 글이 내용이다)
+    sub_html = f'<p style="margin:0;font-size:0.95rem;font-weight:500;color:{MUTED}">{esc(sub)}</p>' if sub else ""
     return (f'<div style="display:flex;align-items:center;gap:16px">{face}'
-            f'<h1 style="margin:0;font-size:1.3rem;font-weight:700;line-height:1.35;color:{INK};background:#FFFFFF;border:2px solid {LINE};'
-            f'border-radius:20px;padding:12px 24px">{esc(text)}</h1></div>')
+            f'<div style="background:#FFFFFF;border:2px solid {LINE};border-radius:20px;padding:10px 24px;display:flex;flex-direction:column;gap:2px">'
+            f'<h1 style="margin:0;font-size:1.3rem;font-weight:700;line-height:1.35;color:{INK}">{esc(text)}</h1>{sub_html}</div></div>')
 
 
-def voice_card() -> str:
-    """말로 하기: 아직 음성 인식이 연결되지 않아 자리만 보여 준다(누를 수 없음)."""
-    return (f'<section style="box-sizing:border-box;height:100%;background:{SOFT};border:2px solid {ORANGE};border-radius:24px;padding:26px;'
-            f'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;opacity:0.75">'
-            f'<div style="width:140px;height:140px;border-radius:50%;background:{ORANGE};border:6px solid #FFFFFF;display:flex;align-items:center;'
-            f'justify-content:center">{MIC}</div>'
-            f'<h2 style="margin:0;font-size:1.5rem;font-weight:700;color:{INK}">말로 하기</h2>'
-            f'<span style="font-size:0.9rem;font-weight:700;color:{BROWN};background:#FFFFFF;border:2px solid {BROWN};border-radius:999px;padding:2px 14px">준비 중</span>'
-            f'<p style="margin:0;font-size:1rem;font-weight:500;line-height:1.5;color:{MUTED};text-align:center">지금은 오른쪽에 글로 써 주세요</p></section>')
+def card_head(text: str, note: str = "") -> str:
+    """카드 제목 + 옆에 작은 안내(예: '안 골라도 됩니다 · 최대 3곳')."""
+    note_html = f' <span style="font-size:0.9rem;font-weight:500;color:{MUTED}">{esc(note)}</span>' if note else ""
+    return f'<h2 style="margin:0 0 6px;font-size:1.1rem;font-weight:700;line-height:1.35;color:{INK}">{esc(text)}{note_html}</h2>'
 
 
-def chips(label: str, names: list[str]) -> str:
-    spans = "".join(f'<span style="font-size:0.8rem;font-weight:500;background:#FFFFFF;border:1.5px solid {LINE};border-radius:999px;'
-                    f'padding:2px 12px;color:{INK}">{esc(n)}</span>' for n in names)
-    return (f'<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">'
-            f'<span style="font-size:0.85rem;font-weight:700;margin-right:2px;color:{INK}">{esc(label)}</span>{spans}</div>')
+def place_tags(names: list[str]) -> str:
+    """고른 지역 표시(읽기 전용). 없으면 '고르지 않음'."""
+    if not names:
+        return f'<p style="margin:0;font-size:0.95rem;color:{MUTED}">아직 고르지 않았어요.</p>'
+    spans = "".join(f'<span style="font-size:0.95rem;font-weight:700;color:{INK};background:{SOFT};border:2px solid {BROWN};'
+                    f'border-radius:999px;padding:4px 16px">{esc(n)}</span>' for n in names)
+    return f'<div style="display:flex;flex-wrap:wrap;gap:8px">{spans}</div>'
+
+
+def claim_head(kicker: str, text: str) -> str:
+    """뜻 고르기 카드 머리: '첫째 말씀' + “주장 문장”."""
+    return (f'<p style="margin:0;font-size:0.95rem;font-weight:700;color:{BROWN}">{esc(kicker)}</p>'
+            f'<h2 style="margin:2px 0 6px;font-size:1.15rem;font-weight:700;line-height:1.4;color:{INK}">“{esc(text)}”</h2>')
+
+
+_VERDICT_STYLE = {"supported": (GREEN, "#E4F2E1"), "partial": (BROWN, SOFT)}
+
+
+def evidence_card(item: dict) -> str:
+    """근거 고르기 카드: 판정 · 지표 · 값 · 비교 · 출처 · 기준일(2년 넘으면 '오래된 자료'). 모든 글은 가린다."""
+    fg, bg = _VERDICT_STYLE.get(item.get("verdict"), (MUTED, GREY))
+    stale = (f'<span style="font-size:0.8rem;font-weight:700;color:{INK};background:#FFFFFF;border:2px dashed {INK};'
+             f'border-radius:999px;padding:0 10px">오래된 자료 (2년 넘음)</span>') if item.get("stale") else ""
+    srcs = list(dict.fromkeys(f"{x.get('publisher', '')} · {x.get('dataset', '')}".strip(" ·") for x in item.get("sources") or []))
+    compare = (f'<p style="margin:0;font-size:0.95rem;line-height:1.5;color:{INK}">{esc(item["region_compare"])}</p>'
+               if item.get("region_compare") else "")
+    claim = (f'<p style="margin:0;font-size:0.85rem;color:{MUTED}">말씀: “{esc(item["claim"])}”</p>' if item.get("claim") else "")
+    return (f'<div style="display:flex;flex-direction:column;gap:6px">'
+            f'<span style="align-self:flex-start;font-size:0.85rem;font-weight:700;color:{fg};background:{bg};border:2px solid {fg};'
+            f'border-radius:999px;padding:1px 12px">판정: {esc(item.get("verdict_ko", ""))}</span>'
+            f'<h3 style="margin:0;font-size:1.05rem;font-weight:700;line-height:1.4;color:{INK}">{esc(item.get("indicator", ""))}</h3>'
+            f'<p style="margin:0;font-size:1.5rem;font-weight:700;line-height:1.2;color:{INK}">{esc(item.get("value_text", ""))}</p>'
+            f'{compare}{claim}'
+            f'<div style="border-top:2px solid {GREY};padding-top:8px;display:flex;flex-direction:column;gap:3px;font-size:0.85rem;color:{MUTED}">'
+            f'<span><b>출처</b> {esc(" / ".join(srcs) or "정보 없음")}</span>'
+            f'<span style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px"><b>기준일</b> {esc(item.get("as_of") or "정보 없음")}{stale}</span>'
+            f'</div></div>')
 
 
 def said_card(text: str) -> str:
-    return (f'<h2 style="margin:0 0 10px;font-size:1rem;font-weight:700;color:{BROWN}">하신 말씀</h2>'
+    return (f'<h2 style="margin:0 0 10px;font-size:1rem;font-weight:700;color:{BROWN}">쓰신 글</h2>'
             f'<p style="margin:0;font-size:1.05rem;line-height:1.6;color:{INK}">“{esc(text)}”</p>')
 
 
@@ -177,7 +212,7 @@ def understood_card(rows: list[tuple[str, str, bool]]) -> str:
                  f'border-radius:999px;padding:1px 12px">확인 필요</span>') if check else ""
         out.append(f'<div style="background:{BG};border-radius:12px;padding:7px 18px;display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px">'
                    f'<span style="width:100px;font-size:0.95rem;font-weight:700;color:{MUTED}">{esc(name)}</span>'
-                   f'<span style="font-size:1.1rem;font-weight:700;color:{INK};flex:1 1 200px">{esc(value) if value else "—"}</span>{badge}</div>')
+                   f'<span style="font-size:1.1rem;font-weight:700;line-height:1.45;color:{INK};flex:1 1 200px;white-space:pre-line">{esc(value) if value else "—"}</span>{badge}</div>')
     return (f'<section style="box-sizing:border-box;height:100%;background:#FFFFFF;border:2px solid {INK};border-radius:20px;padding:20px 24px;'
             f'display:flex;flex-direction:column;gap:10px">'
             f'<h2 style="margin:0;font-size:1rem;font-weight:700;color:{BROWN}">이렇게 이해했어요</h2>'

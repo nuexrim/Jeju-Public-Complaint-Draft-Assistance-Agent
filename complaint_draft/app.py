@@ -2,7 +2,7 @@
 
     저장소 맨 위에서:  streamlit run complaint_draft/app.py
 
-기본 화면      : 1 말하기 → 2 뜻 확인(되묻기·뜻 고르기·최종 확인) → 3 민원서 초안.
+기본 화면      : 큰 틀 3단계 — 1 불편 쓰기 / 2 내용 확인(되묻기 → 뜻 고르기 → 최종 확인) / 3 민원서 만들기(근거 고르기 → 초안).
                complaint_agent 의 Agent 를 그대로 부른다. 흐름은 complaint_draft/flow.py, 꾸밈은 style.py.
 예시·파일로 보기 : 주소 끝에 ?mode=file 을 붙이면 열린다(예: http://localhost:8501/?mode=file). 개발·시연용.
                예시나 handoff JSON(python -m complaint_agent --out handoff.json "...")으로 초안만 본다.
@@ -29,9 +29,12 @@ SAMPLES = {
     "예시 2 · 일부 근거가 빠진 민원 (원문 없음)": "mixed.json",
     "예시 3 · 근거 DB 없이 만든 결과 (mock)": "mock.json",
 }
-HELP_TYPES = ["교통", "의료 접근", "환경·청소", "안전·재난", "생활물가"]     # 근거 엔진이 확인할 수 있는 민원 유형
-STEP_OF = {"input": 0, "questions": 1, "meanings": 1, "confirm": 1, "draft": 2, "stopped": 1}
+# structure.topic_names() 를 못 부를 때만 쓰는 주제 목록(근거 엔진 registry.yaml 의 topics 이름과 같음)
+TOPIC_FALLBACK = ["버스·대중교통", "병원·약국", "쓰레기·재활용", "교통사고·보행 안전", "재난 대피시설", "방범·CCTV", "경로당"]
+STEP_OF = {"input": 0, "questions": 1, "meanings": 1, "confirm": 1, "stopped": 1, "evidence": 2, "draft": 2}
+ORDINAL = ["첫째", "둘째", "셋째", "넷째", "다섯째", "여섯째"]
 FOOTNOTE = "이 도우미는 민원서 작성만 돕습니다. 접수는 국민신문고나 읍·면·동 주민센터에서 직접 하셔야 합니다."
+ALL_NOTE = "제주 전체를 고르면 지역끼리 비교하는 근거는 나오지 않습니다."
 
 st.set_page_config(page_title="제주 민원 도우미", page_icon="🍊", layout="wide", initial_sidebar_state="collapsed")
 
@@ -43,6 +46,8 @@ def font_size() -> str:
 def restart() -> None:
     st.session_state.flow = flow.new_state()
     st.session_state.pop("flow_error", None)
+    for k in ("in_text", "in_places", "in_topics"):
+        st.session_state.pop(k, None)
 
 
 def set_size(size: str) -> None:
@@ -168,12 +173,42 @@ def page_file() -> None:
     show_draft(build_draft(handoff, source_text=source))
 
 
-# ---------------------------------------------------------------- 말로 시작하기
+# ---------------------------------------------------------------- 대화 화면 공통
 @st.cache_resource(show_spinner="준비하고 있어요...")
 def get_agent():
     """Agent 는 앱 전체에서 하나만 만든다(근거 DB 연결을 여러 번 열지 않게). 호출은 잠금으로 한 번에 하나씩."""
     from complaint_agent.pipeline import Agent
     return Agent(), threading.Lock()
+
+
+@st.cache_resource
+def topic_info() -> tuple[list[str], dict[str, str]]:
+    """(주제 이름 목록, 주제 이름 → 민원 유형). 이름은 structure.topic_names(), 유형은 pipeline.TOPIC_TO_TYPE."""
+    try:
+        get_agent()                                   # Agent 를 불러오면 dialect_normalizer·evidence_engine 경로가 잡힌다
+        import structure                              # noqa: E402  (dialect_normalizer)
+        from complaint_agent.pipeline import TOPIC_TO_TYPE
+        from indicators.library import load_registry  # noqa: E402  (evidence_engine)
+        names = structure.topic_names()
+        by_name = {t.get("name", t["id"]): TOPIC_TO_TYPE.get(t["id"], "") for t in load_registry().get("topics", [])}
+        return names, {n: by_name.get(n, "") for n in names}
+    except Exception:                                 # noqa: BLE001  목록을 못 받아도 화면은 열린다
+        return TOPIC_FALLBACK, {}
+
+
+def type_hint(topics: list[str]) -> str:
+    """고른 주제가 모두 같은 민원 유형이면 그 유형(엔진이 '기타'로 읽었을 때만 쓴다). 아니면 빈 문자열."""
+    types = {topic_info()[1].get(t, "") for t in topics} - {""}
+    return types.pop() if len(types) == 1 else ""
+
+
+def place_info(agent) -> dict | None:
+    """agent.place_choices() — {"all": "제주 전체", "max_picks": 3, "groups": [{"label", "names"}]}. 없으면 None."""
+    fn = getattr(agent, "place_choices", None)
+    try:
+        return fn() if fn else None
+    except Exception:                                 # noqa: BLE001
+        return None
 
 
 def call(fn, *args, **kwargs):
@@ -187,137 +222,218 @@ def call(fn, *args, **kwargs):
     st.rerun()
 
 
+def go(fn) -> None:
+    """Agent 를 부르지 않는 이동(이전 단계로)."""
+    st.session_state.flow = fn(st.session_state.flow)
+
+
+def show_messages(s: dict) -> None:
+    for m in s["messages"]:
+        st.caption(m)
+
+
+def place_picker(choices: dict, current: list[str], key: str) -> tuple[list[str], bool]:
+    """시·읍면/동으로 묶은 알약 단추 + '제주 전체'. (고른 장소, 개수 초과 여부)"""
+    all_name, max_n = choices["all"], choices["max_picks"]
+    whole = st.checkbox(f"{all_name}  ({ALL_NOTE})", value=all_name in current, key=f"{key}_all")
+    picked: list[str] = []
+    for i, g in enumerate(choices["groups"]):
+        sel = st.pills(g["label"], g["names"], selection_mode="multi", key=f"{key}_g{i}", disabled=whole,
+                       default=[n for n in current if n in g["names"]])
+        picked += list(sel or [])
+    if whole:
+        return [all_name], False
+    over = len(picked) > max_n
+    if over:
+        st.warning(f"{max_n}곳까지 고를 수 있어요. 지금 {len(picked)}곳을 골랐어요.")
+    else:
+        st.caption(f"{len(picked)} / {max_n}곳 고름")
+    return picked, over
+
+
+@st.dialog("지역 고르기", width="large")
+def place_dialog(choices: dict) -> None:
+    st.caption(f"최대 {choices['max_picks']}곳까지 고를 수 있습니다. 안 고르셔도 됩니다.")
+    picked, over = place_picker(choices, st.session_state.get("in_places", []), "dlg")
+    c1, c2 = st.columns(2)
+    if c1.button("고른 것 지우기", use_container_width=True):
+        st.session_state.in_places = []
+        st.rerun()
+    if c2.button("다 골랐어요", type="primary", disabled=over, use_container_width=True):
+        st.session_state.in_places = picked
+        st.rerun()
+
+
+# ---------------------------------------------------------------- 1. 불편 쓰기
 def step_input(agent) -> None:
-    st.html(style.title("무엇이 불편하셨나요?", "편하게 말씀해 주세요. 제주말로 하셔도 알아듣습니다."))
-    left, right = st.container(key="row_input").columns([4, 7], gap="medium")
-    left.html(style.voice_card())
-    with right.container(key="card_write"):
-        with st.form("f_input"):
-            text = st.text_area("글로 쓰기", height=170,
-                                placeholder="예: 우리 동네 버스가 확 줄어부난 할망덜 병원 가기가 막 힘들어마씸. 구좌읍이우다.")
-            st.caption("평소 말하듯이 쓰시면 됩니다. 어려운 말로 바꾸지 않으셔도 돼요. 어느 읍·면·동인지 함께 적어 주시면 좋아요.")
-            go = st.form_submit_button("다음으로 →", type="primary", use_container_width=True)
-        if go:
-            if text.strip():
-                call(flow.start, text)
-            else:
-                st.warning("불편한 점을 먼저 써 주세요.")
-    st.html(style.chips("이런 민원을 도와드려요", HELP_TYPES))
+    st.html(style.title("무엇이 불편하셨나요?", "편하게 써 주세요. 제주말로 쓰셔도 알아듣습니다."))
+    with st.container(key="card_write"):
+        st.text_area("불편한 점 쓰기", key="in_text", height=130,
+                     placeholder="예: 우리 동네 버스가 확 줄어부난 할망덜 병원 가기가 막 힘들어마씸.")
+        st.caption("평소 말하듯이 쓰시면 됩니다. 어려운 말로 바꾸지 않으셔도 돼요.")
+
+    choices = place_info(agent)
+    names, _ = topic_info()
+    left, right = st.container(key="row_topic").columns([1, 1.3], gap="medium")
+    with left.container(key="card_place"):
+        if choices:
+            st.html(style.card_head("어느 지역 이야기인가요?", f"안 골라도 됩니다 · 최대 {choices['max_picks']}곳"))
+            places = st.session_state.get("in_places", [])
+            st.html(style.place_tags(places))
+            c1, c2 = st.columns(2)
+            if c1.button("지역 고르기", key="open_places", use_container_width=True):
+                place_dialog(choices)
+            if places and c2.button("고른 지역 지우기", key="clear_places", use_container_width=True):
+                st.session_state.in_places = []
+                st.rerun()
+            st.html(style.small_note(ALL_NOTE))
+        else:
+            st.html(style.card_head("어느 지역 이야기인가요?"))
+            st.html(style.small_note("글에 읍·면·동 이름을 함께 써 주세요."))
+    with right.container(key="card_topic"):
+        st.html(style.card_head("어떤 종류의 불편인가요?", "안 골라도 됩니다 · 여러 개 가능"))
+        st.pills("주제", names, selection_mode="multi", key="in_topics", label_visibility="collapsed")
+
     if getattr(agent, "mock_engine", False):
         st.html(style.small_note("※ 이 컴퓨터에는 근거 DB가 없어 근거 수치는 형식 예시로만 나옵니다."))
-    st.html(style.footnote("이 도우미는 민원서를 써 드리는 일만 합니다. 접수는 직접 하셔야 합니다.", small=True))
-
-
-def understood_rows(s: dict) -> list[tuple[str, str, bool]]:
-    """지금까지 이해한 내용. 아직 물어볼 것이 남은 칸에는 '확인 필요'를 붙인다."""
-    q = s["query"] or s["result"]["query"]
-    pending = {x["field"] for x in s["result"]["questions"]} if s["stage"] == "questions" else set()
-    claims = " / ".join(c["text"] for c in q.get("claims") or [])
-    return [
-        ("장소", q.get("location", {}).get("emd_name") or "", "emd_name" in pending),
-        ("문제", claims, "claims" in pending or "dialect" in pending or s["stage"] == "meanings"),
-        ("요청", q.get("user_request") or "", False),
-        ("민원 종류", q.get("complaint_type") or "", False),
-    ]
-
-
-def ask_question(s: dict) -> None:
-    v = flow.question_view(s)
-    st.html(style.ask_head(v["question"]))
-    with st.form("f_question"):
-        if v["kind"] == "dialect":
-            st.info(v["understood"])
-            for a in v["asks"]:
-                st.write(f"· {a}")
-            text = st.text_input("다르면 바른 문장을 써 주세요 (맞으면 비워 두세요)")
-            if st.form_submit_button("다음으로 →", type="primary", use_container_width=True):
-                call(flow.answer_question, s, text=text)
-        elif v["kind"] == "confirm_emd":
-            c1, c2 = st.columns(2)
-            if c1.form_submit_button("네, 맞아요", type="primary", use_container_width=True):
-                call(flow.answer_question, s, yes=True)
-            if c2.form_submit_button("아니요", use_container_width=True):
-                call(flow.answer_question, s, yes=False)
-        elif v["kind"] == "request_suggest":
-            text = st.text_input("다른 요청이 있으면 써 주세요 (없으면 비워 두세요)")
-            c1, c2 = st.columns(2)
-            if c1.form_submit_button(f"네, '{v['suggestion']}' 맞아요", type="primary", use_container_width=True):
-                call(flow.answer_question, s, yes=True)
-            if c2.form_submit_button("쓴 내용으로 / 없음", use_container_width=True):
-                call(flow.answer_question, s, text=text, yes=False)
+    note, btn = st.columns([3, 1], vertical_alignment="center")
+    note.html(style.footnote("이 도우미는 민원서를 써 드리는 일만 합니다. 접수는 직접 하셔야 합니다.", small=True))
+    if btn.button("다음으로 →", type="primary", key="go_next", use_container_width=True):
+        text = st.session_state.get("in_text", "")
+        if not text.strip():
+            st.warning("불편한 점을 먼저 써 주세요.")
         else:
-            optional = v["kind"] == "request"
-            text = st.text_input("답", label_visibility="collapsed",
-                                 placeholder="없으면 비워 두고 '다음으로'를 누르세요" if optional else "")
-            if st.form_submit_button("다음으로 →", type="primary", use_container_width=True):
-                if text.strip() or optional:
+            topics = list(st.session_state.get("in_topics") or [])
+            call(flow.start, text, places=st.session_state.get("in_places", []), topics=topics,
+                 type_hint=type_hint(topics))
+
+
+# ---------------------------------------------------------------- 2. 되묻기
+def step_questions(s: dict) -> None:
+    st.html(style.bubble("몇 가지만 여쭤볼게요.", "아래 물음에 답해 주시면 더 정확하게 써 드립니다."))
+    show_messages(s)
+    v = flow.question_view(s)
+    with st.container(key="card_ask"):
+        st.html(style.ask_head(v["question"], "확인" if v["kind"] in ("dialect", "confirm_emd") else "한 가지만 더 여쭤볼게요"))
+        with st.form("f_question"):
+            if v["kind"] == "dialect":
+                st.info(v["understood"])
+                for a in v["asks"]:
+                    st.write(f"· {a}")
+                text = st.text_input("다르면 바른 문장을 써 주세요 (맞으면 비워 두세요)")
+                if st.form_submit_button("다음으로 →", type="primary", use_container_width=True):
                     call(flow.answer_question, s, text=text)
-                else:
-                    st.warning("답을 써 주세요.")
+            elif v["kind"] == "confirm_emd":
+                c1, c2 = st.columns(2)
+                if c1.form_submit_button("예, 맞아요", type="primary", use_container_width=True):
+                    call(flow.answer_question, s, yes=True)
+                if c2.form_submit_button("아니요", use_container_width=True):
+                    call(flow.answer_question, s, yes=False)
+            elif v["kind"] == "emd" and v.get("choices"):
+                picked, over = place_picker(v["choices"], s["places"], f"q_emd_{s['q_rounds']}")
+                if st.form_submit_button("다 골랐어요 →", type="primary", use_container_width=True):
+                    if over:
+                        st.warning(f"{v['choices']['max_picks']}곳까지 골라 주세요.")
+                    elif not picked:
+                        st.warning("지역을 하나 이상 골라 주세요.")
+                    else:
+                        call(flow.answer_question, s, places=picked)
+            elif v["kind"] == "request_suggest":
+                text = st.text_input("다른 바람이 있으면 써 주세요 (없으면 비워 두세요)")
+                c1, c2 = st.columns(2)
+                if c1.form_submit_button(f"예, '{v['suggestion']}' 맞아요", type="primary", use_container_width=True):
+                    call(flow.answer_question, s, yes=True)
+                if c2.form_submit_button("쓴 내용으로 / 없음", use_container_width=True):
+                    call(flow.answer_question, s, text=text, yes=False)
+            else:
+                optional = v["kind"] == "request"
+                text = st.text_input("답", label_visibility="collapsed",
+                                     placeholder="없으면 비워 두고 '다음으로'를 누르세요" if optional else "")
+                if st.form_submit_button("다음으로 →", type="primary", use_container_width=True):
+                    if text.strip() or optional:
+                        call(flow.answer_question, s, text=text)
+                    else:
+                        st.warning("답을 써 주세요.")
+    st.button("← 처음부터 다시 쓰기", on_click=restart)
 
 
-def ask_meanings(s: dict) -> None:
-    st.html(style.ask_head("어떤 뜻에 가까운가요?", "고르신 뜻으로 제주 데이터를 확인해요"))
+# ---------------------------------------------------------------- 3. 뜻 고르기
+def step_meanings(s: dict) -> None:
     views = flow.meaning_view(s)
-    with st.form("f_meanings"):
-        chosen, others = {}, {}
-        for v in views:
-            st.markdown(f"**“{v['text']}”**")
-            ids = [o["option_id"] for o in v["options"]]
-            by_id = {o["option_id"]: o for o in v["options"]}
+    most = max(v["max_picks"] for v in views)
+    st.html(style.bubble("말씀하신 내용이 어떤 뜻에 가까운지 골라 주세요.", f"말씀마다 최대 {most}개까지 고를 수 있습니다."))
+    show_messages(s)
+    picks, ok = {}, True
+    cols = st.columns(2 if len(views) > 1 else 1, gap="medium")
+    for i, v in enumerate(views):
+        with cols[i % len(cols)].container(key=f"card_claim_{i}"):
+            st.html(style.claim_head(f"{ORDINAL[i] if i < len(ORDINAL) else i + 1} 말씀", v["text"]))
+            chosen = []
+            for o in v["options"]:
+                is_other = o["kind"] == "other"
+                label = "기타 (여기에 없는 뜻)" if is_other else o["text"] + (" · 확인할 자료 없음" if o["kind"] == "no_data" else "")
+                help_ = "고르면 이 말씀은 근거 자료 없이 그대로 적습니다." if is_other else None
+                if st.checkbox(label, value=o["option_id"] == v["recommended"], help=help_,
+                               key=f"m_{s['confirm_tries']}_{v['claim_id']}_{o['option_id']}"):
+                    chosen.append(o["option_id"])
+            n = len([c for c in chosen if c != v["other_id"]])
+            if not chosen:
+                st.warning("하나 이상 골라 주세요. 맞는 뜻이 없으면 '기타'를 고르세요.")
+                ok = False
+            elif n > v["max_picks"]:
+                st.warning(f"이 말씀은 {v['max_picks']}개까지 고를 수 있어요.")
+                ok = False
+            else:
+                st.caption(f"{n} / {v['max_picks']}개 고름")
+            picks[v["claim_id"]] = chosen
+    c1, c2 = st.columns(2)
+    c1.button("← 처음부터 다시 쓰기", on_click=restart, use_container_width=True)
+    if c2.button("다음으로 →", type="primary", disabled=not ok, use_container_width=True):
+        call(flow.submit_meanings, s, picks)
 
-            def label(oid, by_id=by_id, rec=v["recommended"]):
-                o = by_id[oid]
-                mark = " (추천)" if oid == rec else ""
-                note = " · 확인할 자료 없음" if o["kind"] == "no_data" else ""
-                return f"{o['text']}{mark}{note}"
 
-            chosen[v["claim_id"]] = st.radio("뜻", ids, format_func=label, key=f"m_{v['claim_id']}_{s['other_rounds']}",
-                                             index=ids.index(v["recommended"]) if v["recommended"] in ids else 0,
-                                             label_visibility="collapsed")
-            if any(o["kind"] == "other" for o in v["options"]):
-                others[v["claim_id"]] = st.text_input("'기타'를 고르셨다면 여기에 직접 써 주세요",
-                                                      key=f"o_{v['claim_id']}_{s['other_rounds']}")
-        if st.form_submit_button("다음으로 →", type="primary", use_container_width=True):
-            picks = {}
-            for v in views:
-                cid = v["claim_id"]
-                kind = next(o["kind"] for o in v["options"] if o["option_id"] == chosen[cid])
-                picks[cid] = {"other": others.get(cid, "")} if kind == "other" else chosen[cid]
-            call(flow.submit_meanings, s, picks)
-
-
+# ---------------------------------------------------------------- 4. 최종 확인
 def step_confirm(s: dict) -> None:
-    """2단계: 하신 말씀 + 이렇게 이해했어요 + (되묻기 | 뜻 고르기 | 최종 확인)."""
-    stage = s["stage"]
-    st.html(style.bubble("제가 이렇게 알아들었어요. 맞는지 봐 주세요."))
+    st.html(style.bubble("제가 이렇게 알아들었어요. 맞나요?"))
     left, right = st.columns([4, 6], gap="medium")
     with left.container(key="card_said"):
         st.html(style.said_card(" ".join(s["said"])))
-        for m in s["messages"]:
-            st.caption(m)
-    right.html(style.understood_card(understood_rows(s)))
-
-    if stage == "stopped":
-        st.warning(s["stop_reason"])
-        st.button("← 다시 말하기", on_click=restart)
-        return
-
-    with st.container(key="card_ask"):
-        if stage == "questions":
-            ask_question(s)
-        elif stage == "meanings":
-            ask_meanings(s)
-        else:
-            st.html(style.ask_head("이 내용으로 민원서를 만들까요?", "마지막 확인"))
-            c1, c2 = st.columns(2)
-            if c1.button("맞아요, 민원서 만들기 →", type="primary", use_container_width=True):
-                call(flow.confirm, s, True)
-            if c2.button("아니요, 뜻을 다시 고를게요", use_container_width=True):
-                call(flow.confirm, s, False)
-    st.button("← 다시 말하기", on_click=restart)
+        show_messages(s)
+    right.html(style.understood_card([(k, v, False) for k, v in flow.confirm_rows(s)]))
+    c1, c2 = st.columns(2)
+    if c1.button("아니요, 다시 답할게요", use_container_width=True):
+        call(flow.confirm, s, False)
+    if c2.button("맞아요", type="primary", use_container_width=True):
+        call(flow.confirm, s, True)
+    st.caption("'아니요'를 누르면 되묻기 화면으로 돌아갑니다.")
 
 
+# ---------------------------------------------------------------- 5. 근거 고르기
+def step_evidence(s: dict) -> None:
+    items = s["evidence_items"]
+    st.html(style.bubble("민원서에 넣을 근거를 골라 주세요.", "필요 없는 것은 빼셔도 됩니다. 자료와 맞지 않는 근거는 넣을 수 없어요."))
+    picked = []
+    per_row = 3
+    for start in range(0, len(items), per_row):
+        cols = st.container(key=f"row_ev_{start}").columns(per_row, gap="medium")
+        for col, it in zip(cols, items[start:start + per_row]):
+            on_now = it["usable"] and it["index"] in s["picked"]
+            with col.container(key=f"card_ev_{'on_' if on_now else ''}{it['index']}"):
+                if it["usable"]:
+                    if st.checkbox("민원서에 넣기", value=on_now, key=f"ev_{s['confirm_tries']}_{it['index']}"):
+                        picked.append(it["index"])
+                else:
+                    st.checkbox("넣을 수 없음", value=False, disabled=True, key=f"ev_off_{it['index']}")
+                st.html(style.evidence_card(it))
+    if any(it["stale"] for it in items):
+        st.caption("기준일이 2년 넘은 자료는 '오래된 자료'로 표시됩니다. 넣을지 말지는 직접 정하실 수 있습니다.")
+    c1, c2 = st.columns(2)
+    c1.button("← 이전", on_click=go, args=(flow.back_to_confirm,), use_container_width=True)
+    if c2.button(f"고른 근거 {len(picked)}건으로 민원서 만들기 →", type="primary", use_container_width=True):
+        call(flow.choose_evidence, s, picked)
+
+
+# ---------------------------------------------------------------- 화면 고르기
 def page_talk() -> None:
     try:
         agent, _ = get_agent()
@@ -334,12 +450,24 @@ def page_talk() -> None:
 
     if stage == "input":
         step_input(agent)
+    elif stage == "questions":
+        step_questions(s)
+    elif stage == "meanings":
+        step_meanings(s)
+    elif stage == "confirm":
+        step_confirm(s)
+    elif stage == "evidence":
+        step_evidence(s)
     elif stage == "draft":
+        if s["evidence_items"]:
+            st.button("← 근거 다시 고르기", on_click=go, args=(flow.back_to_evidence,))
         show_draft(s["draft"])
         st.download_button("handoff.json 받기 (개발·확인용)", json.dumps(s["handoff"], ensure_ascii=False, indent=2),
                            file_name="handoff.json", mime="application/json")
-    else:
-        step_confirm(s)
+    else:                                       # stopped
+        st.html(style.bubble("여기서 멈출게요."))
+        st.warning(s["stop_reason"])
+        st.button("← 처음부터 다시 쓰기", on_click=restart)
 
 
 # ---------------------------------------------------------------- 화면

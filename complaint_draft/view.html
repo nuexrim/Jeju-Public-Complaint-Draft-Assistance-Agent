@@ -46,6 +46,11 @@
   .ev-value { font-size: 1.5rem; font-weight: 700; }
   .ev-src { font-size: 0.8rem; color: var(--muted); line-height: 1.5; }
   .ev-partial { font-size: 0.8rem; font-weight: 700; color: var(--brown); }
+  .ev-compare { font-size: 0.85rem; line-height: 1.5; }
+  .ev-stale { align-self: flex-start; font-size: 0.8rem; font-weight: 700; border: 2px dashed var(--ink); border-radius: 999px; padding: 0 10px; }
+  .count { margin: -10px 0 0; font-size: 0.9rem; font-weight: 500; color: var(--muted); }
+  .count .over { color: #B42318; font-weight: 700; }
+  mark.dia-word { background: var(--soft); color: var(--ink); font-weight: 700; border-bottom: 3px solid var(--brown); padding: 0 3px; }
   .ev.none { background: var(--paper); border-color: var(--line); }
   .ev.none h2 { color: var(--ink); }
   .know { background: var(--paper); border: 2px solid var(--line); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 6px; }
@@ -105,6 +110,25 @@
     return e;
   }
 
+  // 표준어본에 남은 제주어 낱말에 밑줄(mark)을 친다. 글은 textContent 로만 넣는다.
+  const WORDS = DRAFT.dialect_words || [];
+  const WORD_RE = WORDS.length
+    ? new RegExp("(" + WORDS.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")", "g") : null;
+  function textWithMarks(tag, cls, text) {
+    const e = el(tag, cls);
+    if (!WORD_RE) { e.textContent = text; return e; }
+    for (const part of String(text).split(WORD_RE)) {
+      if (!part) continue;
+      if (WORDS.includes(part)) e.appendChild(el("mark", "dia-word", part));
+      else e.appendChild(document.createTextNode(part));
+    }
+    return e;
+  }
+  function chars(n, limit, name) {
+    const span = el("span", n > limit ? "over" : "", name + " " + n.toLocaleString() + " / " + limit.toLocaleString() + "자");
+    return span;
+  }
+
   function badges(parent, s) {
     parent.appendChild(el("span", "badge dia-only" + (s.dialect_source === "original" ? " original" : ""),
                           s.dialect_source === "original" ? "하신 말씀 그대로" : "표준어로 표시"));
@@ -123,10 +147,16 @@
     if (s.id === "title") {
       const h = el("h2", "doc-title");
       h.dataset.id = s.id;
-      h.appendChild(el("span", "std-only", s.standard));
+      h.appendChild(textWithMarks("span", "std-only", s.standard));
       h.appendChild(el("span", "dia-only", s.dialect));
       badges(h, s);
       doc.appendChild(h);
+      // 국민신문고 글자 수 제한: 제목 200자, 내용 40,000자 (내용 칸에 붙여 넣는 글 전체 기준)
+      const count = el("p", "count std-only");
+      count.appendChild(chars(sub.title_chars, sub.title_limit || 200, "제목"));
+      count.appendChild(document.createTextNode(" · "));
+      count.appendChild(chars(sub.body_chars, sub.body_limit || 40000, "내용 칸"));
+      doc.appendChild(count);
       continue;
     }
     n += 1;
@@ -135,7 +165,7 @@
     const h = el("h3", "", n + ". " + s.title);
     badges(h, s);
     sec.appendChild(h);
-    sec.appendChild(el("p", "text std-only", s.standard));
+    sec.appendChild(s.id === "evidence" ? el("p", "text std-only", s.standard) : textWithMarks("p", "text std-only", s.standard));
     sec.appendChild(el("p", "text dia-only", s.dialect));
     doc.appendChild(sec);
   }
@@ -148,9 +178,11 @@
       const card = el("div", "ev-card");
       card.appendChild(el("div", "ev-name", e.indicator));
       card.appendChild(el("div", "ev-value", e.value_text));
+      if (e.region_compare) card.appendChild(el("div", "ev-compare", e.region_compare));
       const srcs = (e.sources || []).map(x => x.publisher + " · 기준 " + x.as_of);
       card.appendChild(el("div", "ev-src", "출처: " + (srcs.length ? [...new Set(srcs)].join(" / ") : "정보 없음")));
       if (e.verdict === "partial") card.appendChild(el("div", "ev-partial", "일부만 확인된 근거"));
+      if (e.stale) card.appendChild(el("div", "ev-stale", "오래된 자료 (기준일 2년 넘음)"));
       ev.appendChild(card);
     }
   } else {
@@ -158,7 +190,7 @@
     ev.appendChild(el("h2", "", "데이터로 확인된 근거가 없어요"));
   }
   let know = "수치는 공개 데이터 기준이며, 말씀하신 곳만 따로 조사한 값은 아닙니다.";
-  if (DRAFT.excluded.length) know += " 자료와 맞지 않거나 확인할 수 없는 내용 " + DRAFT.excluded.length + "건은 근거에서 뺐습니다(아래에서 볼 수 있어요).";
+  if (DRAFT.excluded.length) know += " 직접 뺐거나 자료와 맞지 않는·확인할 수 없는 내용 " + DRAFT.excluded.length + "건은 근거에서 뺐습니다(아래에서 볼 수 있어요).";
   document.getElementById("know").textContent = know;
 
   // ---- 보기 전환

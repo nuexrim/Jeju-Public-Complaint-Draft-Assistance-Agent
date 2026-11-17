@@ -16,6 +16,8 @@
   나머지 섹션은 표준어를 그대로 둔다(dialect_source="standard_fallback").
 - 숫자·출처는 package.evidence[].value·sources 만 옮긴다. 표시할 때 소수점 둘째 자리까지만 줄인다.
 - 근거 자료에는 supported·partial 만 넣는다. contradicted·unverifiable·gaps 는 excluded 로 돌려 화면에서 안내한다.
+- 근거 고르기 화면에서 사용자가 뺀 근거(build_draft 의 exclude)도 excluded 로 돌린다.
+- 표준어본에 남은 제주어 낱말은 방언 사전(dialect_normalizer/processed/dialect_dict.json)으로 찾아 경고한다. 사전이 없으면 건너뛴다.
 - 엔진이 mock 이면 경고를 붙이고 copy_allowed=False 로 둔다.
 - 표준어본은 격식체(합니다체)로 맞춘다(formal.py, 문장 끝만 규칙으로 바꿈). 방언본의 원문과 사용자가 직접 고친 글은 바꾸지 않는다.
 - 사용자가 고칠 수 있는 것은 제목·민원 내용·요청 사항이다(apply_edits). 근거 자료는 잠근다.
@@ -28,6 +30,7 @@ import csv
 import importlib.util
 import json
 import re
+from datetime import date
 from pathlib import Path
 
 from complaint_draft import templates as T
@@ -36,6 +39,9 @@ from complaint_draft.formal import formalize, has_informal
 ROOT = Path(__file__).resolve().parent.parent
 PRIVACY_PY = ROOT / "evidence_engine" / "package" / "privacy.py"
 EMD_CSV = ROOT / "evidence_engine" / "data" / "spatial" / "emd_codes.csv"   # emd_code, sigungu_name, emd_name
+DIALECT_DICT = ROOT / "dialect_normalizer" / "processed" / "dialect_dict.json"   # 제주어 낱말 → 표준어 후보
+DIALECT_MIN_RATIO = 0.9          # 사전에서 제주어로 쓰인 비율이 이 이상이고
+DIALECT_MIN_SEEN = 20            # 예문에 이만큼 이상 나온 낱말만 '남은 제주어'로 본다(표준어와 겹치는 낱말을 거르려고)
 PII_PLACEHOLDER = "○○"            # 대화 모듈(dialect_normalizer)과 같은 자리표시
 INCLUDED_VERDICTS = ("supported", "partial")
 SECTION_IDS = [sid for sid, _ in T.SECTIONS]
@@ -159,25 +165,61 @@ def _request(query: dict) -> str:
     return T.REQUEST.format(user_request=req)
 
 
-def _split_evidence(package: dict, query: dict) -> tuple[list[dict], list[dict]]:
+def is_stale(as_of: str | None, today: date | None = None) -> bool:
+    """기준일이 STALE_MONTHS(2년)보다 오래됐는지. '2026-09', '2025-12-31', '2024' 모양을 읽는다. 못 읽으면 False."""
+    m = re.match(r"\s*(\d{4})(?:[-./](\d{1,2}))?", as_of or "")
+    if not m:
+        return False
+    today = today or date.today()
+    year, month = int(m.group(1)), int(m.group(2) or 12)
+    return (today.year * 12 + today.month) - (year * 12 + month) > T.STALE_MONTHS
+
+
+def _usable(e: dict) -> bool:
+    return e.get("verdict") in INCLUDED_VERDICTS and e.get("value") is not None
+
+
+def _item(e: dict, claim_text: dict) -> dict:
+    """근거 하나를 화면·초안에서 쓰는 모양으로. 숫자·출처는 패키지 값을 그대로 옮긴다."""
+    sources = e.get("sources") or []
+    dates = list(dict.fromkeys(s.get("as_of") for s in sources if s.get("as_of")))
+    verdict = e.get("verdict", "unverifiable")
+    return {
+        "claim_id": e.get("claim_id"),
+        "claim": claim_text.get(e.get("claim_id"), ""),
+        "verdict": verdict,
+        "verdict_ko": T.VERDICT_KO.get(verdict, verdict),
+        "indicator": e.get("indicator", ""),
+        "value": e.get("value"),
+        "unit": e.get("unit"),
+        "value_text": format_value(e.get("value"), e.get("unit")),
+        "region_compare": e.get("region_compare"),
+        "sources": sources,
+        "as_of": ", ".join(dates),
+        "stale": any(is_stale(d) for d in dates),
+        "caveats": e.get("caveats") or [],
+        "chart": e.get("chart"),
+    }
+
+
+def evidence_choices(package: dict, query: dict) -> list[dict]:
+    """근거 고르기 화면에 보여 줄 근거 전부. index 는 package.evidence 의 순서,
+    usable=False 는 민원서에 넣을 수 없는 근거(자료와 다름·확인 불가·값 없음)라 체크할 수 없다."""
     claim_text = {c["id"]: c["text"] for c in query.get("claims") or []}
+    return [{**_item(e, claim_text), "index": i, "usable": _usable(e)}
+            for i, e in enumerate(package.get("evidence") or [])]
+
+
+def _split_evidence(package: dict, query: dict, exclude=()) -> tuple[list[dict], list[dict]]:
+    claim_text = {c["id"]: c["text"] for c in query.get("claims") or []}
+    exclude = set(exclude or ())
     included, excluded = [], []
-    for e in package.get("evidence") or []:
-        if e.get("verdict") in INCLUDED_VERDICTS and e.get("value") is not None:
-            included.append({
-                "claim_id": e["claim_id"],
-                "claim": claim_text.get(e["claim_id"], ""),
-                "verdict": e["verdict"],
-                "verdict_ko": T.VERDICT_KO[e["verdict"]],
-                "indicator": e["indicator"],
-                "value": e["value"],
-                "unit": e.get("unit"),
-                "value_text": format_value(e["value"], e.get("unit")),
-                "region_compare": e.get("region_compare"),
-                "sources": e.get("sources") or [],
-                "caveats": e.get("caveats") or [],
-                "chart": e.get("chart"),
-            })
+    for i, e in enumerate(package.get("evidence") or []):
+        if _usable(e) and i not in exclude:
+            included.append({**_item(e, claim_text), "index": i})
+        elif _usable(e):
+            excluded.append({"kind": "user", "claim_id": e["claim_id"], "claim": claim_text.get(e["claim_id"], ""),
+                             "label": e.get("indicator", ""), "reason": T.USER_EXCLUDED})
         else:
             verdict = e.get("verdict", "unverifiable")
             if verdict in INCLUDED_VERDICTS:      # 판정은 됐지만 값이 없으면 근거로 쓰지 않는다
@@ -192,6 +234,56 @@ def _split_evidence(package: dict, query: dict) -> tuple[list[dict], list[dict]]
     for g in package.get("gaps") or []:
         excluded.append({"kind": "gap", "claim_id": None, "claim": "", "label": g["concept"], "reason": g["reason"]})
     return included, excluded
+
+
+# ---------------------------------------------------------------- 남은 제주어 낱말
+_dialect = None
+
+
+def _dialect_words() -> set[str]:
+    """방언 사전에서 '거의 제주어로만 쓰이는' 낱말. 사전 파일이 없거나 읽지 못하면 빈 집합(검사를 건너뛴다)."""
+    global _dialect
+    if _dialect is None:
+        _dialect = set()
+        if DIALECT_DICT.exists():
+            try:
+                data = json.loads(DIALECT_DICT.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                data = {}
+            _dialect = {w for w, info in data.items()
+                        if len(w) >= 2 and isinstance(info, dict)
+                        and info.get("dialect_ratio", 0) >= DIALECT_MIN_RATIO and info.get("seen", 0) >= DIALECT_MIN_SEEN}
+    return _dialect
+
+
+def leftover_dialect(*texts: str) -> list[str]:
+    """표준어본 글에 남은 제주어 낱말, 나온 순서대로. 어절에서 문장부호를 떼고, 조사가 붙은 경우('할망덜이')도
+    잡도록 어절 앞부분 중 사전에 있는 가장 긴 것(두 글자 이상)을 찾는다."""
+    words = _dialect_words()
+    found: list[str] = []
+    if not words:
+        return found
+    for text in texts:
+        for token in (text or "").split():
+            w = re.sub(r"[^가-힣]", "", token)
+            hit = next((w[:n] for n in range(len(w), 1, -1) if w[:n] in words), None)
+            if hit and hit not in found:
+                found.append(hit)
+    return found
+
+
+def _check_text(d: dict) -> None:
+    """남은 제주어 낱말과 글자 수 제한을 다시 검사해 d 의 dialect_words·warnings 를 맞춘다(고친 뒤에도 부른다)."""
+    std = {sec["id"]: sec["standard"] for sec in d["sections"]}
+    d["dialect_words"] = leftover_dialect(std["title"], std["content"], std["request"])
+    keep = [w for w in d["warnings"] if not w.startswith((T.DIALECT_WARNING_HEAD, "제목 글자 수", "내용 글자 수"))]
+    if d["dialect_words"]:
+        keep.append(T.DIALECT_WARNING.format(words=", ".join(d["dialect_words"])))
+    sub = d["submission"]
+    for name, n, limit in (("제목", sub["title_chars"], T.TITLE_LIMIT), ("내용", sub["body_chars"], T.BODY_LIMIT)):
+        if n > limit:
+            keep.append(T.LIMIT_WARNING.format(name=name, n=n, limit=limit))
+    d["warnings"] = keep
 
 
 def _evidence_text(items: list[dict]) -> str:
@@ -209,14 +301,15 @@ def _evidence_text(items: list[dict]) -> str:
 
 
 # ---------------------------------------------------------------- 초안
-def build_draft(handoff: dict, source_text: str | None = None) -> dict:
+def build_draft(handoff: dict, source_text: str | None = None, exclude=None) -> dict:
+    """exclude: 근거 고르기에서 사용자가 뺀 근거의 index(package.evidence 순서). 빠진 근거는 excluded 로 간다."""
     query = handoff.get("query") or {}
     package = handoff.get("package") or {}
     if source_text is None:
         source_text = handoff.get("source_text")
     source, source_pii = mask(source_text)        # 원문이 가려지지 않은 채 들어와도 여기서 한 번 더 가린다
 
-    included, excluded = _split_evidence(package, query)
+    included, excluded = _split_evidence(package, query, exclude)
     standard = {
         "title": _title(query),
         "content": _content(query),
@@ -247,7 +340,7 @@ def build_draft(handoff: dict, source_text: str | None = None) -> dict:
         warnings.append(T.NO_SOURCE_WARNING)
     notices = [friendly(n) for n in handoff.get("notices") or [] if "mock" not in n]   # mock 안내는 위 경고로 대신한다
 
-    return {
+    draft = {
         "request_id": package.get("request_id") or query.get("request_id", ""),
         "sections": sections,
         "submission": _submission(query, standard),
@@ -258,7 +351,10 @@ def build_draft(handoff: dict, source_text: str | None = None) -> dict:
         "pii_masked": sorted(set(handoff.get("pii_masked") or []) | set(source_pii)),
         "engine": package.get("engine"),
         "copy_allowed": not is_mock,
+        "dialect_words": [],
     }
+    _check_text(draft)
+    return draft
 
 
 def _compose_body(place: str, standard: dict) -> str:
@@ -280,6 +376,8 @@ def _submission(query: dict, standard: dict) -> dict:
         "body": body,
         "title_chars": len(title),
         "body_chars": len(body),
+        "title_limit": T.TITLE_LIMIT,
+        "body_limit": T.BODY_LIMIT,
         "place": place,
         "complaint_type": query.get("complaint_type") or "",
         "agency": " ".join(x for x in (T.PROVINCE, sigungu) if x),   # 처리기관 고를 때 참고(추천일 뿐)
@@ -323,6 +421,8 @@ def apply_edits(draft: dict, edits: dict | None) -> dict:
     sub["title"], sub["body"] = standard["title"], _compose_body(sub.get("place", ""), standard)
     sub["title_chars"], sub["body_chars"] = len(sub["title"]), len(sub["body"])
     d["pii_masked"] = sorted(found)
+    d.setdefault("warnings", [])
+    _check_text(d)
     return d
 
 
