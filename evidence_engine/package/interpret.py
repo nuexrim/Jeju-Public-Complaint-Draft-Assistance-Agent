@@ -11,6 +11,7 @@
 팀원 쪽 흐름
   1) 구조화 질의로 interpret() 를 부른다 → 주장마다 선택지 목록
   2) 사용자가 고르면 claims[i].text 를 고른 문장으로 바꾸고 claims[i].indicator_id 를 채워 run() 을 부른다
+     뜻을 여러 개(최대 max_picks) 고르면 고른 뜻마다 주장을 하나씩 만든다(complaint_agent Agent.choose)
   3) 기타를 고르면 사용자가 쓴 문장을 claims[i].text 로 넣고 indicator_id 없이 다시 interpret() 또는 run()
 
 선택지 문장은 registry.yaml 의 ask 틀로만 만든다(민원 원문을 옮기지 않는다 → 개인정보가 섞이지 않음).
@@ -22,6 +23,9 @@ from indicators.library import (
 )
 
 MAX_OPTIONS = 5          # 기타를 뺀 선택지 수
+# 한 주장에서 고를 수 있는 뜻 수. 규칙 구조화는 민원 전체를 주장 하나로 두므로(불편 여러 개가 한 문장에 섞임),
+# 구조화가 한 민원에서 뽑는 주장 최대 수(dialect_normalizer structure.MAX_CLAIMS = 3)와 같게 둔다.
+MAX_PICKS = 3
 OTHER_TEXT = "기타 (직접 쓰기)"
 OTHER_NOTE = "직접 쓴 문장을 claims[].text 로 보내면 다시 해석한다"
 NO_DATA_NOTE = "지금 자료로는 확인할 수 없음 (근거 없이 '확인 불가'로 남김)"
@@ -86,6 +90,7 @@ def claim_options(claim: dict, query: dict, tables: set[str], emd_label: str | N
         "options": [{k: o[k] for k in ("option_id", "text", "kind", "indicator_id", "measures", "note")}
                     for o in options],
         "recommended": options[0]["option_id"],
+        "max_picks": MAX_PICKS,
     }
 
 

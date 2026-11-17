@@ -5,6 +5,8 @@
 #   requires : 이 중 하나가 claim 문장에 반드시 있어야 후보가 된다
 #   excludes : claim·민원 본문·targets 어디에든 있으면 후보에서 뺀다 (예: 폭염 대피 ≠ 이재민 시설)
 #   bonus    : claim 문장에 있으면 가산점 (예: '노인'이 있으면 노인 인구 기준 지표를 우선)
+#   '멀-' 처럼 붙임표로 끝나는 낱말은 용언 줄기다. 활용형(멀어·먼·멉니다·머니)까지 찾는다 (library.stem_forms).
+#   그 밖의 낱말은 글자 그대로 찾는다. 이 규칙은 topics·aspects·known_gaps 의 단서에도 같다.
 #
 # 뜻 맞추기 (주장이 말하는 것과 지표가 재는 것이 같은가)
 #   topic    : 주제 묶음 (아래 topics). 해석 선택지는 주장과 같은 주제의 지표에서 고른다.
@@ -90,7 +92,7 @@ indicators:
     ask: "{emd}에서 응급실(응급의료기관)까지 너무 멀다"
     unit: km
     tables: [emergency_medical_center, emd_geo]
-    keywords: [응급, 응급실, 응급의료, 멀다, 거리, 멀어]
+    keywords: [응급, 응급실, 응급의료, 멀-, 거리]
     requires: [응급]
     scope: emd
     rule: rank
@@ -342,8 +344,8 @@ indicators:
     ask: "{emd}에서 길을 걷거나 건너다 차에 치이는 사고가 많다"
     unit: 건/인구 1만 명
     tables: [pedestrian_accident, pop_emd]
-    keywords: [보행자, 보행, 횡단, 건너, 걷다, 걸어, 인도]
-    requires: [보행, 횡단, 건너, 걷, 걸어, 인도]
+    keywords: [보행자, 보행, 횡단, 건너, 걷-, 인도]
+    requires: [보행, 횡단, 건너, 걷-, 인도]
     scope: emd
     rule: rank
     worse: high
@@ -437,26 +439,34 @@ aspects:
     cues: [위험, 사고, 다쳐, 다칠]
   - id: access
     name: 거리·이용 어려움
-    cues: [멀, 거리, 어렵, 힘들, 불편, 접근, 못 가, 못 타]
+    cues: [멀-, 거리, 어렵-, 힘들-, 불편, 접근, 못 가, 못 타]
   - id: supply
     name: 시설 수
-    cues: [부족, 없다, 없어, 없음, 적다, 적어, 모자라, 더 필요, 늘려]
+    cues: [부족, 없-, 적-, 모자라-, 더 필요, 늘려]
 
 # 주제 묶음. 주장 문장에서 먼저 찾고, 없으면 targets 에서 찾는다.
+# name 은 사용자에게 보이는 이름이다(근거를 확인할 수 있는 주제 안내, 화면의 주제 고르기).
 topics:
   - id: bus
+    name: 버스·대중교통
     cues: [버스, 정류소, 정류장, 노선, 배차, 막차, 승차, 대중교통]
   - id: medical
-    cues: [병원, 의원, 진료, 의료, 약국, 응급, 아프, 상비약, 상비의약품, 감기약, 해열제]
+    name: 병원·약국
+    cues: [병원, 의원, 진료, 의료, 약국, 응급, 아프-, 상비약, 상비의약품, 감기약, 해열제]
   - id: waste
+    name: 쓰레기·재활용
     cues: [쓰레기, 클린하우스, 재활용, 분리배출]
   - id: traffic_safety
+    name: 교통사고·보행 안전
     cues: [교통사고, 사고, 통학, 스쿨존, 횡단보도]
   - id: disaster
+    name: 재난 대피시설
     cues: [대피, 이재민, 재난, 태풍, 폭염, 더위, 무더위쉼터, 임시주거]
   - id: safety
-    cues: [CCTV, cctv, 씨씨티비, 감시카메라, 방범, 치안, 범죄, 가로등, 보안등, 어둡, 어두워]
+    name: 방범·CCTV
+    cues: [CCTV, cctv, 씨씨티비, 감시카메라, 방범, 치안, 범죄, 가로등, 보안등, 어둡-]
   - id: elderly_welfare
+    name: 경로당
     cues: [경로당, 노인정, 어르신 쉼터, 노인 쉼터]
 
 # 확보하지 못한 데이터. claim 또는 민원 본문에 이 말이 있고 맞는 지표가 없으면 이 사유로 빈칸을 남긴다.
@@ -480,7 +490,7 @@ known_gaps:
     topic: safety
     aspect: supply
     ask: "밤길을 밝힐 가로등·보안등이 부족하다"
-    keywords: [가로등, 보안등, 어둡, 어두워, 밤길]
+    keywords: [가로등, 보안등, 어둡-, 밤길]
     concept: 가로등·보안등
     reason: 제주데이터허브 카탈로그와 적재 DB에 가로등·보안등 위치 자료가 없음
   - id: night_clinic

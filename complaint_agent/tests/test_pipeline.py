@@ -115,9 +115,64 @@ def test_blocked_llm_uses_rules_and_types_match_fixtures(agent, monkeypatch):
 
 
 def test_rules_resolve_unique_village_but_not_ambiguous(agent):
-    assert agent._resolve_place("종달리 버스가 줄었다") == "구좌읍"
-    assert agent._resolve_place("세화리 버스") == ""          # 구좌읍·표선면 두 곳에 있음 → 묻는다
-    assert agent._resolve_place("버스가 연동되어") == ""        # 낱말 일부를 지명으로 보지 않음
+    assert agent._resolve_place("종달리 버스가 줄었다") == ("구좌읍", "")
+    assert agent._resolve_place("세화리 버스") == ("", "")          # 구좌읍·표선면 두 곳에 있음 → 묻는다
+    assert agent._resolve_place("버스가 연동되어") == ("", "")        # 낱말 일부를 지명으로 보지 않음
+
+
+def test_rules_short_place_name_asks_to_confirm(agent, monkeypatch):
+    """'노형'처럼 줄여 말하면 노형동으로 잡되, 글자만 보고 고른 것이라 맞는지 묻는다."""
+    def blocked(*a, **k):
+        raise P.llm.PaidCallNotAllowed("blocked")
+    monkeypatch.setattr(P.S.llm, "call_json", blocked)
+    r = agent.understand("노형에 사는데 병원이 너무 멉니다", use_normalize=False)
+    assert r["query"]["location"]["emd_name"] == "노형동"
+    confirm = r["questions"][0]                         # 요구사항보다 먼저 묻는다
+    assert confirm["field"] == "emd_name" and confirm.get("confirm") and "'노형'" in confirm["question"]
+    later = agent.answer(r, user_request="")              # 다른 질문에 먼저 답해도 확인 질문은 남는다
+    assert any(q.get("confirm") for q in later["questions"])
+    assert agent.answer(r, confirm_emd=True)["query"]["location"]["emd_name"] == "노형동"
+    no = agent.answer(r, confirm_emd=False)
+    assert no["query"]["location"]["emd_name"] == "" and no["status"] == "need_input"
+    assert agent._resolve_place("도로 중앙에 쓰레기가 많아요") == ("", "")   # 흔한 낱말은 지명으로 보지 않음
+
+
+def test_rules_aspect_reads_conjugated_predicates(agent, monkeypatch):
+    """규칙 구조화도 '멉니다·힘듭니다·없습니다' 같은 활용형으로 측면을 읽는다."""
+    def blocked(*a, **k):
+        raise P.llm.PaidCallNotAllowed("blocked")
+    monkeypatch.setattr(P.S.llm, "call_json", blocked)
+    r = agent.answer(agent.understand("구좌읍 정류소까지 너무 멉니다", use_normalize=False), user_request="")
+    interp = agent.meaning_options(r["query"])
+    assert interp["claims"][0]["aspect"] == "거리·이용 어려움"
+
+
+def test_choose_several_meanings_makes_one_claim_each(agent, fake_llm):
+    """규칙 구조화는 민원 전체가 주장 하나 → 뜻을 여러 개 고르면 고른 뜻마다 주장이 생긴다."""
+    r = agent.answer(agent.understand("구좌읍 버스가 줄어부난 병원 가기 힘들어요"), user_request="")
+    query = {**r["query"], "claims": [{"id": "c1", "text": "버스가 줄어서 할머니들이 병원 가기 힘들다"}]}
+    interp = agent.meaning_options(query)
+    c1 = interp["claims"][0]
+    assert c1["max_picks"] == 3
+    ind = [o for o in c1["options"] if o["kind"] == "indicator"]
+    q, again = agent.choose(query, interp, {"c1": [ind[0]["option_id"], ind[1]["option_id"], ind[0]["option_id"]]})
+    assert [c["id"] for c in q["claims"]] == ["c1", "c1-2"] and not again        # 같은 뜻 두 번은 하나로
+    assert [c["indicator_id"] for c in q["claims"]] == [ind[0]["indicator_id"], ind[1]["indicator_id"]]
+    pkg = agent.evidence(q)
+    assert [e["claim_id"] for e in pkg["evidence"]] == ["c1", "c1-2"]
+    q2, again2 = agent.choose(query, interp, {"c1": [ind[0]["option_id"], {"other": "막차가 빨라졌다"}]})
+    assert again2 == ["c1-2"] and "indicator_id" not in q2["claims"][1]
+    with pytest.raises(ValueError):
+        agent.choose(query, interp, {"c1": [o["option_id"] for o in ind[:4]]})   # max_picks 초과
+    with pytest.raises(ValueError):
+        agent.choose(query, interp, {"c1": []})
+
+
+def test_parse_picks():
+    from complaint_agent.conversation import parse_picks
+    assert parse_picks("", 6, 3) == [] and parse_picks("2", 6, 3) == [1]
+    assert parse_picks("1,3", 6, 3) == [0, 2] and parse_picks("1 3 3", 6, 3) == [0, 2]
+    assert parse_picks("7", 6, 3) is None and parse_picks("1,2,3,4", 6, 3) is None and parse_picks("가", 6, 3) is None
 
 
 def test_emd_answers(agent, fake_llm):
@@ -161,6 +216,17 @@ def test_scripted_conversation(agent, fake_llm):
     assert all(c.get("indicator_id") for c in out["query"]["claims"])
 
 
+def test_scripted_conversation_with_several_meanings(agent, monkeypatch):
+    """Claude 없이(규칙) 한 문장에 불편 두 개 → 뜻 두 개를 골라 근거 두 개."""
+    def blocked(*a, **k):
+        raise P.llm.PaidCallNotAllowed("blocked")
+    monkeypatch.setattr(P.S.llm, "call_json", blocked)
+    answers = iter(["", "1,2", "y"])        # 요구사항 없음, 뜻 1·2번, 확인
+    out = run_conversation("구좌읍 버스가 줄어서 할머니들이 병원 가기가 힘듭니다", ask=lambda p: next(answers, "y"),
+                           say=lambda s: None, agent=agent)
+    assert out and out["structured_by"] == "rules" and len(out["package"]["evidence"]) == 2
+
+
 def test_paid_on_but_no_key_falls_back_without_network(agent, monkeypatch):
     import normalize
     monkeypatch.setenv("ALLOW_PAID_CALLS", "1")
@@ -170,3 +236,83 @@ def test_paid_on_but_no_key_falls_back_without_network(agent, monkeypatch):
     monkeypatch.setattr(P.S.llm, "_cache", {})
     r = agent.understand("구좌읍 버스가 줄었어요", use_normalize=False)
     assert r["structured_by"] == "rules" and any("LLMError" in n for n in r["notices"])
+
+
+def test_no_evidence_question_follows_engine_topics(agent, monkeypatch):
+    """'근거 없이 작성할까요?'는 유형 이름이 아니라 엔진에 자료가 있는 주제로 정한다."""
+    def blocked(*a, **k):
+        raise P.llm.PaidCallNotAllowed("blocked")
+    monkeypatch.setattr(P.S.llm, "call_json", blocked)
+    price = agent.understand("구좌읍 물가가 너무 올랐어요", use_normalize=False)
+    q = [x for x in price["questions"] if x["field"] == "complaint_type"]
+    assert q and "경로당" in q[0]["question"] and "생활물가" not in q[0]["question"]
+    hall = agent.understand("구좌읍 경로당이 부족해요", use_normalize=False)
+    assert hall["query"]["complaint_type"] == "기타"                 # 유형 보기에 복지가 없어 '기타'
+    assert not [x for x in hall["questions"] if x["field"] == "complaint_type"]   # 그래도 자료는 있음
+    apt = agent.understand("노형동 아파트 쓰레기가 넘쳐요", use_normalize=False)
+    assert apt["query"]["complaint_type"] == "환경·청소"
+
+
+def test_llm_path_short_place_name_when_claude_leaves_it_empty(agent, monkeypatch):
+    """Claude 가 읍면동을 비워 둬도 문장 속 줄인 이름(노형)을 찾아 확인 질문과 함께 채운다."""
+    out = {**STRUCT_OUT, "emd_name": "", "location_mention": ""}
+    monkeypatch.setattr(P.S.llm, "call_json", lambda *a, **k: json.loads(json.dumps(out)))
+    r = agent.understand("노형 사는데 버스가 줄었어요", use_normalize=False)
+    assert r["structured_by"] == "llm" and r["query"]["location"]["emd_name"] == "노형동"
+    assert any(q["field"] == "emd_name" and q.get("confirm") for q in r["questions"])
+
+
+def test_conversation_skips_meaning_question_without_options(agent, monkeypatch):
+    """엔진 주제 밖 주장(선택지가 '기타'뿐)은 뜻을 묻지 않고 문장 그대로 근거를 찾는다."""
+    def blocked(*a, **k):
+        raise P.llm.PaidCallNotAllowed("blocked")
+    monkeypatch.setattr(P.S.llm, "call_json", blocked)
+    asked = []
+
+    def ask(prompt):
+        asked.append(prompt)
+        return "y" if "맞나요" in prompt else ""
+    out = run_conversation("구좌읍 공영주차장이 부족해요", ask=ask, say=lambda s: None, agent=agent)
+    assert out and not any("어떤 뜻인가요" in p for p in asked) and not any("직접 써" in p for p in asked)
+
+
+def _rules(monkeypatch):
+    def blocked(*a, **k):
+        raise P.llm.PaidCallNotAllowed("blocked")
+    monkeypatch.setattr(P.S.llm, "call_json", blocked)
+
+
+def test_place_question_offers_choices_and_takes_several(agent, monkeypatch):
+    """읍면동을 못 알아들으면 목록(시·읍면/동 묶음 + 제주 전체)을 주고, 여러 곳을 고르면 장소마다 근거를 낸다."""
+    _rules(monkeypatch)
+    r = agent.understand("병원이 너무 부족해요", use_normalize=False)
+    q = next(x for x in r["questions"] if x["field"] == "emd_name")
+    ch = q["choices"]
+    assert ch["all"] == "제주 전체" and ch["max_picks"] == 3
+    assert sum(len(g["names"]) for g in ch["groups"]) == 43
+    r = agent.answer(r, emd_names=["구좌읍", "성산읍"], user_request="")
+    assert r["status"] == "ready" and r["places"] == ["구좌읍", "성산읍"]
+    assert r["query"]["location"]["emd_name"] == "구좌읍"
+    assert "구좌읍, 성산읍" in agent.summary(r["query"], r["places"])
+    pkg = agent.evidence(r["query"], r["places"])
+    labels = [e["indicator"] for e in pkg["evidence"]]
+    assert any("구좌읍" in x for x in labels) and any("성산읍" in x for x in labels)
+    assert agent.handoff(r, r["query"], pkg)["places"] == ["구좌읍", "성산읍"]
+    with pytest.raises(ValueError):
+        agent.answer(r, emd_names=["구좌읍", "성산읍", "표선면", "남원읍"])
+
+
+def test_whole_jeju_choice(agent, monkeypatch):
+    _rules(monkeypatch)
+    r = agent.answer(agent.understand("버스가 줄었어요", use_normalize=False), emd_names=["제주 전체"], user_request="")
+    assert r["status"] == "ready" and r["query"]["location"]["emd_name"] == "제주 전체"
+    pkg = agent.evidence(r["query"], r["places"])
+    assert pkg["evidence"]
+    assert any("제주 전체" in n for n in agent.handoff(r, r["query"], pkg)["notices"])
+
+
+def test_terminal_place_answer_with_commas(agent, monkeypatch):
+    _rules(monkeypatch)
+    r = agent.understand("병원이 부족해요", use_normalize=False)
+    assert agent.answer(r, emd_name="구좌, 성산읍")["places"] == ["구좌읍", "성산읍"]
+    assert agent.answer(r, emd_name="전체")["places"] == ["제주 전체"]

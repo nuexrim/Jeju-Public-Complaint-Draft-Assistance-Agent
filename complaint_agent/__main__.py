@@ -11,6 +11,8 @@ from complaint_agent.pipeline import Agent
 
 
 def main(argv: list[str] | None = None) -> int:
+    from win_console import safe_output       # dialect_normalizer (pipeline 이 경로를 올린다)
+    safe_output()
     ap = argparse.ArgumentParser(description="민원 말해봅서: 되묻기 → 뜻 선택 → 근거 패키지")
     ap.add_argument("text", nargs="?")
     ap.add_argument("--out", type=Path, help="민원 초안 모델에 넘길 JSON(가린 질의 + 근거 패키지) 저장 경로")

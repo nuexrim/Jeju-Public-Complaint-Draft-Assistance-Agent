@@ -1,8 +1,8 @@
 """
 제주 방언 라벨 JSON 전처리 스크립트 (v2.4: 이중 전사 표기 정리)
 
-사용법:  python3 preprocess.py
-        python3 preprocess.py --daily ./label --senior ./label_senior --output ./processed
+사용법:  python preprocess.py
+        python preprocess.py --daily ./label --senior ./label_senior --output ./processed
 
 입력
   daily  : AI Hub 한국어 방언 발화(제주도)          - 일상 대화, 10~60대 이상
@@ -130,6 +130,8 @@ def read_senior(doc, fp):
 
 
 def main():
+    from win_console import safe_output
+    safe_output()
     ap = argparse.ArgumentParser()
     ap.add_argument("--daily", default="./label")
     ap.add_argument("--senior", default="./label_senior")

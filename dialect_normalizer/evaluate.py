@@ -2,10 +2,10 @@
 A/B 평가: A(LLM만, zero-shot) vs B(사전+예문+LLM, RAG)
 
 사용법
-  python3 evaluate.py --limit 20                 먼저 20문장씩만 (비용·오류 확인용)
-  python3 evaluate.py                            전체: 평가셋 2개 × 방법 2개 = 2,000번 호출
-  python3 evaluate.py --sets senior --modes rag  일부만
-  python3 evaluate.py --report                   API 호출 없이 저장된 결과로 점수만 다시 계산
+  python evaluate.py --limit 20                 먼저 20문장씩만 (비용·오류 확인용)
+  python evaluate.py                            전체: 평가셋 2개 × 방법 2개 = 2,000번 호출
+  python evaluate.py --sets senior --modes rag  일부만
+  python evaluate.py --report                   API 호출 없이 저장된 결과로 점수만 다시 계산
 
 특징
   - 결과를 results/<모델 이름>/ 폴더에 한 줄씩 저장 → 중간에 끊겨도 다시 실행하면 이어서 진행
@@ -273,6 +273,8 @@ def report(sets, modes):
 
 
 def main():
+    from win_console import safe_output
+    safe_output()
     import llm
     llm.load_env()
     ap = argparse.ArgumentParser()

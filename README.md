@@ -117,6 +117,10 @@ py -3.11 -m venv .venv
 pip install -r requirements.txt
 ```
 
+- PowerShell이 `Activate.ps1`을 막으면("이 시스템에서 스크립트를 실행할 수 없으므로") 그 창에서만 `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`를 실행한 뒤 다시 켭니다. 창을 닫으면 원래대로 돌아갑니다.
+- 설치 폴더는 `C:\jeju\`처럼 짧은 경로를 권합니다. Windows는 기본 경로 길이 제한이 260자입니다.
+- 결과를 파일로 보내거나(`> out.txt`) 다른 프로그램이 출력을 받아 갈 때 한국어 Windows는 CP949로 씁니다. 실행 진입점은 CP949에 없는 글자(—, ✅ 등)를 `?`로 바꿔 멈추지 않게 합니다. UTF-8로 받으려면 `$env:PYTHONUTF8=1`을 설정합니다.
+
 macOS:
 
 ```bash
@@ -157,6 +161,7 @@ LLM 설정은 `config.yaml`의 두 곳입니다. `dev_llm`은 개발 단계 일�
 7. **빅데이터센터 데이터 명세서**: 센터에서 받은 명세서 xlsx를 `raw/center/`에 넣습니다(카드 생성용, 외부 공개 금지).
 8. **적재**: `python data/build_db.py` → `data/jeju.duckdb` 생성 (약 20초). 끝에 파생 테이블(`pop_emd`, `emd_geo`, `bus_usage_monthly`)도 만듭니다. 파생 테이블만 다시 만들 때는 `python data/derived.py`
 9. **카드 생성**: `python catalog/build_cards.py` → `catalog/cards.parquet` 생성, 이어서 `python catalog/tag_concepts.py --rules`(규칙 개념 태그)
+10. **작은 표 미리 받기(범용 틀용)**: `python data/ingest/hub_files.py --small 10`으로 데이터허브의 10MB 이하 표(csv·xlsx) 전부를 받고, `python data/prefetch.py`로 `pf_<허브id>_<n>` 표와 진단표 `prefetch_profile`(읍면동을 찾은 컬럼·비율, 시설 목록 여부)을 만듭니다. 등록 지표가 없는 '부족하다·멀다' 주장은 이 중 시설 목록으로 인구 1만 명당 개수를 세어 '부분 지지'까지 판정합니다(`package/template.py`). 실행 중에는 내려받지 않습니다.
 
 raw 없이 설치할 때(센터 PC)는 전달받은 스냅샷 폴더를 `data/snapshot/<날짜>/`에 두고 `python data/snapshot.py --restore <날짜>`로 DB를 만듭니다.
 

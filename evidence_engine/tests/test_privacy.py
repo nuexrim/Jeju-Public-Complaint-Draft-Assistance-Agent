@@ -86,3 +86,14 @@ def test_local_number_masked_but_year_range_kept():
     assert mask_with_labels("710-2584로 전화 주세요")[1] == ["전화번호"]
     assert mask_with_labels("2018-2019년 사고")[1] == [] and mask_with_labels("2018-2019 사고")[1] == []
     assert mask_with_labels("김철수 씨 노형로 123", "○○")[0] == "○○ 씨 노형로 ○○"
+
+
+def test_self_introduced_names():
+    """자기소개 꼴의 이름은 가리고, 같은 자리의 지명·신분 낱말은 남긴다."""
+    from package.privacy import mask_with_labels
+    assert mask_with_labels("저는 김철수입니다 버스가 줄었어요")[0] == "저는 [이름]입니다 버스가 줄었어요"
+    assert mask_with_labels("제 이름은 박영희예요")[1] == ["이름"]
+    assert mask_with_labels("김철수라고 합니다")[1] == ["이름"]
+    for keep in ("저는 주민입니다", "저는 노인인데 병원이 멀어요", "저는 한림읍입니다", "저는 연동입니다",
+                 "정류소입니다", "이것은 민원입니다"):
+        assert mask_with_labels(keep) == (keep, []), keep

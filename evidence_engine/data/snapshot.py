@@ -24,6 +24,11 @@ DB = ENGINE_ROOT / "data" / "jeju.duckdb"
 SNAP = ENGINE_ROOT / "data" / "snapshot"
 
 
+def _sql_path(path: Path) -> str:
+    """SQL 문자열에 넣을 경로. 설치 폴더 이름에 작은따옴표가 있어도(예: C:\\Users\\O'Neil) 깨지지 않게 겹친다."""
+    return path.as_posix().replace("'", "''")
+
+
 def _sha(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -36,8 +41,9 @@ def export(tag: str) -> Path:
     out = SNAP / tag
     if out.exists():
         shutil.rmtree(out)
+    SNAP.mkdir(parents=True, exist_ok=True)       # DuckDB 는 상위 폴더를 만들지 않는다
     con = duckdb.connect(str(DB), read_only=True)
-    con.execute(f"EXPORT DATABASE '{out.as_posix()}' (FORMAT parquet, COMPRESSION zstd)")
+    con.execute(f"EXPORT DATABASE '{_sql_path(out)}' (FORMAT parquet, COMPRESSION zstd)")
     tables = {t: con.execute(f'SELECT count(*) FROM "{t}"').fetchone()[0]
               for (t,) in con.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='main'").fetchall()}
     con.close()
@@ -63,9 +69,14 @@ def restore(tag: str) -> None:
     if not verify(tag):
         raise SystemExit("스냅샷이 손상되었다")
     if DB.exists():
-        DB.rename(DB.with_suffix(".duckdb.bak"))
+        # rename 은 Windows에서 .bak 가 이미 있으면 실패한다(맥은 덮어씀). replace 는 두 OS 모두 덮어쓴다.
+        # Windows는 다른 프로그램(엔진·UI)이 DB를 열고 있으면 옮길 수 없다.
+        try:
+            DB.replace(DB.with_suffix(".duckdb.bak"))
+        except PermissionError:
+            raise SystemExit(f"{DB.name} 를 다른 프로그램이 열고 있어 바꿀 수 없다. 엔진·화면을 끄고 다시 실행한다.") from None
     con = duckdb.connect(str(DB))
-    con.execute(f"IMPORT DATABASE '{src.as_posix()}'")
+    con.execute(f"IMPORT DATABASE '{_sql_path(src)}'")
     manifest = json.loads((src / "manifest.json").read_text(encoding="utf-8"))
     wrong = {t: n for t, n in manifest["tables"].items()
              if con.execute(f'SELECT count(*) FROM "{t}"').fetchone()[0] != n}

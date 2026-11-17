@@ -140,3 +140,29 @@ def test_mask_uses_engine_rules():
     """마스킹 구현은 근거 엔진 privacy.py 하나. 님 호칭 이름도 가리고, 날짜 숫자는 남긴다."""
     t, found = S.mask_pii("박영희님이 20261115에 신청했어요")
     assert "박영희" not in t and "20261115" in t and found == ["이름"]
+
+
+def test_short_emd_names():
+    """줄인 이름은 하나로 정해질 때만, 흔한 낱말·숫자 동(일도1·2동)은 잡지 않는다."""
+    assert S.find_short_emd_in_text("노형에 사는데 버스가 없어요") == ("노형동", "노형")
+    assert S.find_short_emd_in_text("구좌 쪽 병원이 멀어요") == ("구좌읍", "구좌")
+    assert S.find_short_emd_in_text("도로 중앙에 쓰레기") == ("", "")
+    assert S.find_short_emd_in_text("일도에 살아요") == ("", "")
+    assert S.find_short_emd_in_text("성산포 가는 버스") == ("", "")
+    assert S.find_short_emd_in_text("애월이랑 한림 둘 다") == ("", "")      # 두 곳 → 묻는다
+    assert "노형" in S.SHORT_EMD and "중앙" not in S.SHORT_EMD and "일도" not in S.SHORT_EMD
+
+
+def test_safe_output_keeps_running_on_cp949(monkeypatch):
+    """한국어 Windows에서 출력을 파일·파이프로 보내면 CP949. 없는 글자(—)는 '?'로 바꾸고 멈추지 않는다."""
+    import io
+    import sys
+    from win_console import safe_output
+    buf = io.BytesIO()
+    out = io.TextIOWrapper(buf, encoding="cp949")
+    monkeypatch.setattr(sys, "stdout", out)
+    monkeypatch.setattr(sys, "stderr", out)
+    safe_output()
+    print("뜻 — 확인 ✅")
+    out.flush()
+    assert buf.getvalue().decode("cp949") == "뜻 ? 확인 ?\n"
