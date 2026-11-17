@@ -148,6 +148,14 @@ pip install -r requirements.txt
 
 LLM 설정은 `config.yaml`의 두 곳입니다. `dev_llm`은 개발 단계 일괄 작업(Claude Sonnet 5.5 `claude-sonnet-5-5`, effort `high`), `llm`은 실행 중 SQL 초안(기본 `mock`, 호출 없음)입니다. Claude 호출은 공식 `anthropic` SDK로 하며, 최신 모델은 thinking이 항상 켜져 있어 thinking 토큰도 출력 토큰으로 과금됩니다. 안전 분류기 거절에 대비해 서버측 대체 모델(`fallbacks: "default"`)이 켜져 있습니다(Claude Haiku 5.5는 이 기능을 받지 않아 Haiku 모델일 때는 보내지 않습니다).
 
+## 평가 (유료 호출 없음)
+
+```bash
+python -m complaint_agent.eval.run_eval     # complaint_agent/eval/results/eval_<날짜>.md, .json
+```
+
+정답 세트 `complaint_agent/eval/gold.yaml`(민원 32개, 초안)로 데이터셋 현황, 주장 이해(규칙 구조화: 읍면동·주제·측면·선택지·추천), 근거 수와 판정(사용자가 뜻을 고른 경우와 엔진에 맡긴 경우), 남은 한계를 표로 뽑습니다. Claude 경로는 유료 평가에서 따로 잽니다. 판정이 맞는지는 정답 판정을 원자료로 확인해 채운 뒤에 잽니다.
+
 ## 데이터 준비
 
 원본 데이터는 저장소에 넣지 않습니다. 아래 순서로 `evidence_engine/data/ingest/raw/` 아래에 모은 뒤 DuckDB를 만듭니다. 명령은 `evidence_engine/` 폴더에서 실행합니다.

@@ -63,3 +63,37 @@ def test_apartment_is_not_sick():
     """'아파트'의 '아파'는 '아프다'가 아니다 (연결 시험에서 아파트 쓰레기 민원이 의료로 분류됐었다)."""
     assert claim_topics("노형동 아파트 쓰레기가 넘쳐요") == ["waste"]
     assert claim_topics("밤에 아파서 병원") == ["medical"]
+
+
+COMPLAINT_WORDS = {
+    "risk": ["차가 쌩쌩 달려서 아찔해요", "치일 뻔했어요", "사고 날 뻔했어요", "밤길이 위태로워요"],
+    "supply": ["클린하우스가 넘쳐요", "쓰레기통이 꽉 차 있어요", "정류장이 드물어요", "CCTV를 더 설치해 주세요",
+               "경로당이 있었으면 좋겠어요", "병원이 어서마씸", "병원이 엇수다", "밤길이 너무 어두워요", "의원을 늘려 주세요",
+               "CCTV가 없어서 밤에 무서워요"],
+    "access": ["병원까지 한참 걸려요", "병원 가는 데 오래 걸려요", "병원 가기 곤란해요"],
+    "service": ["버스가 자주 안 와요", "버스가 띄엄띄엄 와요", "버스를 한참 기다려요"],
+}
+
+
+@pytest.mark.parametrize("aspect,text", [(a, t) for a, ts in COMPLAINT_WORDS.items() for t in ts])
+def test_complaint_words(aspect, text):
+    assert claim_aspect(text) == aspect
+
+
+@pytest.mark.parametrize("text", ["병원이 멀지 않아요", "의원이 부족하지는 않아요", "정류장이 안 멀어요", "어서 오세요",
+                                  "버스가 잘 와서 좋아요"])
+def test_negated_or_not_a_complaint(text):
+    assert claim_aspect(text) is None
+
+
+def test_dialect_without_is_not_connective_ending():
+    """제주어 '어서'(없어)는 띄어 쓴 낱말만. '줄어서마씸'의 '-어서'는 아니다."""
+    assert claim_aspect("병원이 어서마씸") == "supply"
+    assert claim_aspect("밥을 먹어서마씸") is None
+
+
+def test_positive_tone_and_school_route():
+    from indicators.library import positive_tone
+    assert positive_tone("버스가 잘 와서 좋아요 감사합니다")
+    assert not positive_tone("병원이 없어서 불편해요 감사합니다")
+    assert claim_topics("봉개동 아이들 학교 가는 길이 위험해요") == ["traffic_safety"]
