@@ -346,3 +346,13 @@ def test_html_hides_evidence_section_when_none():
     h = load_handoff(SAMPLES / "supported.json")
     h["package"]["evidence"] = []
     assert 's.id === "evidence" && !DRAFT.evidence.length' in render_html(build_draft(h))
+
+
+def test_title_without_request_uses_chosen_meaning():
+    h = load_handoff(SAMPLES / "supported.json")
+    h["query"].pop("user_request")
+    assert build_draft(h)["submission"]["title"] == "구좌읍 불편 개선 요청: 정류소에서 버스를 타는 사람이 1년 전보다 줄었다 외 1건"
+    h["query"]["claims"] = h["query"]["claims"][1:]
+    assert build_draft(h)["submission"]["title"] == "구좌읍 불편 개선 요청: 어르신 수에 비해 의원이 적다"
+    h["query"]["claims"] = [{"id": "c1", "text": "버스 배차가 줄었다", "indicator_id": "gap:bus_service"}]
+    assert "배차" not in build_draft(h)["submission"]["title"]          # 자료 없는 뜻은 제목에 쓰지 않고 대상으로

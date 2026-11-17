@@ -114,13 +114,30 @@ def _shorten(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[:limit].rstrip() + "…"
 
 
+def _chosen_claims(query: dict, place: str) -> list[str]:
+    """뜻 고르기에서 고른 주장(자료로 잴 수 있는 indicator_id 가 붙은 것) 문장. 앞의 장소 이름과 조사는 뗀다."""
+    out = []
+    for c in query.get("claims") or []:
+        ind = c.get("indicator_id") or ""
+        text = (c.get("text") or "").strip()
+        if not ind or ind.startswith("gap:") or not text:
+            continue
+        if place:
+            text = re.sub(rf"^{re.escape(place)}\s*(?:에서|에|의|은|는|이|가)?\s*", "", text)
+        out.append(text.rstrip(" ."))
+    return [t for t in dict.fromkeys(out) if t]
+
+
 def _title(query: dict) -> str:
-    """제목: '장소 + 요청' 한 문장. 요구사항이 없으면 대상(targets)이나 첫 주장을 주제로 쓴다."""
+    """제목: '장소 + 요청' 한 문장. 요구사항이 없으면 뜻 고르기에서 고른 주장, 그것도 없으면 대상(targets)이나 첫 주장을 주제로 쓴다."""
     place = query.get("location", {}).get("emd_name") or ""
     request = _shorten(formalize(query.get("user_request") or ""), 30)
     if request:
         title = f"{place} {request}" if request.endswith(T.REQUEST_ENDINGS) else \
             T.TITLE_REQUEST.format(place=place, user_request=request)
+    elif chosen := _chosen_claims(query, place):
+        more = T.TITLE_MORE.format(n=len(chosen) - 1) if len(chosen) > 1 else ""
+        title = T.TITLE_CLAIM.format(place=place, claim=_shorten(chosen[0], 40) + more)
     else:
         targets = [t for t in query.get("targets") or [] if t]
         if targets:

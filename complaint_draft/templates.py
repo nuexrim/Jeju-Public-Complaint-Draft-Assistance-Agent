@@ -15,6 +15,8 @@ SECTIONS = [
 # 제목: 국민신문고 작성 요령대로 '장소 + 요청'을 한 문장으로. 요구사항이 없으면 주제로 쓴다.
 TITLE_REQUEST = "{place} {user_request} 요청"
 TITLE_TOPIC = "{place} {topic} 관련 불편 개선 요청"
+TITLE_CLAIM = "{place} 불편 개선 요청: {claim}"          # 바라는 점이 없고 뜻을 골랐을 때: 고른 뜻 문장을 그대로
+TITLE_MORE = " 외 {n}건"
 TITLE_MAX = 60                    # 제목이 이보다 길면 줄인다(창구 공식 제한이 아니라 읽기 좋은 길이)
 TITLE_LIMIT = 200                 # 국민신문고 제목 칸 글자 수 제한
 BODY_LIMIT = 40000                # 국민신문고 내용 칸 글자 수 제한
