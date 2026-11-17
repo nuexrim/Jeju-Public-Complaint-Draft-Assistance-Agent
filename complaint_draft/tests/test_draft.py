@@ -329,3 +329,20 @@ def test_html_no_evidence_card_reassures():
     h = load_handoff(SAMPLES / "supported.json")
     h["package"]["evidence"] = []
     assert "근거 없이도 민원서는 낼 수 있어요" in render_html(build_draft(h))
+
+
+def test_no_evidence_means_no_evidence_block_in_submission():
+    h = load_handoff(SAMPLES / "mixed.json")
+    h["package"]["evidence"] = [e for e in h["package"]["evidence"] if e["verdict"] != "supported"]
+    d = build_draft(h)
+    assert "[근거 자료]" not in d["submission"]["body"] and "[요청 사항]" in d["submission"]["body"]
+    assert validate_draft(d) == []
+    d2 = apply_edits(d, {"request": "버스를 늘려 주세요"})
+    assert "[근거 자료]" not in d2["submission"]["body"]
+    assert "[근거 자료]" in build_draft(load_handoff(SAMPLES / "supported.json"))["submission"]["body"]
+
+
+def test_html_hides_evidence_section_when_none():
+    h = load_handoff(SAMPLES / "supported.json")
+    h["package"]["evidence"] = []
+    assert 's.id === "evidence" && !DRAFT.evidence.length' in render_html(build_draft(h))

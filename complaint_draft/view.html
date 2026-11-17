@@ -160,6 +160,8 @@
       doc.appendChild(count);
       continue;
     }
+    // 근거가 없으면 문서(인쇄·화면)에서도 '근거 자료' 칸을 빼서, 복사되는 내용 칸 글과 같게 한다
+    if (s.id === "evidence" && !DRAFT.evidence.length) continue;
     n += 1;
     const sec = el("section", "sec");
     sec.dataset.id = s.id;

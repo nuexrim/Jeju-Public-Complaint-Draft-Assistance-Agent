@@ -360,8 +360,12 @@ def build_draft(handoff: dict, source_text: str | None = None, exclude=None) -> 
 
 
 def _compose_body(place: str, standard: dict) -> str:
+    """내용 칸 글. 근거가 없으면 '[근거 자료] 데이터로 확인된 근거는 없습니다'를 붙이지 않는다
+    (근거 없음을 적어 내면 민원이 약해 보이므로, 불편 사항·요청 사항만 낸다)."""
     parts = [f"{T.BODY_PLACE_HEAD}\n{place}"] if place else []
     for sid in ("content", "request", "evidence"):
+        if sid == "evidence" and standard[sid].strip() == T.EVIDENCE_NONE:
+            continue
         parts.append(f"{T.BODY_HEADS[sid]}\n{standard[sid]}")
     return "\n\n".join(parts)
 
