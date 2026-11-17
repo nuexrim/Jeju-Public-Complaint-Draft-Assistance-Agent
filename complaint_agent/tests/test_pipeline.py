@@ -274,3 +274,45 @@ def test_conversation_skips_meaning_question_without_options(agent, monkeypatch)
         return "y" if "맞나요" in prompt else ""
     out = run_conversation("구좌읍 공영주차장이 부족해요", ask=ask, say=lambda s: None, agent=agent)
     assert out and not any("어떤 뜻인가요" in p for p in asked) and not any("직접 써" in p for p in asked)
+
+
+def _rules(monkeypatch):
+    def blocked(*a, **k):
+        raise P.llm.PaidCallNotAllowed("blocked")
+    monkeypatch.setattr(P.S.llm, "call_json", blocked)
+
+
+def test_place_question_offers_choices_and_takes_several(agent, monkeypatch):
+    """읍면동을 못 알아들으면 목록(시·읍면/동 묶음 + 제주 전체)을 주고, 여러 곳을 고르면 장소마다 근거를 낸다."""
+    _rules(monkeypatch)
+    r = agent.understand("병원이 너무 부족해요", use_normalize=False)
+    q = next(x for x in r["questions"] if x["field"] == "emd_name")
+    ch = q["choices"]
+    assert ch["all"] == "제주 전체" and ch["max_picks"] == 3
+    assert sum(len(g["names"]) for g in ch["groups"]) == 43
+    r = agent.answer(r, emd_names=["구좌읍", "성산읍"], user_request="")
+    assert r["status"] == "ready" and r["places"] == ["구좌읍", "성산읍"]
+    assert r["query"]["location"]["emd_name"] == "구좌읍"
+    assert "구좌읍, 성산읍" in agent.summary(r["query"], r["places"])
+    pkg = agent.evidence(r["query"], r["places"])
+    labels = [e["indicator"] for e in pkg["evidence"]]
+    assert any("구좌읍" in x for x in labels) and any("성산읍" in x for x in labels)
+    assert agent.handoff(r, r["query"], pkg)["places"] == ["구좌읍", "성산읍"]
+    with pytest.raises(ValueError):
+        agent.answer(r, emd_names=["구좌읍", "성산읍", "표선면", "남원읍"])
+
+
+def test_whole_jeju_choice(agent, monkeypatch):
+    _rules(monkeypatch)
+    r = agent.answer(agent.understand("버스가 줄었어요", use_normalize=False), emd_names=["제주 전체"], user_request="")
+    assert r["status"] == "ready" and r["query"]["location"]["emd_name"] == "제주 전체"
+    pkg = agent.evidence(r["query"], r["places"])
+    assert pkg["evidence"]
+    assert any("제주 전체" in n for n in agent.handoff(r, r["query"], pkg)["notices"])
+
+
+def test_terminal_place_answer_with_commas(agent, monkeypatch):
+    _rules(monkeypatch)
+    r = agent.understand("병원이 부족해요", use_normalize=False)
+    assert agent.answer(r, emd_name="구좌, 성산읍")["places"] == ["구좌읍", "성산읍"]
+    assert agent.answer(r, emd_name="전체")["places"] == ["제주 전체"]

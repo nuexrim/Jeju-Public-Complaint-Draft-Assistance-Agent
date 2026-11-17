@@ -57,6 +57,10 @@ ENV_FILES = (ENGINE_DIR / ".env", DIALECT_DIR / ".env")
 TOPIC_TO_TYPE = {"bus": "교통", "traffic_safety": "교통", "medical": "의료 접근", "waste": "환경·청소",
                  "disaster": "안전·재난", "safety": "안전·재난"}
 MAX_OTHER_ROUNDS = 2          # '기타(직접 쓰기)'를 다시 해석하는 최대 횟수. 넘으면 그 문장 그대로 계산한다.
+# 읍면동 고르기: 이름을 못 알아들었을 때 목록에서 고른다. 여러 곳(장소마다 엔진을 따로 돌림)과 '제주 전체'.
+EMD_ALL = "제주 전체"         # 질의 location.emd_name 에 이 값이 오면 읍면동 비교 지표는 계산하지 않는다(제주 전체 값만)
+# 장소 수만큼 근거가 늘어난다(주장 최대 3 × 장소). 민원서 한 장에 읽을 만한 양으로 뜻 고르기 상한(3)과 같게 둔다.
+MAX_PLACES = 3
 
 
 def load_env(files=ENV_FILES, keys=ENV_KEYS) -> list[str]:
@@ -129,6 +133,40 @@ class Agent:
         r["structured_by"] = by
         r["notices"] = notices
         r["source_text"] = S.mask_pii(" ".join(text.split()))[0]   # 다시 이해할 때 쓰는 가린 원문
+        r["places"] = [r["query"]["location"]["emd_name"]] if r["query"]["location"]["emd_name"] else []
+        return self._with_choices(r)
+
+    # ------------------------------------------------------------------ 읍면동 고르기
+    def place_choices(self) -> dict:
+        """화면의 읍면동 고르기 목록. 시·읍면/동으로 묶고 '제주 전체'를 따로 둔다."""
+        groups: dict[str, list[str]] = {}
+        import csv
+        with self._emd_csv.open(encoding="utf-8", newline="") as f:
+            for row in csv.DictReader(f):
+                kind = "읍·면" if row["emd_name"].endswith(("읍", "면")) else "동"
+                groups.setdefault(f"{row['sigungu_name']} {kind}", []).append(row["emd_name"])
+        return {"all": EMD_ALL, "max_picks": MAX_PLACES,
+                "groups": [{"label": k, "names": v} for k, v in groups.items()]}
+
+    def _with_choices(self, r: dict) -> dict:
+        """읍면동을 묻는 질문(확인 질문 제외)에 고르기 목록을 붙인다. 화면은 목록으로, 터미널은 글로 받는다."""
+        for q in r.get("questions", []):
+            if q["field"] == "emd_name" and not q.get("confirm"):
+                q["choices"] = self.place_choices()
+                q["question"] = "어느 읍·면·동의 일인가요? 여러 곳이면 모두 골라 주세요 (제주 전체도 고를 수 있어요)"
+        return r
+
+    def _set_places(self, r: dict, names: list[str]) -> dict:
+        """고른 장소들을 반영한다. 질의에는 첫 장소(계약상 하나)를, 나머지는 r['places'] 에 둔다."""
+        if EMD_ALL in names:
+            r["query"]["location"] = {"emd_name": EMD_ALL, "emd_code": ""}
+            r["questions"] = [q for q in r["questions"] if q["field"] != "emd_name"]
+            r["schema_errors"] = S.validate(r["query"])
+            r["status"] = S._status(r["query"], r["questions"])
+            r["places"] = [EMD_ALL]
+            return r
+        r = self._update(r, emd_name=names[0])
+        r["places"] = names
         return r
 
     def _resolve_place(self, text: str) -> tuple[str, str]:
@@ -175,7 +213,7 @@ class Agent:
     def answer(self, result: dict, *, emd_name: str | None = None, confirm_emd: bool | None = None,
                user_request: str | None = None, complaint_type: str | None = None,
                accept_sentence: bool = False, corrected_sentence: str | None = None,
-               detail: str | None = None) -> dict:
+               detail: str | None = None, emd_names: list[str] | None = None) -> dict:
         """사용자 답을 반영한다. 자유 입력은 모두 먼저 가린다(개인정보가 질의·LLM으로 가지 않게).
 
         corrected_sentence: 제주어 뜻 확인에서 사용자가 문장을 고쳐 쓴 것 → 그 문장으로 다시 이해(표준어 변환 없이)
@@ -190,11 +228,25 @@ class Agent:
         elif accept_sentence:
             r = self._update(r, normalized_text=r["query"]["normalized_text"])
 
-        if emd_name is not None and emd_name.strip():
+        if emd_names:                        # 목록에서 고른 장소들 (여러 곳 또는 '제주 전체')
+            names = [n for n in dict.fromkeys(x.strip() for x in emd_names) if n in S.EMD_NAMES or n == EMD_ALL]
+            if not names:
+                r.setdefault("notices", []).append("고른 읍·면·동을 찾지 못했어요")
+            elif len(names) > MAX_PLACES and EMD_ALL not in names:
+                raise ValueError(f"장소는 {MAX_PLACES}곳까지 고른다 (받은 수 {len(names)})")
+            else:
+                r = self._set_places(r, names)
+        elif emd_name is not None and emd_name.strip():
             name = emd_name.strip()
+            parts = [x.strip() for x in re.split(r"[,，/]", name) if x.strip()]
+            if len(parts) > 1 or name == EMD_ALL or name == "전체":   # 터미널: '구좌읍, 성산읍' 또는 '전체'
+                return self.answer(r, emd_names=[EMD_ALL if x in ("전체", EMD_ALL) else
+                                                 (x if x in S.EMD_NAMES else S.guess_emd(x) or self._resolve_place(x)[0])
+                                                 for x in parts], user_request=user_request,
+                                   complaint_type=complaint_type)
             resolved = name if name in S.EMD_NAMES else (S.guess_emd(name) or self._resolve_place(name)[0])
             if resolved:
-                r = self._update(r, emd_name=resolved)
+                r = self._set_places(r, [resolved])
             else:
                 r.setdefault("notices", []).append(f"'{S.mask_pii(name)[0]}'에 해당하는 읍·면·동을 찾지 못했어요")
         elif confirm_emd is True:
@@ -205,6 +257,7 @@ class Agent:
                 {"field": "emd_name", "question": "어느 읍·면·동인가요? (예: 구좌읍, 노형동)"}]
             r["schema_errors"] = S.validate(r["query"])
             r["status"] = S._status(r["query"], r["questions"])
+            r["places"] = []
         if user_request is not None and user_request.strip():
             r = self._update(r, user_request=S.mask_pii(user_request)[0])
         elif user_request is not None:       # 빈 답 = 요구사항 없이 진행
@@ -212,10 +265,10 @@ class Agent:
             r["status"] = S._status(r["query"], r["questions"])
         if complaint_type:
             r = self._update(r, complaint_type=complaint_type)
-        return r
+        return self._with_choices(r)
 
     def _update(self, r: dict, **kw) -> dict:
-        keep = {k: r.get(k) for k in ("structured_by", "notices", "source_text")}
+        keep = {k: r.get(k) for k in ("structured_by", "notices", "source_text", "places")}
         out = S.update(r, **kw)
         out.update(keep)
         return out
@@ -224,7 +277,9 @@ class Agent:
         prev = r["query"]
         new = self.understand(text, use_normalize=use_normalize)
         new["notices"] = list(dict.fromkeys(r.get("notices", []) + new["notices"]))
-        if not new["query"]["location"]["emd_name"] and prev["location"].get("emd_name"):
+        if not new["query"]["location"]["emd_name"] and r.get("places"):
+            new = self._set_places(new, r["places"])
+        elif not new["query"]["location"]["emd_name"] and prev["location"].get("emd_name"):
             new = self._update(new, emd_name=prev["location"]["emd_name"])
         if not new["query"].get("user_request") and prev.get("user_request"):
             new = self._update(new, user_request=prev["user_request"])
@@ -296,8 +351,8 @@ class Agent:
 
     # ------------------------------------------------------------------ 4. 최종 확인
     @staticmethod
-    def summary(query: dict) -> str:
-        place = query["location"]["emd_name"] or "어느 지역인지 모름"
+    def summary(query: dict, places: list[str] | None = None) -> str:
+        place = ", ".join(places) if places and len(places) > 1 else (query["location"]["emd_name"] or "어느 지역인지 모름")
         period = query.get("period")
         when = f", {period['from']}~{period['to']}" if period else ""
         claims = " / ".join(c["text"] for c in query["claims"])
@@ -305,16 +360,33 @@ class Agent:
         return f"[{query['complaint_type']} · {place}{when}] {claims}.{req} 이렇게 이해했어요. 맞나요?"
 
     # ------------------------------------------------------------------ 5. 근거
-    def evidence(self, query: dict) -> dict:
-        return run_engine.run(query, self.config, mock=self.mock_engine, engine=self.engine)
+    def evidence(self, query: dict, places: list[str] | None = None) -> dict:
+        """근거 패키지. places 가 둘 이상이면 장소마다 엔진을 돌려 근거를 합친다
+        (계약상 질의의 장소는 하나라서. 근거마다 지표 이름 끝에 '· 장소'가 붙어 있어 섞이지 않는다)."""
+        if not places or len(places) < 2:
+            return run_engine.run(query, self.config, mock=self.mock_engine, engine=self.engine)
+        merged = None
+        for name in places:
+            q = {**query, "location": {"emd_name": name, "emd_code": ""}}
+            pkg = run_engine.run(q, self.config, mock=self.mock_engine, engine=self.engine)
+            if merged is None:
+                merged = pkg
+                continue
+            merged["evidence"] += pkg["evidence"]
+            merged["gaps"] += [g for g in pkg["gaps"] if g not in merged["gaps"]]
+        return merged
 
     def handoff(self, result: dict, query: dict, package: dict) -> dict:
-        """민원 초안 모델에 넘길 것. 질의는 엔진과 같은 규칙으로 한 번 더 가린 사본(raw_text 없음)."""
+        """민원 초안 모델에 넘길 것. 질의는 엔진과 같은 규칙으로 한 번 더 가린 사본(raw_text 없음).
+        places: 사용자가 고른 장소 전부(질의의 location 은 그중 첫 곳)."""
+        places = result.get("places") or ([query["location"]["emd_name"]] if query["location"]["emd_name"] else [])
         return {
             "query": mask_query(query),
             "package": package,
+            "places": places,
             "structured_by": result.get("structured_by"),
             "notices": result.get("notices", []) + ([
-                "근거 DB가 없어 엔진 mock 결과(계산값 아님)"] if self.mock_engine else []),
+                "근거 DB가 없어 엔진 mock 결과(계산값 아님)"] if self.mock_engine else []) + ([
+                "제주 전체를 골라 읍·면·동끼리 비교하는 지표는 계산하지 않았어요"] if EMD_ALL in places else []),
             "pii_masked": result.get("pii_masked", []),
         }

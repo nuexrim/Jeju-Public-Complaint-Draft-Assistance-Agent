@@ -34,7 +34,11 @@ def ask_questions(agent: Agent, r: dict, ask: Callable[[str], str], say: Callabl
         elif field == "emd_name" and q.get("confirm"):
             r = agent.answer(r, confirm_emd=_yes(ask(f"{q['question']} [Y/n]: ")))
         elif field == "emd_name":
-            r = agent.answer(r, emd_name=ask(f"{q['question']} ") or "")
+            hint = " (예: 구좌읍 / 여러 곳은 구좌읍, 성산읍 / 전체)" if q.get("choices") else ""
+            try:
+                r = agent.answer(r, emd_name=ask(f"{q['question']}{hint} ") or "")
+            except ValueError as e:
+                say(str(e))
         elif field == "claims":
             r = agent.answer(r, detail=ask(f"{q['question']} ") or "")
         elif field == "user_request":
@@ -125,13 +129,13 @@ def run_conversation(text: str, ask: Callable[[str], str] = input, say: Callable
         query = r["query"]
         for _ in range(2):
             query = choose_meanings(agent, query, ask, say)
-            if _yes(ask("\n" + agent.summary(query) + " [Y/n]: ")):
+            if _yes(ask("\n" + agent.summary(query, r.get("places")) + " [Y/n]: ")):
                 break
             query = {**query, "claims": [{"id": c["id"], "text": c["text"]} for c in r["query"]["claims"]]}
         else:
             say("확인을 받지 못해 멈출게요. 처음부터 다시 말씀해 주세요.")
             return None
-        package = agent.evidence(query)
+        package = agent.evidence(query, r.get("places"))
         for e in package["evidence"]:
             say(f"- {e['claim_id']} {VERDICT_KO[e['verdict']]}: {e['indicator']}"
                 + (f" = {e['value']}{e['unit'] or ''}" if e["value"] is not None else ""))
