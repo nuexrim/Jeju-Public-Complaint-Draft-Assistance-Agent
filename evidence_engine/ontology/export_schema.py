@@ -152,7 +152,7 @@ def write_docs(con, schema: dict, colmap: dict) -> int:
 
     reg = yaml.safe_load((ENGINE_ROOT / "indicators" / "registry.yaml").read_text(encoding="utf-8"))
     dom = ["# 제주 민원 분야와 근거 지표",
-           "민원 유형: 교통, 의료 접근, 환경·청소, 안전·재난, 생활물가.",
+           "민원 유형: 교통, 의료 접근, 환경·청소, 안전·재난, 복지, 생활물가.",
            "읍면동(행정동) 43곳이 공간 단위이며 emd_code 로 모든 테이블이 연결된다.", "", "## 지표"]
     for ind in reg["indicators"]:
         dom.append(f"- {ind['name']} ({ind['unit']}): 테이블 {', '.join(ind['tables'])}; 관련 낱말 {', '.join(ind['keywords'])}")

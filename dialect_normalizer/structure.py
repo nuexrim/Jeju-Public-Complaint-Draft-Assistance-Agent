@@ -37,7 +37,8 @@ CONTRACT = REPO / "evidence_engine" / "contracts" / "query.schema.json"
 FIXTURES = REPO / "evidence_engine" / "tests" / "fixtures"
 
 # 엔진 README의 권장 유형 + 기타
-COMPLAINT_TYPES = ["교통", "의료 접근", "환경·청소", "안전·재난", "생활물가", "기타"]
+# 복지: 경로당 등 노인복지시설 민원(노인복지법상 노인여가복지시설). 근거 엔진 주제 elderly_welfare 와 짝.
+COMPLAINT_TYPES = ["교통", "의료 접근", "환경·청소", "안전·재난", "복지", "생활물가", "기타"]
 
 # 제주 43개 읍면동 (행정동)
 EMD_NAMES = [
@@ -117,7 +118,7 @@ RULES = """너는 제주 도민의 민원 문장을 근거 확인 엔진에 넘�
 엔진은 공공데이터로 각 주장(claim)이 사실인지 계산한다. 그러므로 원문에 없는 내용을 지어내지 않는다.
 
 항목 규칙
-- complaint_type: 보기 중 하나. 보기에 맞는 것이 없으면 "기타".
+- complaint_type: 보기 중 하나. 경로당·노인 쉼터 같은 복지시설은 "복지". 보기에 맞는 것이 없으면 "기타".
 - location_mention: 문장에서 장소를 가리키는 말을 그대로 (예: "세화리", "우리 동네 노형"). 없으면 "".
 - emd_name: 제주 행정 읍면동 중 하나. 문장에 읍면동이 나오거나, 리·마을 이름으로 읍면동을 확실히 알 수 있을 때만 쓴다.
   확실하지 않으면 "". "제주시", "서귀포시"만으로는 정하지 않는다.
@@ -255,8 +256,9 @@ def drop_place_questions(norm: dict | None) -> dict | None:
     return norm
 
 
-def _questions(query: dict, mention: str, emd_from_llm: str, norm: dict | None,
-               suggested_request: str = "", emd_in_text: bool = False) -> list[dict]:
+def build_questions(query: dict, mention: str, emd_from_llm: str, norm: dict | None,
+                    suggested_request: str = "", emd_in_text: bool = False) -> list[dict]:
+    """질의의 빈 칸으로 되물을 질문 목록을 만든다. 연결 모듈(complaint_agent)의 규칙 구조화도 이것을 쓴다(공개 함수)."""
     qs = []
     if norm:
         for q in norm.get("ask_user", []):
@@ -287,7 +289,8 @@ def _questions(query: dict, mention: str, emd_from_llm: str, norm: dict | None,
     return qs
 
 
-def _status(query: dict, questions: list[dict]) -> str:
+def status_of(query: dict, questions: list[dict]) -> str:
+    """'ready'(근거를 찾을 수 있음) | 'need_input'. 확인 질문·선택 질문은 막지 않는다(공개 함수)."""
     blocking = [q for q in questions if not q.get("optional") and not q.get("confirm")]
     return "ready" if not blocking and validate(query) == [] else "need_input"
 
@@ -384,7 +387,7 @@ def structure(text: str, *, use_normalize: bool = True, include_raw: bool = Fals
     if not query["user_request"]:
         query.pop("user_request")
 
-    questions = _questions(query, out["location_mention"], out["emd_name"], norm, suggested,
+    questions = build_questions(query, out["location_mention"], out["emd_name"], norm, suggested,
                            emd_in_text=bool(text_emd))   # 문장에 읍면동이 직접 있으면 확인 질문 생략
     if short_mention:
         questions = add_short_name_question(questions, short_mention, emd)
@@ -397,7 +400,7 @@ def structure(text: str, *, use_normalize: bool = True, include_raw: bool = Fals
         "location_mention": out["location_mention"],
         "normalize": norm,
     }
-    result["status"] = _status(query, questions)
+    result["status"] = status_of(query, questions)
     return result
 
 
@@ -428,7 +431,7 @@ def update(result: dict, *, emd_name: str | None = None, user_request: str | Non
         answered.add("dialect")
     r["questions"] = [x for x in r["questions"] if x["field"] not in answered]
     r["schema_errors"] = validate(q)
-    r["status"] = _status(q, r["questions"])
+    r["status"] = status_of(q, r["questions"])
     return r
 
 

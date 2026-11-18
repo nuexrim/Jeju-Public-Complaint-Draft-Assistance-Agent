@@ -50,3 +50,24 @@ def test_hidden_change_warned():
     _, _, warn, _ = check("집 앞이 고냉이가", {"standard": "집 앞에 고양이가",
                                            "changes": [{"from": "고냉이가", "to": "고양이가"}], "unclear": []})
     assert warn and "앞이" in warn[0]
+
+
+def test_index_failure_raises_same_error_every_time(tmp_path, monkeypatch):
+    """scikit-learn 이 없어 색인을 못 읽으면 두 번째 호출도 같은 ResourceMissing (전에는 AttributeError 로 멈춤)."""
+    import pytest
+    import normalize as N
+    d, i = tmp_path / "dict.json", tmp_path / "index.pkl"
+    d.write_text("{}", encoding="utf-8")
+    i.write_bytes(b"x")
+    monkeypatch.setattr(N, "DICT_PATH", d)
+    monkeypatch.setattr(N, "INDEX_PATH", i)
+    monkeypatch.setattr(N, "_res", {})
+    monkeypatch.setattr(N, "DialectDict", lambda: object())
+
+    def no_sklearn(*a, **k):
+        raise ModuleNotFoundError("No module named 'sklearn'")
+    monkeypatch.setattr(N, "ExampleIndex", no_sklearn)
+    for _ in range(2):
+        with pytest.raises(N.ResourceMissing):
+            N.normalize("고냉이 막 울엄수다")
+    assert N._res == {}                               # 반쯤 불러온 상태를 기억하지 않는다

@@ -40,7 +40,7 @@ BOUNDARY_SOURCE = {
     "url": "https://github.com/vuski/admdongkor",
 }
 SKIP_TABLES = {"dim_emd"}
-_VERDICT_KO = {"supported": "지지", "contradicted": "반박", "partial": "부분 지지", "unverifiable": "확인 불가"}
+from package.labels import CROSS_CHECK, INDIRECT, WEAK, downgraded  # noqa: E402  (사용자에게 보이는 이름은 한곳에)
 EVIDENCE_ORDER = ["claim_id", "verdict", "indicator", "value", "unit", "region_compare", "sources",
                   "found_by", "relation_path", "chart", "caveats"]
 
@@ -205,7 +205,7 @@ class Engine:
             verdict = self._proxy_check(claim["text"], indicator, verdict, caveats, gaps)
         weak = indicator.get("weak_evidence")
         if weak and verdict in ("supported", "contradicted"):
-            caveats.append(f"약한 근거: {weak} → '{_VERDICT_KO[verdict]}'을(를) '부분 지지'로 낮춤")
+            caveats.append(WEAK + downgraded(verdict, f"{weak}."))
             verdict = "partial"
         caveats += self._cross_checks_by_agent(claim, indicator, verdict, region_compare, emd_code, emd_label)
         found_by, relation_path = self._found_by(indicator, catalog_top, exp)
@@ -255,7 +255,7 @@ class Engine:
         res = self.agent.choose(claim["text"], indicator, verdict, region_compare, emd_label, self.tables, check)
         out = self._cross_checks(indicator, emd_code, emd_label, res.keep)
         if res.used_llm and out:
-            out.append(f"교차 확인 항목은 근거 탐색 에이전트가 고름 (확인 {len(res.checked)}개 중 {len(res.keep)}개)")
+            out.append(f"함께 볼 자료는 AI(근거 탐색 에이전트)가 고름 (확인 {len(res.checked)}개 중 {len(res.keep)}개)")
         if res.note:
             out.append(res.note)
         return out
@@ -280,7 +280,7 @@ class Engine:
             vals = sorted((r.values[c] for c in group if c in r.values), reverse=True)
             pos = vals.index(r.value) + 1
             why = ctx.get("why") or f"같은 주제의 다른 측면({aspect_name(ctx.get('measures')) or '-'})"
-            out.append(f"교차 확인 · {ctx['name']}: {emd_label} {describe(r.value)}{ctx['unit']} "
+            out.append(f"{CROSS_CHECK}{ctx['name']}: {emd_label} {describe(r.value)}{ctx['unit']} "
                        f"({label} {len(vals)}곳(이곳 포함) 중 높은 쪽 {pos}번째). 확인 이유: {why}")
         return out
 
@@ -290,7 +290,7 @@ class Engine:
         aspect = claim_aspect(claim_text)
         if not aspect or aspect == indicator.get("measures"):
             return verdict
-        caveats.append(f"간접 지표: 주장은 '{aspect_name(aspect)}'에 관한 것인데 이 지표는 "
+        caveats.append(f"{INDIRECT}주장은 '{aspect_name(aspect)}'에 관한 것인데 이 자료는 "
                        f"'{aspect_name(indicator.get('measures'))}'을(를) 잼")
         gap = proxy_gap(indicator, aspect)
         if gap:
@@ -298,10 +298,10 @@ class Engine:
             if entry not in gaps:
                 gaps.append(entry)
         if verdict == "supported":
-            caveats.append("간접 지표라 '지지'를 '부분 지지'로 낮춤")
+            caveats.append(downgraded("supported", "간접 근거라"))
             return "partial"
         if verdict == "contradicted":
-            caveats.append("간접 지표라 반박 근거로도 약함")
+            caveats.append("간접 근거라 '자료와 다름'의 근거로도 약함")
         return verdict
 
     def interpret(self, query: dict) -> dict:

@@ -185,24 +185,14 @@ def get_agent():
 
 
 @st.cache_resource
-def topic_info() -> tuple[list[str], dict[str, str]]:
-    """(주제 이름 목록, 주제 이름 → 민원 유형). 이름은 structure.topic_names(), 유형은 pipeline.TOPIC_TO_TYPE."""
+def topic_names() -> list[str]:
+    """주제 이름 목록(structure.topic_names() = 근거 엔진 registry 의 topics 이름). 고른 주제는 엔진이 유형까지 정한다."""
     try:
         get_agent()                                   # Agent 를 불러오면 dialect_normalizer·evidence_engine 경로가 잡힌다
         import structure                              # noqa: E402  (dialect_normalizer)
-        from complaint_agent.pipeline import TOPIC_TO_TYPE
-        from indicators.library import load_registry  # noqa: E402  (evidence_engine)
-        names = structure.topic_names()
-        by_name = {t.get("name", t["id"]): TOPIC_TO_TYPE.get(t["id"], "") for t in load_registry().get("topics", [])}
-        return names, {n: by_name.get(n, "") for n in names}
+        return structure.topic_names()
     except Exception:                                 # noqa: BLE001  목록을 못 받아도 화면은 열린다
-        return TOPIC_FALLBACK, {}
-
-
-def type_hint(topics: list[str]) -> str:
-    """고른 주제가 모두 같은 민원 유형이면 그 유형(엔진이 '기타'로 읽었을 때만 쓴다). 아니면 빈 문자열."""
-    types = {topic_info()[1].get(t, "") for t in topics} - {""}
-    return types.pop() if len(types) == 1 else ""
+        return TOPIC_FALLBACK
 
 
 def place_info(agent) -> dict | None:
@@ -278,7 +268,7 @@ def step_input(agent) -> None:
         st.caption("평소 말하듯이 쓰시면 됩니다. 어려운 말로 바꾸지 않으셔도 돼요.")
 
     choices = place_info(agent)
-    names, _ = topic_info()
+    names = topic_names()
     left, right = st.container(key="row_topic").columns([1, 1.3], gap="medium")
     with left.container(key="card_place"):
         if choices:
@@ -309,8 +299,7 @@ def step_input(agent) -> None:
             st.warning("불편한 점을 먼저 써 주세요.")
         else:
             topics = list(st.session_state.get("in_topics") or [])
-            call(flow.start, text, places=st.session_state.get("in_places", []), topics=topics,
-                 type_hint=type_hint(topics))
+            call(flow.start, text, places=st.session_state.get("in_places", []), topics=topics)
 
 
 # ---------------------------------------------------------------- 2. 되묻기

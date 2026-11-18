@@ -35,7 +35,7 @@ STAGE_LABELS = {"input": "불편 쓰기", "questions": "되묻기", "meanings": 
 
 
 def new_state() -> dict:
-    return {"stage": "input", "said": [], "places": [], "topics": [], "type_hint": "",
+    return {"stage": "input", "said": [], "places": [], "topics": [],
             "result": None, "query": None, "interp": None, "pending": [],
             "q_rounds": 0, "confirm_tries": 0, "summary": "", "messages": [], "stop_reason": "",
             "package": None, "evidence_items": [], "picked": [], "handoff": None, "draft": None}
@@ -79,14 +79,14 @@ def standardize(text: str) -> str:
 
 
 # ------------------------------------------------------------------ 1. 불편 쓰기
-def start(agent, text: str, places=None, topics=None, type_hint: str = "") -> dict:
+def start(agent, text: str, places=None, topics=None) -> dict:
     """places: 고른 읍면동(없으면 엔진이 되묻는다). topics: 고른 주제 이름(structure.topic_names()).
-    type_hint: 고른 주제로 정해지는 민원 유형. 엔진이 유형을 '기타'로 읽었을 때만 넘긴다."""
+    주제는 agent.understand(topics=...) 로 넘긴다: 유형이 '기타'일 때 유형을 정하고, 문장에 주제가 없을 때
+    뜻 선택지를 찾는 힌트로 쓴다(문장에 주제가 있으면 문장이 이긴다)."""
     text = " ".join((text or "").split())
     s = new_state()
     s["places"] = clean_places(places)
     s["topics"] = list(dict.fromkeys(t for t in (topics or []) if t))
-    s["type_hint"] = type_hint or ""
     if not text:
         return s
     s["said"] = [text]
@@ -94,7 +94,7 @@ def start(agent, text: str, places=None, topics=None, type_hint: str = "") -> di
 
 
 def _understand(agent, s: dict, text: str) -> dict:
-    r = agent.understand(text)
+    r = agent.understand(text, topics=s["topics"] or None)
     s["messages"] = []
     _note(s, r.get("notices", []))
     if r.get("pii_masked"):
@@ -102,8 +102,6 @@ def _understand(agent, s: dict, text: str) -> dict:
     extra = {}
     if s["places"]:
         extra["emd_names"] = s["places"]
-    if s["type_hint"] and r["query"].get("complaint_type") in ("", "기타"):
-        extra["complaint_type"] = s["type_hint"]
     if extra:
         before = len(r.get("notices", []))
         r = agent.answer(r, **extra)

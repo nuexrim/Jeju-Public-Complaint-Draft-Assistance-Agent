@@ -115,6 +115,6 @@ def test_engine_attaches_agent_choice_without_changing_verdict(scripted, tmp_pat
         ev = run_engine.run(query, engine=e)["evidence"][0]
     finally:
         e.close()
-    checks = [c for c in ev["caveats"] if c.startswith("교차 확인 ·")]
+    checks = [c for c in ev["caveats"] if c.startswith("함께 볼 자료 ·")]
     assert ev["verdict"] == "partial" and len(checks) == 1 and "인구 밀도" in checks[0]
-    assert any("근거 탐색 에이전트가 고름" in c for c in ev["caveats"])
+    assert any("근거 탐색 에이전트)가 고름" in c for c in ev["caveats"])

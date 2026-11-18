@@ -55,8 +55,7 @@ ENV_FILES = (ENGINE_DIR / ".env", DIALECT_DIR / ".env")
 
 # 규칙 구조화: 엔진 registry 의 주제 → 민원 유형. 테스트 질의 10개의 유형을 모두 맞힌다(tests 참고).
 TOPIC_TO_TYPE = {"bus": "교통", "traffic_safety": "교통", "medical": "의료 접근", "waste": "환경·청소",
-                 "disaster": "안전·재난", "safety": "안전·재난"}
-MAX_OTHER_ROUNDS = 2          # '기타(직접 쓰기)'를 다시 해석하는 최대 횟수. 넘으면 그 문장 그대로 계산한다.
+                 "disaster": "안전·재난", "safety": "안전·재난", "elderly_welfare": "복지"}
 # 읍면동 고르기: 이름을 못 알아들었을 때 목록에서 고른다. 여러 곳(장소마다 엔진을 따로 돌림)과 '제주 전체'.
 EMD_ALL = "제주 전체"         # 질의 location.emd_name 에 이 값이 오면 읍면동 비교 지표는 계산하지 않는다(제주 전체 값만)
 # 장소 수만큼 근거가 늘어난다(주장 최대 3 × 장소). 민원서 한 장에 읽을 만한 양으로 뜻 고르기 상한(3)과 같게 둔다.
@@ -113,7 +112,11 @@ class Agent:
             self.engine = None
 
     # ------------------------------------------------------------------ 1. 이해
-    def understand(self, text: str, *, use_normalize: bool = True) -> dict:
+    def understand(self, text: str, *, use_normalize: bool = True, topics: list[str] | None = None) -> dict:
+        """topics: 화면에서 고른 주제(이름 structure.topic_names() 또는 registry id). 힌트로만 쓴다:
+        ① 유형이 비었거나 '기타'면 고른 주제의 유형(하나로 정해질 때), ② 주제 단서를 targets 에 보태 문장에 주제가
+        없을 때 뜻 선택지·근거 주제를 찾게 한다. 문장에 주제가 있으면 문장이 이긴다(고른 주제로 막지 않음).
+        안 고르면(None/빈 목록) 예전과 같다."""
         notices: list[str] = []
         try:
             r = S.structure(text, use_normalize=use_normalize)
@@ -136,7 +139,31 @@ class Agent:
         r["notices"] = notices
         r["source_text"] = S.mask_pii(" ".join(text.split()))[0]   # 다시 이해할 때 쓰는 가린 원문
         r["places"] = [r["query"]["location"]["emd_name"]] if r["query"]["location"]["emd_name"] else []
+        r["topics"] = self.topic_ids(topics)
+        if r["topics"]:
+            r = self._apply_topics(r)
         return self._with_choices(r)
+
+    # ------------------------------------------------------------------ 고른 주제 (힌트)
+    @staticmethod
+    def topic_ids(topics: list[str] | None) -> list[str]:
+        """주제 이름·id → registry 주제 id (모르는 값은 버린다, 순서 유지)."""
+        reg = load_registry().get("topics", [])
+        by = {t["id"]: t["id"] for t in reg} | {t.get("name", t["id"]): t["id"] for t in reg}
+        return list(dict.fromkeys(by[x.strip()] for x in (topics or []) if x and x.strip() in by))
+
+    def _apply_topics(self, r: dict) -> dict:
+        q = r["query"]
+        types = {TOPIC_TO_TYPE[t] for t in r["topics"] if t in TOPIC_TO_TYPE}
+        if q.get("complaint_type") in ("", "기타") and len(types) == 1:
+            q["complaint_type"] = types.pop()
+        cues = {t["id"]: t["cues"][0].rstrip("-") for t in load_registry().get("topics", [])}
+        q["targets"] = list(dict.fromkeys(list(q.get("targets", [])) + [cues[t] for t in r["topics"]]))
+        if S.evidence_topics(q):                  # 고른 주제로 근거 자료가 생겼으면 '근거 없음' 안내는 뺀다
+            r["questions"] = [x for x in r["questions"] if x["field"] != "complaint_type"]
+        r["schema_errors"] = S.validate(q)
+        r["status"] = S.status_of(q, r["questions"])
+        return r
 
     # ------------------------------------------------------------------ 읍면동 고르기
     def place_choices(self) -> dict:
@@ -164,7 +191,7 @@ class Agent:
             r["query"]["location"] = {"emd_name": EMD_ALL, "emd_code": ""}
             r["questions"] = [q for q in r["questions"] if q["field"] != "emd_name"]
             r["schema_errors"] = S.validate(r["query"])
-            r["status"] = S._status(r["query"], r["questions"])
+            r["status"] = S.status_of(r["query"], r["questions"])
             r["places"] = [EMD_ALL]
             return r
         r = self._update(r, emd_name=names[0])
@@ -205,10 +232,10 @@ class Agent:
             "location": {"emd_name": emd, "emd_code": ""},
             "targets": list(dict.fromkeys(cues)),
         }
-        questions = S._questions(query, "", "", None, "", emd_in_text=bool(emd))
+        questions = S.build_questions(query, "", "", None, "", emd_in_text=bool(emd))
         if short_mention:
             questions = S.add_short_name_question(questions, short_mention, emd)
-        return {"status": S._status(query, questions), "query": query, "questions": questions,
+        return {"status": S.status_of(query, questions), "query": query, "questions": questions,
                 "schema_errors": S.validate(query), "pii_masked": pii, "location_mention": "", "normalize": None}
 
     # ------------------------------------------------------------------ 2. 되묻기 답 반영
@@ -258,26 +285,26 @@ class Agent:
             r["questions"] = [q for q in r["questions"] if q["field"] != "emd_name"] + [
                 {"field": "emd_name", "question": "어느 읍·면·동인가요? (예: 구좌읍, 노형동)"}]
             r["schema_errors"] = S.validate(r["query"])
-            r["status"] = S._status(r["query"], r["questions"])
+            r["status"] = S.status_of(r["query"], r["questions"])
             r["places"] = []
         if user_request is not None and user_request.strip():
             r = self._update(r, user_request=S.mask_pii(user_request)[0])
         elif user_request is not None:       # 빈 답 = 요구사항 없이 진행
             r["questions"] = [q for q in r["questions"] if q["field"] != "user_request"]
-            r["status"] = S._status(r["query"], r["questions"])
+            r["status"] = S.status_of(r["query"], r["questions"])
         if complaint_type:
             r = self._update(r, complaint_type=complaint_type)
         return self._with_choices(r)
 
     def _update(self, r: dict, **kw) -> dict:
-        keep = {k: r.get(k) for k in ("structured_by", "notices", "source_text", "places")}
+        keep = {k: r.get(k) for k in ("structured_by", "notices", "source_text", "places", "topics")}
         out = S.update(r, **kw)
         out.update(keep)
         return out
 
     def _reunderstand(self, r: dict, text: str, *, use_normalize: bool) -> dict:
         prev = r["query"]
-        new = self.understand(text, use_normalize=use_normalize)
+        new = self.understand(text, use_normalize=use_normalize, topics=r.get("topics"))
         new["notices"] = list(dict.fromkeys(r.get("notices", []) + new["notices"]))
         if not new["query"]["location"]["emd_name"] and r.get("places"):
             new = self._set_places(new, r["places"])

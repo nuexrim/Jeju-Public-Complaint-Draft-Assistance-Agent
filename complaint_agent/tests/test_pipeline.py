@@ -209,10 +209,11 @@ def test_env_loader_never_turns_on_paid_calls(tmp_path, monkeypatch):
 
 
 def test_scripted_conversation(agent, fake_llm):
-    answers = iter(["", "", "y"])          # 요구사항 없음, 추천 뜻, 확인
-    out = run_conversation("구좌읍 버스가 줄어부난 병원 가기 힘들어요", ask=lambda p: next(answers, "y"),
+    """터미널 대화도 화면 흐름(flow.py)을 탄다: 요구사항 없음 → 추천 뜻 → 확인 → 근거 그대로 → 민원서."""
+    answers = iter(["", "", "y", ""])
+    out = run_conversation("구좌읍 버스가 줄어부난 병원 가기 힘들어요", ask=lambda p: next(answers, ""),
                            say=lambda s: None, agent=agent)
-    assert out and len(out["package"]["evidence"]) == 2
+    assert out and len(out["package"]["evidence"]) == 2 and out["draft"]["sections"]
     assert all(c.get("indicator_id") for c in out["query"]["claims"])
 
 
@@ -221,8 +222,8 @@ def test_scripted_conversation_with_several_meanings(agent, monkeypatch):
     def blocked(*a, **k):
         raise P.llm.PaidCallNotAllowed("blocked")
     monkeypatch.setattr(P.S.llm, "call_json", blocked)
-    answers = iter(["", "1,2", "y"])        # 요구사항 없음, 뜻 1·2번, 확인
-    out = run_conversation("구좌읍 버스가 줄어서 할머니들이 병원 가기가 힘듭니다", ask=lambda p: next(answers, "y"),
+    answers = iter(["", "1,2", "y", ""])        # 요구사항 없음, 뜻 1·2번, 확인, 근거 그대로
+    out = run_conversation("구좌읍 버스가 줄어서 할머니들이 병원 가기가 힘듭니다", ask=lambda p: next(answers, ""),
                            say=lambda s: None, agent=agent)
     assert out and out["structured_by"] == "rules" and len(out["package"]["evidence"]) == 2
 
@@ -247,7 +248,7 @@ def test_no_evidence_question_follows_engine_topics(agent, monkeypatch):
     q = [x for x in price["questions"] if x["field"] == "complaint_type"]
     assert q and "경로당" in q[0]["question"] and "생활물가" not in q[0]["question"]
     hall = agent.understand("구좌읍 경로당이 부족해요", use_normalize=False)
-    assert hall["query"]["complaint_type"] == "기타"                 # 유형 보기에 복지가 없어 '기타'
+    assert hall["query"]["complaint_type"] == "복지"                 # 경로당 → 복지 유형
     assert not [x for x in hall["questions"] if x["field"] == "complaint_type"]   # 그래도 자료는 있음
     apt = agent.understand("노형동 아파트 쓰레기가 넘쳐요", use_normalize=False)
     assert apt["query"]["complaint_type"] == "환경·청소"
@@ -263,7 +264,7 @@ def test_llm_path_short_place_name_when_claude_leaves_it_empty(agent, monkeypatc
 
 
 def test_conversation_skips_meaning_question_without_options(agent, monkeypatch):
-    """엔진 주제 밖 주장(선택지가 '기타'뿐)은 뜻을 묻지 않고 문장 그대로 근거를 찾는다."""
+    """엔진 주제 밖 주장(선택지가 '자료 없음·기타'뿐)은 뜻을 묻지 않고 문장 그대로 간다(화면과 같은 규칙)."""
     def blocked(*a, **k):
         raise P.llm.PaidCallNotAllowed("blocked")
     monkeypatch.setattr(P.S.llm, "call_json", blocked)
@@ -274,6 +275,20 @@ def test_conversation_skips_meaning_question_without_options(agent, monkeypatch)
         return "y" if "맞나요" in prompt else ""
     out = run_conversation("구좌읍 공영주차장이 부족해요", ask=ask, say=lambda s: None, agent=agent)
     assert out and not any("어떤 뜻인가요" in p for p in asked) and not any("직접 써" in p for p in asked)
+
+
+def test_conversation_passes_place_and_topic(agent, monkeypatch):
+    """--place·--topic 은 화면의 지역·주제 고르기와 같다(읍면동을 되묻지 않고, 경로당은 복지)."""
+    _rules(monkeypatch)
+    asked = []
+
+    def ask(prompt):
+        asked.append(prompt)
+        return "y" if "맞나요" in prompt else ""
+    out = run_conversation("어르신들 모일 데가 없어요", ask=ask, say=lambda s: None, agent=agent,
+                           places=["조천읍"], topics=["경로당"])
+    assert out and out["places"] == ["조천읍"] and out["query"]["complaint_type"] == "복지"
+    assert not any("읍·면·동" in p for p in asked)
 
 
 def _rules(monkeypatch):
@@ -316,3 +331,46 @@ def test_terminal_place_answer_with_commas(agent, monkeypatch):
     r = agent.understand("병원이 부족해요", use_normalize=False)
     assert agent.answer(r, emd_name="구좌, 성산읍")["places"] == ["구좌읍", "성산읍"]
     assert agent.answer(r, emd_name="전체")["places"] == ["제주 전체"]
+
+
+def test_second_complaint_works_when_index_cannot_load(agent, fake_llm, monkeypatch):
+    """색인을 못 읽어도 두 번째 민원부터 멈추지 않고 '표준어 변환 없이' 이해한다."""
+    import normalize as N
+
+    def missing(t, use_rag=True):
+        raise N.ResourceMissing("예문 색인을 읽지 못했어요")
+    monkeypatch.setattr(N, "normalize", missing)
+    for _ in range(2):
+        r = agent.understand("구좌읍 버스가 줄었어요")
+        assert r["structured_by"] == "llm" and any("표준어 변환" in n for n in r["notices"])
+
+
+def test_every_engine_topic_has_a_complaint_type():
+    """엔진 주제가 늘면 유형 대응도 같이 늘려야 한다(경로당이 '기타'로 나오던 문제)."""
+    from indicators.library import load_registry
+    for t in load_registry()["topics"]:
+        assert P.TOPIC_TO_TYPE.get(t["id"]) in P.S.COMPLAINT_TYPES, t["id"]
+
+
+def test_topics_hint(agent, monkeypatch):
+    """고른 주제: 유형이 '기타'일 때 유형을 정하고, 문장에 주제가 없을 때만 선택지를 만든다. 안 고르면 예전과 같다."""
+    _rules(monkeypatch)
+    text = "구좌읍 어르신들 모일 데가 없어요"                      # 문장만으로는 주제를 모름
+    plain = agent.understand(text, use_normalize=False)
+    assert plain["query"]["complaint_type"] == "기타" and plain["topics"] == []
+    assert any(q["field"] == "complaint_type" for q in plain["questions"])
+    hinted = agent.understand(text, use_normalize=False, topics=["경로당"])
+    assert hinted["topics"] == ["elderly_welfare"] and hinted["query"]["complaint_type"] == "복지"
+    assert not any(q["field"] == "complaint_type" for q in hinted["questions"])
+    ids = [o["indicator_id"] for c in agent.meaning_options(agent.answer(hinted, user_request="")["query"])["claims"]
+           for o in c["options"]]
+    assert "senior_center_per_1k_elderly" in ids
+    # 문장에 주제가 있으면 문장이 이긴다(버스를 골라도 병원 민원은 의료)
+    bus = agent.understand("구좌읍 병원이 너무 멀어요", use_normalize=False, topics=["버스·대중교통"])
+    assert bus["query"]["complaint_type"] == "의료 접근"
+    opts = agent.meaning_options(agent.answer(bus, user_request="")["query"])
+    assert all("bus" not in (o["indicator_id"] or "") for c in opts["claims"] for o in c["options"])
+    assert agent.understand(text, use_normalize=False, topics=["없는 주제"])["topics"] == []
+    # 되묻기에서 다시 이해해도 고른 주제는 남는다
+    again = agent.answer(hinted, detail="경로당이 부족해요")
+    assert again["topics"] == ["elderly_welfare"]

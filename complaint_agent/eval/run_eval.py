@@ -34,7 +34,7 @@ from indicators.library import claim_aspect, claim_topics, gap_by_id, indicator_
 HERE = Path(__file__).resolve().parent
 GOLD = HERE / "gold.yaml"
 RESULTS = HERE / "results"
-TEMPLATE_MARK = "(범용 틀)"
+from package.labels import CROSS_CHECK, TEMPLATE_MARK  # noqa: E402
 NO_INDICATOR = "해당 지표 없음"
 
 
@@ -209,7 +209,7 @@ def _score_package(pkg: dict, accepts: list[list[str]]) -> dict:
         "verdicts": dict(Counter(e["verdict"] for e in ev)),
         "template": template,
         "sources": sum(len(e["sources"]) for e in ev),
-        "cross_checks": sum(sum(c.startswith("교차 확인") for c in e["caveats"]) for e in ev),
+        "cross_checks": sum(sum(c.startswith(CROSS_CHECK) for c in e["caveats"]) for e in ev),
         "stale": sum(sum("넘게 지난 자료" in c for c in e["caveats"]) for e in ev),
         "indicators": sorted(got_ids), "gaps": sorted(got_gaps),
         "correct": correct,
