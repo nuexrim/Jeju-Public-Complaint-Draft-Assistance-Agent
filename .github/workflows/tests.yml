@@ -80,5 +80,5 @@ jobs:
               out = run_conversation(text, ask=lambda p: "", say=lambda s: None, agent=agent, places=["구좌읍"])
               assert out and out["draft"]["sections"], text
           agent.close()
-          print("두 번 모두 끝까지 감")
+          print("ok: both complaints finished")   # 러너 Windows 는 cp1252 라 한글을 못 찍는다
           PY
