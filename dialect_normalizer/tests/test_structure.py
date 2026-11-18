@@ -159,7 +159,7 @@ def test_safe_output_keeps_running_on_cp949(monkeypatch):
     import sys
     from win_console import safe_output
     buf = io.BytesIO()
-    out = io.TextIOWrapper(buf, encoding="cp949")
+    out = io.TextIOWrapper(buf, encoding="cp949", newline="\n")   # 줄 끝을 OS와 상관없이 \n 으로
     monkeypatch.setattr(sys, "stdout", out)
     monkeypatch.setattr(sys, "stderr", out)
     safe_output()
