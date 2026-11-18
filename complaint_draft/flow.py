@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import copy
 
+from complaint_draft import writer
 from complaint_draft.draft import build_draft, evidence_choices, friendly, leftover_dialect, mask
 
 MAX_QUESTION_ROUNDS = 4       # conversation.py 와 같음: 같은 빈 칸을 끝없이 묻지 않는다
@@ -293,7 +294,8 @@ def _make_draft(agent, s: dict) -> dict:
     handoff = agent.handoff(s["result"], s["query"], s["package"])
     s["handoff"] = handoff
     s["draft"] = build_draft(handoff, source_text=" ".join(s["said"]),        # 원문은 build_draft 가 한 번 더 가린다
-                             exclude=sorted(usable - set(s["picked"])))
+                             exclude=sorted(usable - set(s["picked"])),
+                             write=writer.write_sections)          # 제목·내용·요청을 Claude 가 다듬음(못 쓰면 틀)
     s["stage"] = "draft"
     return s
 

@@ -320,8 +320,10 @@ def _evidence_text(items: list[dict]) -> str:
 
 
 # ---------------------------------------------------------------- 초안
-def build_draft(handoff: dict, source_text: str | None = None, exclude=None) -> dict:
-    """exclude: 근거 고르기에서 사용자가 뺀 근거의 index(package.evidence 순서). 빠진 근거는 excluded 로 간다."""
+def build_draft(handoff: dict, source_text: str | None = None, exclude=None, write=None) -> dict:
+    """exclude: 근거 고르기에서 사용자가 뺀 근거의 index(package.evidence 순서). 빠진 근거는 excluded 로 간다.
+    write: 제목·민원 내용·요청 사항을 다듬는 함수(writer.write_sections). 없거나 실패하면 틀(templates.py) 글을 쓴다.
+           근거 자료 칸은 어느 쪽이든 엔진 값으로 만든다(다듬지 않음)."""
     query = handoff.get("query") or {}
     package = handoff.get("package") or {}
     if source_text is None:
@@ -335,6 +337,16 @@ def build_draft(handoff: dict, source_text: str | None = None, exclude=None) -> 
         "request": _request(query),
         "evidence": _evidence_text(included),
     }
+    written_by, write_note = "template", ""
+    if write is not None:
+        from complaint_draft.writer import WriteFailed
+        emd = query.get("location", {}).get("emd_name") or ""
+        places = list(handoff.get("places") or ([emd] if emd else []))
+        try:
+            standard.update(write(query, places, source, [it["indicator"] for it in included]))
+            written_by = "claude"
+        except WriteFailed as e:
+            write_note = str(e)
 
     sections = []
     for sid, title in T.SECTIONS:
@@ -357,7 +369,11 @@ def build_draft(handoff: dict, source_text: str | None = None, exclude=None) -> 
         warnings.append(T.INFORMAL_WARNING)
     if not source:
         warnings.append(T.NO_SOURCE_WARNING)
+    if write is not None and written_by == "template":
+        warnings.append(T.WRITER_FALLBACK_WARNING)
     notices = [friendly(n) for n in handoff.get("notices") or [] if "mock" not in n]   # mock 안내는 위 경고로 대신한다
+    if write_note:
+        notices.append(T.WRITER_FALLBACK_NOTE.format(reason=write_note))
 
     draft = {
         "request_id": package.get("request_id") or query.get("request_id", ""),
@@ -371,6 +387,7 @@ def build_draft(handoff: dict, source_text: str | None = None, exclude=None) -> 
         "engine": package.get("engine"),
         "copy_allowed": not is_mock,
         "dialect_words": [],
+        "written_by": written_by,            # "claude"(다듬은 글) | "template"(틀 글)
     }
     _check_text(draft)
     return draft
