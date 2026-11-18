@@ -326,14 +326,21 @@ class Agent:
           "c1-o2"                    뜻 하나
           ["c1-o1", "c1-o3"]         뜻 여러 개(최대 max_picks). 고른 뜻마다 주장이 하나씩 생긴다(c1, c1-2, ...)
           {"other": "직접 쓴 문장"}   기타. 목록 안에 넣어도 된다. 이 주장은 다시 선택지를 받는다
+        같은 뜻(indicator_id)은 주장이 달라도 한 번만 넣는다. 앞 주장에서 이미 고른 뜻만 고른 주장은 빠진다
+        (예: 두 주장에서 모두 '가로등·보안등이 부족하다'를 고르면 최종 확인·근거에 한 번만 나온다).
         """
         q = copy.deepcopy(query)
         by_claim = {c["claim_id"]: c for c in interpretation["claims"]}
         used_ids = {c["id"] for c in q["claims"]}
         out, again = [], []
+        taken: set[str] = set()                    # 앞 주장들에서 이미 쓴 뜻(지표·빈칸 id)
         for claim in q["claims"]:
             pick = picks.get(claim["id"])
             if pick is None:
+                if claim.get("indicator_id") in taken:
+                    continue                       # 이전에 고른 뜻과 같음 → 한 번만
+                if claim.get("indicator_id"):
+                    taken.add(claim["indicator_id"])
                 out.append(claim)
                 continue
             items = pick if isinstance(pick, list) else [pick]
@@ -343,7 +350,7 @@ class Agent:
             limit = info.get("max_picks", 1)
             if not items or len(items) > limit:
                 raise ValueError(f"{claim['id']}: 뜻은 1~{limit}개 고른다 (받은 수 {len(items)})")
-            made, seen = [], set()
+            made, duplicate = [], False
             for item in items:
                 if isinstance(item, dict):
                     text = S.mask_pii(item.get("other", ""))[0].strip()
@@ -355,13 +362,15 @@ class Agent:
                     raise ValueError(f"{claim['id']}: 선택지에 없는 option_id '{item}'")
                 if opt["kind"] == "other":
                     raise ValueError(f"{claim['id']}: 기타는 {{'other': 문장}} 으로 고른다")
-                if opt["indicator_id"] in seen:
+                if opt["indicator_id"] in taken:
+                    duplicate = True
                     continue
-                seen.add(opt["indicator_id"])
+                taken.add(opt["indicator_id"])
                 made.append(({"text": opt["text"], "indicator_id": opt["indicator_id"]}, False))
-            if not made:                      # 기타 문장이 비었음 → 원래 주장 그대로
-                out.append(claim)
-                continue
+            if not made:
+                if not duplicate:                 # 기타 문장이 비었음 → 원래 주장 그대로
+                    out.append(claim)
+                continue                          # 고른 뜻이 모두 앞 주장과 같음 → 이 주장은 뺀다
             for n, (fields, is_other) in enumerate(made, 1):
                 cid = claim["id"] if n == 1 else Agent._next_id(claim["id"], used_ids)
                 used_ids.add(cid)

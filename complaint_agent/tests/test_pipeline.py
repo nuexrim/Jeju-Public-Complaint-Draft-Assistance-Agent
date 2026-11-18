@@ -381,3 +381,19 @@ def test_topics_hint(agent, monkeypatch):
     # 되묻기에서 다시 이해해도 고른 주제는 남는다
     again = agent.answer(hinted, detail="경로당이 부족해요")
     assert again["topics"] == ["elderly_welfare"]
+
+
+def test_same_meaning_in_two_claims_appears_once(agent, fake_llm):
+    """두 주장에서 같은 뜻을 고르면 최종 확인·근거에 한 번만 나온다."""
+    r = agent.answer(agent.understand("구좌읍 밤길이 어두워요"), user_request="")
+    query = {**r["query"], "claims": [{"id": "c1", "text": "밤길이 어둡다"}, {"id": "c2", "text": "가로등이 없다"}]}
+    interp = agent.meaning_options(query)
+    gap = {c["claim_id"]: next(o["option_id"] for o in c["options"] if o["indicator_id"] == "gap:streetlight")
+           for c in interp["claims"]}
+    cctv = next(o["option_id"] for o in interp["claims"][1]["options"]
+                if o["indicator_id"] == "cctv_cameras_per_10k_pop")
+    q, _ = agent.choose(query, interp, {"c1": [gap["c1"]], "c2": [gap["c2"]]})
+    assert [c["indicator_id"] for c in q["claims"]] == ["gap:streetlight"]           # c2 는 같은 뜻뿐 → 빠짐
+    q, _ = agent.choose(query, interp, {"c1": [gap["c1"]], "c2": [gap["c2"], cctv]})
+    assert [c["indicator_id"] for c in q["claims"]] == ["gap:streetlight", "cctv_cameras_per_10k_pop"]
+    assert len({c["id"] for c in q["claims"]}) == 2
