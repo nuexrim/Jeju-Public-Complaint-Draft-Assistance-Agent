@@ -1,6 +1,7 @@
 """두 모듈 연결: 이해 → 되묻기 → 뜻 선택 → 확인 → 근거. 네트워크·유료 호출 없음(LLM 응답은 가짜)."""
 import json
 import os
+import unicodedata
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,10 @@ from complaint_agent.conversation import run_conversation
 ROOT = Path(__file__).resolve().parents[2]
 FIX = ROOT / "evidence_engine" / "tests" / "fixtures"
 HAS_DB = (ROOT / "evidence_engine" / "data" / "jeju.duckdb").exists()
+# 리 이름(종달리 → 구좌읍)은 법정동 연계정보 CSV(공공데이터포털, 저장소에 없음)가 있어야 찾는다
+HAS_LINK = any("연계정보" in unicodedata.normalize("NFC", p.name)      # 맥에서 받은 파일명은 NFD 일 수 있다
+               for p in (ROOT / "evidence_engine" / "data" / "ingest" / "raw" / "emd_link").glob("*.csv"))
+needs_link = pytest.mark.skipif(not HAS_LINK, reason="법정동 연계정보 CSV 없음 (리 이름 찾기)")
 
 STRUCT_OUT = {
     "complaint_type": "교통", "location_mention": "우리 동네", "emd_name": "구좌읍",
@@ -114,6 +119,7 @@ def test_blocked_llm_uses_rules_and_types_match_fixtures(agent, monkeypatch):
     assert ok == 10
 
 
+@needs_link
 def test_rules_resolve_unique_village_but_not_ambiguous(agent):
     assert agent._resolve_place("종달리 버스가 줄었다") == ("구좌읍", "")
     assert agent._resolve_place("세화리 버스") == ("", "")          # 구좌읍·표선면 두 곳에 있음 → 묻는다
@@ -175,6 +181,7 @@ def test_parse_picks():
     assert parse_picks("7", 6, 3) is None and parse_picks("1,2,3,4", 6, 3) is None and parse_picks("가", 6, 3) is None
 
 
+@needs_link
 def test_emd_answers(agent, fake_llm):
     r = agent.understand("버스가 줄었어요")
     r = agent.answer(r, confirm_emd=False)

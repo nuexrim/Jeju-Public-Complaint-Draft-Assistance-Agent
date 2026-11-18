@@ -1,0 +1,84 @@
+# 자동 검사: 푸시·PR 마다 깃허브 서버에서 테스트를 돌린다 (유료 LLM 호출 없음).
+#
+#   full    : 전체 설치로 Mac 대신 Linux, 그리고 Windows(센터 PC와 같은 OS)에서
+#   minimal : 빠진 게 있는 컴퓨터 — scikit-learn·streamlit 없음, 제주어 사전·근거 DB·카드·API 키 없음
+#
+# 저장소에 없는 자료(근거 DB, 카탈로그 카드, 법정동 연계정보, 제주어 사전)가 필요한 테스트는 건너뛴다(skip).
+# 그 자료로 도는 확인은 각자 컴퓨터에서 한다(README '테스트').
+name: tests
+
+on:
+  push:
+    branches: [main, "feature/**", "refactor/**", "ci/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "0"            # 한국어 Windows처럼 기본 인코딩을 쓰게 둔다(UTF-8 강제 안 함)
+  TEST_DIRS: evidence_engine/tests complaint_agent/tests complaint_draft/tests dialect_normalizer/tests
+
+jobs:
+  full:
+    name: 전체 설치 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: 설치 (requirements.txt)
+        run: python -m pip install -r requirements.txt
+      - name: 테스트
+        shell: bash
+        run: python -m pytest -q $TEST_DIRS
+      - name: 터미널 대화 끝까지 (근거 DB 없이, 출력은 CP949)
+        shell: bash
+        env:
+          PYTHONIOENCODING: cp949       # 출력을 파일로 보낼 때 한국어 Windows가 쓰는 인코딩
+        run: |
+          printf '\n\n\n\n\n\n\n\n\n\n' | python -m complaint_agent --mock-engine --place 구좌읍 \
+            --topic 버스·대중교통 --out smoke.json "버스가 줄어서 병원 가기 힘들어요" > smoke_out.txt
+          python -c "import json; d = json.load(open('smoke.json', encoding='utf-8')); assert d['places'] == ['구좌읍'] and d['draft']['sections'], d"
+
+  minimal:
+    name: 빠진 게 있는 환경 (scikit-learn·streamlit·사전·DB·키 없음)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: 설치 (scikit-learn·streamlit 빼고)
+        shell: bash
+        run: |
+          grep -v -i -E "scikit-learn|streamlit" dialect_normalizer/requirements.txt > req_min.txt
+          python -m pip install -r evidence_engine/requirements.txt -r req_min.txt
+          python -c "import importlib.util as u; assert u.find_spec('sklearn') is None and u.find_spec('streamlit') is None"
+      - name: 테스트
+        shell: bash
+        run: python -m pytest -q $TEST_DIRS
+      - name: 한 프로그램에서 민원 두 번 연속 (두 번째에서 멈추지 않는지)
+        shell: bash
+        run: |
+          python - <<'PY'
+          from complaint_agent.conversation import run_conversation
+          from complaint_agent.pipeline import Agent
+          agent = Agent(mock_engine=True)
+          for text in ("버스가 줄었어요", "병원이 너무 멀어요"):
+              out = run_conversation(text, ask=lambda p: "", say=lambda s: None, agent=agent, places=["구좌읍"])
+              assert out and out["draft"]["sections"], text
+          agent.close()
+          print("두 번 모두 끝까지 감")
+          PY
