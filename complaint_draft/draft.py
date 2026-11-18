@@ -159,17 +159,13 @@ def _stop(text: str) -> str:
 
 
 def _content(query: dict) -> str:
-    """민원 내용. 표준어본은 격식체(합니다체)로 맞춘다: 이해한 문장은 해요체 끝을, 주장은 '-다' 끝도 바꾼다."""
-    lines = [T.CONTENT_INTRO]
+    """민원 내용(틀 글). 머리말 없이, 이해한 문장을 격식체(합니다체)로만 바꿔 쓴다.
+    낱말만 나열한 글을 문장으로 풀어 쓰는 일은 Claude 다듬기(writer.py)가 한다. 이해한 문장이 없으면 고른 뜻으로."""
     raw = (query.get("normalized_text") or "").strip()
     if raw:
-        lines.append(_stop(formalize(raw)))
-    raw_claims = [c["text"].strip() for c in query.get("claims") or [] if c.get("text", "").strip()]
-    if raw_claims and not (len(raw_claims) == 1 and raw_claims[0] == raw):
-        lines.append("")
-        lines.append(T.CONTENT_CLAIMS_HEAD)
-        lines.extend(f"- {_stop(formalize(c, plain=True))}" for c in raw_claims)
-    return "\n".join(lines)
+        return _stop(formalize(raw))
+    claims = [c["text"].strip() for c in query.get("claims") or [] if c.get("text", "").strip()]
+    return " ".join(_stop(formalize(c, plain=True)) for c in claims)
 
 
 def _request(query: dict) -> str:

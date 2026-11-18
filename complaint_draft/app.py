@@ -22,7 +22,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from complaint_draft import flow, style                                  # noqa: E402
-from complaint_draft.draft import apply_edits, build_draft, plain_text   # noqa: E402
+from complaint_draft.draft import apply_edits, build_draft               # noqa: E402
 from complaint_draft.view import render_html                             # noqa: E402
 
 SAMPLES = {
@@ -42,8 +42,21 @@ DEV = st.query_params.get("mode") == "dev"   # 개발용 정보(엔진 알림, h
 st.set_page_config(page_title="제주 민원 도우미", page_icon="🍊", layout="wide", initial_sidebar_state="collapsed")
 
 
+SIZES = ["작게", "보통", "크게"]
+
+
 def font_size() -> str:
-    return st.session_state.get("font_size", "크게")
+    return st.session_state.get("font_size_ctl") or "크게"     # 머리의 글자 크기 단추(고른 것이 없으면 크게)
+
+
+def home_url() -> str:
+    """로고를 누르면 가는 주소: 처음 화면(새로 시작). 글자 크기와 개발용 표시는 유지한다."""
+    url = f"./?size={font_size()}"
+    return url + ("&mode=dev" if DEV else "")
+
+
+def remove_place(name: str) -> None:
+    st.session_state.in_places = [p for p in st.session_state.get("in_places", []) if p != name]
 
 
 def restart() -> None:
@@ -53,21 +66,14 @@ def restart() -> None:
         st.session_state.pop(k, None)
 
 
-def set_size(size: str) -> None:
-    st.session_state.font_size = size
-
-
 # ---------------------------------------------------------------- 머리: 캐릭터·글자 크기·처음으로
 def show_header() -> None:
     with st.container(key="hdr"):
-        left, right = st.columns([5, 4], vertical_alignment="center")
-        left.html(style.header())
-        c0, c1, c2, c3, c4 = right.columns([1.1, 1, 1, 1, 1.4], vertical_alignment="center")
+        left, right = st.columns([3, 2], vertical_alignment="center")
+        left.html(style.header(home_url()))
+        c0, c1 = right.columns([1, 2.6], vertical_alignment="center")
         c0.markdown("글자 크기")
-        for col, (size, key) in zip((c1, c2, c3), (("작게", "size_small"), ("보통", "size_normal"), ("크게", "size_big"))):
-            col.button(size, key=key, type="primary" if font_size() == size else "secondary",
-                       on_click=set_size, args=(size,), use_container_width=True)
-        c4.button("처음으로", key="go_home", on_click=restart, use_container_width=True)
+        c1.segmented_control("글자 크기", SIZES, key="font_size_ctl", label_visibility="collapsed")
 
 
 # ---------------------------------------------------------------- 초안 (3단계 / 예시 보기 공통)
@@ -77,31 +83,53 @@ def edited_draft(base: dict) -> dict:
     return apply_edits(base, store.get(base["request_id"] or "draft"))
 
 
-def edit_panel(draft: dict) -> None:
-    """표준어본을 직접 고치는 칸."""
-    rid = draft["request_id"] or "draft"
+def _rid(draft: dict) -> str:
+    return draft["request_id"] or "draft"
+
+
+def set_editing(rid: str, on: bool) -> None:
+    st.session_state.setdefault("editing", {})[rid] = on
+
+
+def reset_edits(rid: str) -> None:
+    """처음 초안으로 되돌리기: 고친 글을 버린다."""
+    st.session_state.setdefault("edits", {}).pop(rid, None)
+    for k in ("title", "content", "request"):
+        st.session_state.pop(f"e_{k}_{rid}", None)
+    set_editing(rid, False)
+
+
+def edit_form(draft: dict) -> None:
+    """수정 화면: 표준어본의 제목·민원 내용·요청 사항을 고친다. 근거 자료는 숫자·출처가 바뀌지 않게 잠근다."""
+    rid = _rid(draft)
     store = st.session_state.setdefault("edits", {})
     now = {sec["id"]: sec for sec in draft["sections"]}
-    edited = any(sec.get("edited") for sec in draft["sections"])
-    with st.expander("고쳐 쓰기" + (" (고친 글 있음)" if edited else ""), expanded=False):
-        st.caption("표준어 민원서의 제목·민원 내용·요청 사항을 고칠 수 있어요. 근거 자료는 숫자와 출처가 바뀌지 않게 잠겨 있어요.")
-        with st.form(f"f_edit_{rid}"):
+    with st.container(key="card_edit"):
+        st.html(style.card_head("민원서 고치기", "근거 자료는 숫자와 출처가 바뀌지 않게 잠겨 있어요"))
+        with st.form(f"f_edit_{rid}", border=False):
             title = st.text_input("제목", value=now["title"]["standard"], key=f"e_title_{rid}")
-            content = st.text_area("민원 내용", value=now["content"]["standard"], height=220, key=f"e_content_{rid}")
-            request = st.text_area("요청 사항", value=now["request"]["standard"], height=100, key=f"e_request_{rid}")
+            content = st.text_area("민원 내용", value=now["content"]["standard"], height=200, key=f"e_content_{rid}")
+            request = st.text_area("요청 사항", value=now["request"]["standard"], height=110, key=f"e_request_{rid}")
             st.text_area("근거 자료 (고칠 수 없음)", value=now["evidence"]["standard"], height=140, disabled=True,
                          key=f"e_evidence_{rid}")
-            c1, c2 = st.columns(2)
-            save = c1.form_submit_button("고친 내용 반영하기", type="primary", use_container_width=True)
-            reset = c2.form_submit_button("처음 글로 되돌리기", use_container_width=True)
-        if save or reset:
-            if save:
-                store[rid] = {"title": title, "content": content, "request": request}
-            else:
-                store.pop(rid, None)
-            for k in ("title", "content", "request"):      # 칸을 반영된 글(개인정보 가린 뒤)로 다시 채운다
-                st.session_state.pop(f"e_{k}_{rid}", None)
-            st.rerun()
+            c1, c2, c3 = st.columns([1, 1, 1.4])
+            cancel = c1.form_submit_button("취소", use_container_width=True)
+            reset = c2.form_submit_button("처음 초안으로 되돌리기", use_container_width=True)
+            save = c3.form_submit_button("저장", type="primary", use_container_width=True)
+    if save:
+        store[rid] = {"title": title, "content": content, "request": request}
+        for k in ("title", "content", "request"):          # 칸을 저장된 글(개인정보 가린 뒤)로 다시 채운다
+            st.session_state.pop(f"e_{k}_{rid}", None)
+        set_editing(rid, False)
+        st.rerun()
+    if reset:
+        reset_edits(rid)
+        st.rerun()
+    if cancel:
+        for k in ("title", "content", "request"):
+            st.session_state.pop(f"e_{k}_{rid}", None)
+        set_editing(rid, False)
+        st.rerun()
 
 
 def show_draft(base: dict) -> None:
@@ -114,10 +142,24 @@ def show_draft(base: dict) -> None:
     if draft["pii_masked"]:
         st.caption("개인정보를 ○○로 가렸어요: " + ", ".join(draft["pii_masked"]))
 
-    # 화면 HTML은 사용자 글을 JSON으로만 넣고 textContent 로 그린다(view.html 참고). 높이는 내용에 맞춘다.
-    st.iframe(render_html(draft, font_size()), height="content")
-
-    edit_panel(draft)
+    rid = _rid(draft)
+    if st.session_state.get("editing", {}).get(rid):
+        edit_form(draft)
+    else:
+        edited = any(sec.get("edited") for sec in draft["sections"])
+        # 초안 머리 줄: 왼쪽 제목, 오른쪽 [처음 초안으로 되돌리기] [수정하기] [표준어|방언]
+        head, tools = st.columns([1, 2], vertical_alignment="center")
+        head.html(style.card_head("민원서 초안"))
+        with tools.container(key="draft_tools", horizontal=True, horizontal_alignment="right", vertical_alignment="center",
+                             gap="small"):
+            if edited:
+                st.button("처음 초안으로 되돌리기", key=f"reset_{rid}", on_click=reset_edits, args=(rid,))
+            st.button("✏️ 수정하기", key=f"edit_{rid}", type="primary", on_click=set_editing, args=(rid, True))
+            view = st.segmented_control("보기", ["표준어", "방언"], default="표준어", key=f"view_{rid}",
+                                        label_visibility="collapsed")
+        # 화면 HTML은 사용자 글을 JSON으로만 넣고 textContent 로 그린다(view.html 참고). 높이는 내용에 맞춘다.
+        st.iframe(render_html(draft, font_size(), mode="dia" if view == "방언" else "std", top=False),
+                  height="content")
 
     sub = draft["submission"]
     with st.expander("제출하는 방법", expanded=False):
@@ -130,7 +172,7 @@ def show_draft(base: dict) -> None:
             st.markdown(f"- [{portal['name']}]({portal['url']}) — {portal['note']}")
 
     if draft["excluded"]:
-        with st.expander(f"근거에서 뺀 내용 {len(draft['excluded'])}건", expanded=True):
+        with st.expander(f"근거에서 뺀 내용 {len(draft['excluded'])}건", expanded=False):
             st.write("자료와 다르거나 자료로 확인할 수 없어 근거 자료에 넣지 않았어요. 민원 내용에는 하신 말씀이 그대로 남아 있어요.")
             for x in draft["excluded"]:
                 who = f"'{x['claim']}' — " if x["claim"] else ""
@@ -143,15 +185,15 @@ def show_draft(base: dict) -> None:
                 for c in e["caveats"]:
                     st.markdown(f"  - {c}")
 
-    st.download_button("표준어 민원서 글로 받기 (.txt)", plain_text(draft, "standard"),
-                       file_name=f"민원서_{draft['request_id'] or '초안'}.txt", mime="text/plain",
-                       disabled=not draft["copy_allowed"])
-    st.html(style.footnote(FOOTNOTE))
+    know = "수치는 공개 데이터 기준이며, 말씀하신 곳만 따로 조사한 값은 아닙니다."
+    if draft["excluded"]:
+        know += f" 직접 뺐거나 자료와 맞지 않는·확인할 수 없는 내용 {len(draft['excluded'])}건은 근거에서 뺐습니다(위에서 볼 수 있어요)."
+    st.html(style.note_card("알아두세요", know))
 
 
 # ---------------------------------------------------------------- 예시·파일로 보기
 def page_file() -> None:
-    st.html(style.stepper(2))
+    st.html(style.hero("예시로 민원서 보기", "개발·시연용: 예시나 handoff.json 으로 초안만 봅니다.", step=2))
     with st.expander("불러올 내용 고르기", expanded=True):
         how = st.radio("어디서 불러올까요?", ["예시", "파일 올리기 (handoff.json)"], horizontal=True)
         handoff = None
@@ -220,10 +262,13 @@ def go(fn) -> None:
     st.session_state.flow = fn(st.session_state.flow)
 
 
-def show_messages(s: dict) -> None:
+TOPIC_NOTICE = "근거를 확인할 수 있는 주제는"     # 엔진의 '근거 자료가 없는 주제' 안내(첫 화면에 같은 안내가 있음)
+
+
+def show_messages(s: dict, skip: str | None = None) -> None:
     """엔진 알림('알림: ...')은 개발용이라 ?mode=dev 에서만 보인다. 되묻기와 관련된 안내는 늘 보인다."""
     for m in s["messages"]:
-        if DEV or not m.startswith("알림:"):
+        if (DEV or not m.startswith("알림:")) and not (skip and skip in m):
             st.caption(m)
 
 
@@ -261,11 +306,11 @@ def place_dialog(choices: dict) -> None:
 
 # ---------------------------------------------------------------- 1. 불편 쓰기
 def step_input(agent) -> None:
-    st.html(style.title("무엇이 불편하셨나요?", "편하게 써 주세요. 제주말로 쓰셔도 알아듣습니다."))
     with st.container(key="card_write"):
-        st.text_area("불편한 점 쓰기", key="in_text", height=130,
+        st.html(style.card_head("불편한 점", "평소 말하듯이 쓰시면 됩니다"))
+        st.text_area("불편한 점 쓰기", key="in_text", height=150, label_visibility="collapsed",
                      placeholder="예: 우리 동네 버스가 확 줄어부난 할망덜 병원 가기가 막 힘들어마씸.")
-        st.caption("평소 말하듯이 쓰시면 됩니다. 어려운 말로 바꾸지 않으셔도 돼요.")
+        st.caption("제주말로 쓰셔도 됩니다. 어려운 말로 바꾸지 않으셔도 돼요.")
 
     choices = place_info(agent)
     names = topic_names()
@@ -274,13 +319,15 @@ def step_input(agent) -> None:
         if choices:
             st.html(style.card_head("어느 지역 이야기인가요?", f"안 골라도 됩니다 · 최대 {choices['max_picks']}곳"))
             places = st.session_state.get("in_places", [])
-            st.html(style.place_tags(places))
-            c1, c2 = st.columns(2)
-            if c1.button("지역 고르기", key="open_places", use_container_width=True):
+            if places:
+                with st.container(horizontal=True, gap="small"):
+                    for name in places:          # 꼬리표: 마우스를 올리면 ✕, 누르면 그 지역만 지운다
+                        st.button(name, key=f"rm_place_{name}", on_click=remove_place, args=(name,),
+                                  help=f"{name} 지우기")
+            else:
+                st.html(style.place_tags([]))
+            if st.button("지역 고르기" if not places else "지역 더 고르기 · 바꾸기", key="open_places", use_container_width=True):
                 place_dialog(choices)
-            if places and c2.button("고른 지역 지우기", key="clear_places", use_container_width=True):
-                st.session_state.in_places = []
-                st.rerun()
             st.html(style.small_note(ALL_NOTE))
         else:
             st.html(style.card_head("어느 지역 이야기인가요?"))
@@ -291,8 +338,10 @@ def step_input(agent) -> None:
 
     if getattr(agent, "mock_engine", False):
         st.html(style.small_note("※ 이 컴퓨터에는 근거 DB가 없어 근거 수치는 형식 예시로만 나옵니다."))
-    note, btn = st.columns([3, 1], vertical_alignment="center")
-    note.html(style.footnote("이 도우미는 민원서를 써 드리는 일만 합니다. 접수는 직접 하셔야 합니다.", small=True))
+    with st.container(key="card_actions"):
+        note, btn = st.columns([3, 1], vertical_alignment="center")
+    note.caption(f"지금 자료로 근거를 확인할 수 있는 주제는 {', '.join(names)}이에요. "
+                 "그 밖의 주제는 근거 없이 민원서만 작성해요.")
     if btn.button("다음으로 →", type="primary", key="go_next", use_container_width=True):
         text = st.session_state.get("in_text", "")
         if not text.strip():
@@ -304,7 +353,6 @@ def step_input(agent) -> None:
 
 # ---------------------------------------------------------------- 2. 되묻기
 def step_questions(s: dict) -> None:
-    st.html(style.bubble("몇 가지만 여쭤볼게요.", "아래 물음에 답해 주시면 더 정확하게 써 드립니다."))
     show_messages(s)
     v = flow.question_view(s)
     with st.container(key="card_ask"):
@@ -348,14 +396,13 @@ def step_questions(s: dict) -> None:
                         call(flow.answer_question, s, text=text)
                     else:
                         st.warning("답을 써 주세요.")
-    st.button("← 처음부터 다시 쓰기", on_click=restart)
+    with st.container(key="card_actions"):
+        st.button("← 처음부터 다시 쓰기", on_click=restart)
 
 
 # ---------------------------------------------------------------- 3. 뜻 고르기
 def step_meanings(s: dict) -> None:
     views = flow.meaning_view(s)
-    most = max(v["max_picks"] for v in views)
-    st.html(style.bubble("말씀하신 내용이 어떤 뜻에 가까운지 골라 주세요.", f"말씀마다 최대 {most}개까지 고를 수 있습니다."))
     show_messages(s)
     picks, ok = {}, True
     cols = st.columns(2 if len(views) > 1 else 1, gap="medium")
@@ -380,7 +427,8 @@ def step_meanings(s: dict) -> None:
             else:
                 st.caption(f"{n} / {v['max_picks']}개 고름")
             picks[v["claim_id"]] = chosen
-    c1, c2 = st.columns(2)
+    with st.container(key="card_actions"):
+        c1, _, c2 = st.columns([1, 1, 1])
     c1.button("← 처음부터 다시 쓰기", on_click=restart, use_container_width=True)
     if c2.button("다음으로 →", type="primary", disabled=not ok, use_container_width=True):
         call(flow.submit_meanings, s, picks)
@@ -388,13 +436,13 @@ def step_meanings(s: dict) -> None:
 
 # ---------------------------------------------------------------- 4. 최종 확인
 def step_confirm(s: dict) -> None:
-    st.html(style.bubble("제가 이렇게 알아들었어요. 맞나요?"))
+    show_messages(s, skip=TOPIC_NOTICE)                # 근거 주제 안내는 첫 화면에 늘 있다
     left, right = st.container(key="row_confirm").columns([4, 6], gap="medium")
     with left.container(key="card_said"):
         st.html(style.said_card(" ".join(s["said"])))
-        show_messages(s)
     right.html(style.understood_card([(k, v, False) for k, v in flow.confirm_rows(s)]))
-    c1, c2 = st.columns([4, 6], gap="medium")          # 단추 넓이를 위 두 카드(쓰신 글 / 이렇게 이해했어요)와 맞춘다
+    with st.container(key="card_actions"):
+        c1, c2 = st.columns([4, 6], gap="medium")      # 단추 넓이를 위 두 카드(쓰신 글 / 이렇게 이해했어요)와 맞춘다
     if c1.button("아니요, 다시 답할게요", use_container_width=True):
         call(flow.confirm, s, False)
     if c2.button("맞아요", type="primary", use_container_width=True):
@@ -407,14 +455,12 @@ def step_evidence(s: dict) -> None:
     items = s["evidence_items"]
     usable = [it for it in items if it["usable"]]
     if usable:
-        st.html(style.bubble("민원서에 넣을 근거를 골라 주세요.", "필요 없는 것은 빼셔도 됩니다. 자료와 맞지 않는 근거는 넣을 수 없어요."))
         box = st.container()
     else:                                       # 넣을 수 있는 근거가 없으면: 안내를 먼저, 찾아본 자료는 접어 둔다
-        st.html(style.bubble("자료로 뒷받침되는 근거를 찾지 못했어요."))
         st.html(style.no_evidence_note(items))
         box = st.expander(f"찾아본 자료 {len(items)}건 보기")
     picked = []
-    per_row = 3
+    per_row = 1 if len(items) == 1 else 2 if len(items) in (2, 4) else 3     # 한 장이면 넓게, 빈 칸이 덜 남게
     with box:
         for start in range(0, len(items), per_row):
             cols = st.container(key=f"row_ev_{start}").columns(per_row, gap="medium")
@@ -430,13 +476,32 @@ def step_evidence(s: dict) -> None:
         if any(it["stale"] for it in items):
             st.caption("기준일이 2년 넘은 자료는 '오래된 자료'로 표시됩니다. 넣을지 말지는 직접 정하실 수 있습니다.")
     label = f"고른 근거 {len(picked)}건으로 민원서 만들기 →" if picked else "근거 없이 민원서 만들기 →"
-    c1, c2 = st.columns(2)
+    with st.container(key="card_actions"):
+        c1, _, c2 = st.columns([1, 0.6, 1.4])
     c1.button("← 이전", on_click=go, args=(flow.back_to_confirm,), use_container_width=True)
     if c2.button(label, type="primary", use_container_width=True):
         call(flow.choose_evidence, s, picked)
 
 
 # ---------------------------------------------------------------- 화면 고르기
+def hero_text(s: dict) -> tuple[str, str]:
+    """제목 띠의 (제목, 설명). 단계마다 하나."""
+    stage = s["stage"]
+    if stage == "meanings":
+        most = max((v["max_picks"] for v in flow.meaning_view(s)), default=1)
+        return "말씀하신 내용이 어떤 뜻에 가까운가요?", f"말씀마다 맞는 뜻을 골라 주세요. 최대 {most}개까지 고를 수 있어요."
+    if stage == "evidence":
+        if any(it["usable"] for it in s["evidence_items"]):
+            return "민원서에 넣을 근거를 골라 주세요", "필요 없는 것은 빼셔도 됩니다. 자료와 맞지 않는 근거는 넣을 수 없어요."
+        return "자료로 뒷받침되는 근거를 찾지 못했어요", "근거 없이도 민원서는 만들 수 있어요."
+    return {
+        "input": ("무엇이 불편하셨나요?", "편하게 써 주세요. 제주말로 쓰셔도 알아듣고, 근거 자료를 찾아 민원서를 써 드립니다."),
+        "questions": ("몇 가지만 여쭤볼게요", "답해 주시면 더 정확하게 써 드립니다."),
+        "confirm": ("제가 이렇게 알아들었어요. 맞나요?", "맞으면 근거 자료를 찾고, 아니면 다시 여쭤볼게요."),
+        "draft": ("민원서가 준비됐어요", "읽어 보고 고칠 곳은 고친 뒤, 제목과 내용을 복사해 국민신문고에 내시면 됩니다."),
+    }.get(stage, ("여기서 멈출게요", ""))
+
+
 def page_talk() -> None:
     try:
         agent, _ = get_agent()
@@ -447,7 +512,7 @@ def page_talk() -> None:
 
     s = st.session_state.setdefault("flow", flow.new_state())
     stage = s["stage"]
-    st.html(style.stepper(STEP_OF[stage]))
+    st.html(style.hero(*hero_text(s), step=STEP_OF[stage]))
     if st.session_state.get("flow_error"):
         st.error(st.session_state.pop("flow_error"))
 
@@ -462,22 +527,26 @@ def page_talk() -> None:
     elif stage == "evidence":
         step_evidence(s)
     elif stage == "draft":
-        if s["evidence_items"]:
-            st.button("← 근거 다시 고르기", on_click=go, args=(flow.back_to_evidence,))
         show_draft(s["draft"])
+        if s["evidence_items"]:
+            with st.container(key="card_actions"):
+                st.button("← 근거 다시 고르기", on_click=go, args=(flow.back_to_evidence,))
         if DEV:
             st.download_button("handoff.json 받기 (개발·확인용)", json.dumps(s["handoff"], ensure_ascii=False, indent=2),
                                file_name="handoff.json", mime="application/json")
     else:                                       # stopped
-        st.html(style.bubble("여기서 멈출게요."))
         st.warning(s["stop_reason"])
         st.button("← 처음부터 다시 쓰기", on_click=restart)
 
 
 # ---------------------------------------------------------------- 화면
-st.html(style.css(font_size()))
+if "font_size_ctl" not in st.session_state:          # 처음 화면으로 갈 때(로고) 주소에 남긴 글자 크기
+    st.session_state.font_size_ctl = st.query_params.get("size") if st.query_params.get("size") in SIZES else "크게"
+_wide = st.session_state.get("flow", {}).get("stage") == "draft" or st.query_params.get("mode") == "file"
+st.html(style.css(font_size(), style.WIDE_W if _wide else None))
 show_header()
 if st.query_params.get("mode") == "file":      # 시연·개발용: 주소 끝에 ?mode=file 을 붙이면 예시·파일로 보기
     page_file()
 else:
     page_talk()
+st.html(style.site_footer(FOOTNOTE))

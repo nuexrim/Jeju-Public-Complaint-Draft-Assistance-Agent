@@ -216,9 +216,13 @@ def test_friendly_strips_developer_codes_only():
     assert d["notices"] == ["Claude 구조화를 쓰지 못해 규칙으로 정리했어요"]
 
 
-def test_content_does_not_repeat_place_sentence():
+def test_content_has_no_intro_and_no_place_repeat():
+    """민원 내용은 머리말('다음과 같은 생활 불편이…') 없이 하신 말씀을 격식체로 바꾼 문장만."""
     d = build_draft(load_handoff(SAMPLES / "supported.json"))
-    assert d["submission"]["body"].count("구좌읍") == 3              # 발생 장소 1 + 주장 문장 2
+    content = {s["id"]: s for s in d["sections"]}["content"]["standard"]
+    assert content == "우리 동네 버스가 크게 줄어서 할머니들이 병원 가기가 매우 힘듭니다."
+    assert "말씀드립니다" not in d["submission"]["body"]
+    assert d["submission"]["body"].count("구좌읍") == 1               # 발생 장소에만
 
 
 def test_standard_version_is_formal_and_dialect_is_untouched():
@@ -227,8 +231,6 @@ def test_standard_version_is_formal_and_dialect_is_untouched():
     by = {s["id"]: s for s in d["sections"]}
     std = by["content"]["standard"]
     assert "매우 힘듭니다." in std and "힘들어요" not in std
-    assert "- 구좌읍 정류소에서 버스를 타는 사람이 1년 전보다 줄었습니다." in std
-    assert "- 구좌읍 어르신 수에 비해 의원이 적습니다." in std
     assert by["content"]["dialect"] == h["source_text"]                 # 원문은 그대로
     assert d["evidence"][0]["claim"].endswith("줄었다")                  # 자료(주장 원문)는 바꾸지 않는다
     assert not any("격식체" in w for w in d["warnings"])
