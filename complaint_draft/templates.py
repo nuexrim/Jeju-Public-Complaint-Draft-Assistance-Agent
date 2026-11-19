@@ -22,8 +22,6 @@ TITLE_LIMIT = 200                 # 국민신문고 제목 칸 글자 수 제한
 BODY_LIMIT = 40000                # 국민신문고 내용 칸 글자 수 제한
 REQUEST_ENDINGS = ("요청", "요망", "건의", "바랍니다", "주세요", "주십시오")   # 이미 요청으로 끝나면 '요청'을 덧붙이지 않는다
 
-CONTENT_INTRO = "다음과 같은 생활 불편이 있어 말씀드립니다."   # 장소는 제목과 [발생 장소]에 있으므로 되풀이하지 않는다
-CONTENT_CLAIMS_HEAD = "불편한 점은 다음과 같습니다."
 
 REQUEST = "다음 사항을 검토해 주시기 바랍니다: {user_request}"
 REQUEST_DEFAULT = "현황을 확인하시고 개선 방안을 검토해 주시기 바랍니다."
@@ -46,6 +44,8 @@ VERDICT_KO = {
 MOCK_WARNING = "근거 DB 없이 만든 형식 예시입니다. 수치는 실제 계산값이 아니라서 복사·제출할 수 없어요."
 RULES_WARNING = "AI 이해 단계를 쓰지 못해 규칙으로 정리한 결과입니다. 내용이 맞는지 꼭 확인해 주세요."
 INFORMAL_WARNING = "일부 문장은 격식체(합니다체)로 바꾸지 못했어요. '고쳐 쓰기'에서 다듬어 주세요."
+WRITER_FALLBACK_WARNING = "문장을 자동으로 다듬지 못해 기본 틀로 만들었어요. 제목과 내용을 한 번 읽고 고쳐 주세요."
+WRITER_FALLBACK_NOTE = "문장 다듬기를 쓰지 못함: {reason}"
 NO_SOURCE_WARNING = "원래 하신 말씀(원문)이 없어 제주어 화면도 표준어로 보여 드려요."
 DIALECT_WARNING_HEAD = "표준어로 바뀌지 않은 제주어 낱말이 있어요"
 DIALECT_WARNING = DIALECT_WARNING_HEAD + ": {words}. 초안에서 밑줄 친 낱말을 '고쳐 쓰기'에서 바꿔 주세요."

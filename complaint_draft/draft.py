@@ -159,17 +159,13 @@ def _stop(text: str) -> str:
 
 
 def _content(query: dict) -> str:
-    """민원 내용. 표준어본은 격식체(합니다체)로 맞춘다: 이해한 문장은 해요체 끝을, 주장은 '-다' 끝도 바꾼다."""
-    lines = [T.CONTENT_INTRO]
+    """민원 내용(틀 글). 머리말 없이, 이해한 문장을 격식체(합니다체)로만 바꿔 쓴다.
+    낱말만 나열한 글을 문장으로 풀어 쓰는 일은 Claude 다듬기(writer.py)가 한다. 이해한 문장이 없으면 고른 뜻으로."""
     raw = (query.get("normalized_text") or "").strip()
     if raw:
-        lines.append(_stop(formalize(raw)))
-    raw_claims = [c["text"].strip() for c in query.get("claims") or [] if c.get("text", "").strip()]
-    if raw_claims and not (len(raw_claims) == 1 and raw_claims[0] == raw):
-        lines.append("")
-        lines.append(T.CONTENT_CLAIMS_HEAD)
-        lines.extend(f"- {_stop(formalize(c, plain=True))}" for c in raw_claims)
-    return "\n".join(lines)
+        return _stop(formalize(raw))
+    claims = [c["text"].strip() for c in query.get("claims") or [] if c.get("text", "").strip()]
+    return " ".join(_stop(formalize(c, plain=True)) for c in claims)
 
 
 def _request(query: dict) -> str:
@@ -320,8 +316,10 @@ def _evidence_text(items: list[dict]) -> str:
 
 
 # ---------------------------------------------------------------- 초안
-def build_draft(handoff: dict, source_text: str | None = None, exclude=None) -> dict:
-    """exclude: 근거 고르기에서 사용자가 뺀 근거의 index(package.evidence 순서). 빠진 근거는 excluded 로 간다."""
+def build_draft(handoff: dict, source_text: str | None = None, exclude=None, write=None) -> dict:
+    """exclude: 근거 고르기에서 사용자가 뺀 근거의 index(package.evidence 순서). 빠진 근거는 excluded 로 간다.
+    write: 제목·민원 내용·요청 사항을 다듬는 함수(writer.write_sections). 없거나 실패하면 틀(templates.py) 글을 쓴다.
+           근거 자료 칸은 어느 쪽이든 엔진 값으로 만든다(다듬지 않음)."""
     query = handoff.get("query") or {}
     package = handoff.get("package") or {}
     if source_text is None:
@@ -335,6 +333,16 @@ def build_draft(handoff: dict, source_text: str | None = None, exclude=None) -> 
         "request": _request(query),
         "evidence": _evidence_text(included),
     }
+    written_by, write_note = "template", ""
+    if write is not None:
+        from complaint_draft.writer import WriteFailed
+        emd = query.get("location", {}).get("emd_name") or ""
+        places = list(handoff.get("places") or ([emd] if emd else []))
+        try:
+            standard.update(write(query, places, source, [it["indicator"] for it in included]))
+            written_by = "claude"
+        except WriteFailed as e:
+            write_note = str(e)
 
     sections = []
     for sid, title in T.SECTIONS:
@@ -355,7 +363,11 @@ def build_draft(handoff: dict, source_text: str | None = None, exclude=None) -> 
         warnings.append(T.RULES_WARNING)
     if has_informal(standard["content"]) or has_informal(standard["request"]):
         warnings.append(T.INFORMAL_WARNING)
+    if write is not None and written_by == "template":
+        warnings.append(T.WRITER_FALLBACK_WARNING)
     notices = [friendly(n) for n in handoff.get("notices") or [] if "mock" not in n]   # mock 안내는 위 경고로 대신한다
+    if write_note:
+        notices.append(T.WRITER_FALLBACK_NOTE.format(reason=write_note))
 
     draft = {
         "request_id": package.get("request_id") or query.get("request_id", ""),
@@ -369,6 +381,7 @@ def build_draft(handoff: dict, source_text: str | None = None, exclude=None) -> 
         "engine": package.get("engine"),
         "copy_allowed": not is_mock,
         "dialect_words": [],
+        "written_by": written_by,            # "claude"(다듬은 글) | "template"(틀 글)
     }
     _check_text(draft)
     return draft

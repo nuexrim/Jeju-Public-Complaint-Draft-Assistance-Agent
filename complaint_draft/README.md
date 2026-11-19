@@ -27,7 +27,7 @@ Streamlit 과 무관한 함수라 다른 화면에서도 쓸 수 있습니다.
 
 | 단계(`state["stage"]`) | 보여 줄 것 | 답 넣기 |
 | --- | --- | --- |
-| `input` | 글 칸, 지역(`agent.place_choices()`), 주제(`structure.topic_names()`) | `start(agent, text, places=[...], topics=[...], type_hint=...)` |
+| `input` | 글 칸, 지역(`agent.place_choices()`), 주제(`structure.topic_names()`) | `start(agent, text, places=[...], topics=[...])` |
 | `questions` | `question_view(state)` 질문 하나 (읍면동 질문에 `choices`가 오면 목록에서 고름) | `answer_question(agent, state, text=..., yes=..., places=[...])` |
 | `meanings` | `meaning_view(state)` 주장별 뜻(최대 5개 + 기타), `max_picks` | `submit_meanings(agent, state, {"c1": ["c1-o1", "c1-o3"]})` |
 | `confirm` | `confirm_rows(state)` (지역·주제·민원 종류·문제·바라는 점) | `confirm(agent, state, yes)` — 아니요면 되묻기부터 다시 |
@@ -37,7 +37,7 @@ Streamlit 과 무관한 함수라 다른 화면에서도 쓸 수 있습니다.
 
 - 불편 쓰기에서 고른 읍면동은 `understand()` 바로 다음에 `answer(r, emd_names=[...])` 로 넘깁니다. 고르지 않았으면 엔진이 되묻기에 고르기 목록(`choices`)을 붙여 보냅니다. 고른 장소(`r["places"]`)는 `summary`·`evidence` 에 함께 넘깁니다.
 - 고를 수 있는 장소 수는 엔진의 `place_choices()["max_picks"]` 를 그대로 씁니다. "제주 전체"를 고르면 그것 하나만 넘깁니다.
-- 고른 주제는 지금 엔진에 넘길 칸이 없어 화면과 최종 확인에만 보입니다. 다만 고른 주제가 모두 같은 민원 유형이고 엔진이 유형을 "기타"로 읽었으면 `answer(r, complaint_type=...)` 로 유형을 알려 줍니다(`pipeline.TOPIC_TO_TYPE` 기준, 경로당은 대응 유형이 없음).
+- 고른 주제는 `agent.understand(text, topics=[...])` 로 엔진에 넘깁니다. 엔진은 유형이 비었거나 "기타"면 고른 주제의 유형으로 정하고(경로당 → 복지), 문장에 주제가 없을 때 뜻 선택지를 찾는 힌트로 씁니다. 문장에 주제가 있으면 문장을 따릅니다(고른 주제로 막지 않음).
 - 뜻 고르기에서 "기타"만 고르면 직접 쓰기 없이 하신 말씀 그대로 둡니다. 근거 자료가 없는 주제(선택지가 "자료 없음"·"기타"뿐)인 주장은 묻지 않고 넘어갑니다.
 - 최종 확인에서 "아니요"를 누르면 쓰신 글을 다시 이해해 되묻기로 돌아갑니다(고른 지역·주제는 그대로). 엔진이 더 물을 것이 없다고 해도 이해한 문장을 한 번 보여 주고 고칠 기회를 줍니다. 두 번째 "아니요"면 멈춥니다.
 - 근거 고르기에서는 민원서에 넣을 수 있는 근거(`supported`·`partial`이고 값이 있음)만 체크할 수 있고, 처음에는 모두 체크돼 있습니다. 체크를 푼 근거는 초안의 `excluded` 에 "직접 뺀 근거"로 남습니다.

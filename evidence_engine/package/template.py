@@ -11,7 +11,8 @@
 계산과 판정
   값 = 10000 × 그 읍면동의 행 수 / 그 읍면동 인구 (pop_emd). 등록 지표의 시설 수 지표와 같은 식.
   판정 = 같은 유형 지역(읍·면끼리, 동끼리) 안의 순위(rank, 적을수록 나쁨). 등록 지표와 같은 규칙.
-  지표로 검수하지 않은 표라 '지지·반박'은 '부분 지지'로 낮춘다(약한 근거와 같은 처리).
+  지표로 검수하지 않은 표라 '자료로 확인됨·자료와 다름'은 '일부만 확인됨'으로 낮춘다(약한 자료와 같은 처리).
+  사용자에게는 '자동 집계·참고용'으로 보인다(package/labels.py TEMPLATE_MARK).
 숫자는 SQL(읽기 전용 실행기)로만 만들고, 표 이름은 진단표의 pf_<숫자>_<숫자> 꼴만 받는다.
 """
 from __future__ import annotations
@@ -19,6 +20,7 @@ from __future__ import annotations
 import re
 
 from indicators.library import claim_aspect, comparison_group, describe
+from package.labels import INDIRECT, TEMPLATE_MARK, VERDICT_LABEL, downgraded
 
 TEMPLATE_ID = "template:place_per_10k_pop"
 TOP_CARDS = 3                        # 빈칸 사유에 보여 주는 검색 상위 데이터셋 수와 같다
@@ -95,14 +97,14 @@ def evaluate(info: dict, emd_code: str | None, emd_label: str, runner, emd_names
            f'LEFT JOIN "{info["table"]}" t ON t.emd_code = p.emd_code WHERE p.total_pop IS NOT NULL '
            f'GROUP BY p.emd_code, p.total_pop')
     values = {code: float(v) for code, v in runner.run(sql).rows if v is not None}
-    name = f"인구 1만 명당 '{info['title']}' 수 (범용 틀)"
+    name = f"인구 1만 명당 '{info['title']}' 수 {TEMPLATE_MARK}"
     caveats = [
-        "범용 틀: 등록 지표가 없어, 미리 받은 데이터허브 표를 '한 행 = 시설·지점 하나'로 보고 인구 대비 개수를 셈. "
-        "지표로 검수하지 않아 '부분 지지'까지만 판정",
+        "자동 집계(참고용): 등록 지표가 없어, 미리 받은 데이터허브 표를 '한 행 = 시설·지점 하나'로 보고 인구 대비 "
+        f"개수를 셈. 검수한 지표가 아니라 '{VERDICT_LABEL['partial']}'까지만 판정",
         f"읍면동은 {MODE_KO.get(info['emd_mode'], info['emd_mode'])}로 찾음 (전체 {info['rows']}행 중 {info['emd_ratio']:.0%})",
     ]
     if claim_aspect(claim_text) == "access":
-        caveats.append("간접 지표: 주장은 거리·이용 어려움에 관한 것인데 이 틀은 시설 수를 잼")
+        caveats.append(f"{INDIRECT}주장은 거리·이용 어려움에 관한 것인데 이 자료는 시설 수를 잼")
     city = city_scope(info["title"])
     if city:
         caveats.append(f"데이터셋 이름상 {city}만 다루는 자료라 {city} 안에서만 비교")
@@ -125,8 +127,7 @@ def evaluate(info: dict, emd_code: str | None, emd_label: str, runner, emd_names
         caveats.append(f"판정 근거: {j.detail}")
         verdict = j.verdict
         if verdict in ("supported", "contradicted"):
-            ko = {"supported": "지지", "contradicted": "반박"}[verdict]
-            caveats.append(f"범용 틀이라 '{ko}'을(를) '부분 지지'로 낮춤")
+            caveats.append(downgraded(verdict, "참고용 자동 집계라"))
             verdict = "partial"
     return {
         "verdict": verdict,

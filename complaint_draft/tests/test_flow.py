@@ -20,8 +20,9 @@ class FakeAgent:
         self.ctype = ctype
         self.calls = []
 
-    def understand(self, text):
+    def understand(self, text, topics=None):
         self.calls.append(("understand", text))
+        self.topics = topics
         return {"status": self.status, "questions": copy.deepcopy(self.questions), "schema_errors": [],
                 "pii_masked": [], "notices": [], "structured_by": "rules", "source_text": text, "places": ["구좌읍"],
                 "query": {"request_id": "t-1", "normalized_text": text, "complaint_type": self.ctype,
@@ -130,14 +131,15 @@ def test_jeju_all_wins_over_other_places():
     assert flow.clean_places(["구좌읍", "제주 전체"]) == ["제주 전체"]
 
 
-def test_type_hint_only_when_engine_says_other():
+def test_topics_go_to_engine():
+    """고른 주제는 understand(topics=...) 로 넘기고, 유형은 엔진이 정한다(화면에서 유형을 덮어쓰지 않음)."""
     a = FakeAgent(ctype="기타")
-    s = flow.start(a, "경로당이 멀어요", topics=["경로당"], type_hint="교통")
-    assert s["result"]["query"]["complaint_type"] == "교통" and s["topics"] == ["경로당"]
-    b = FakeAgent(ctype="의료 접근")
-    s = flow.start(b, "병원이 멀어요", type_hint="교통")
-    assert s["result"]["query"]["complaint_type"] == "의료 접근"
-    assert not any(c[0] == "answer" for c in b.calls)
+    s = flow.start(a, "경로당이 멀어요", topics=["경로당"])
+    assert a.topics == ["경로당"] and s["topics"] == ["경로당"]
+    assert not any(c[0] == "answer" and "complaint_type" in c[1] for c in a.calls)
+    b = FakeAgent()
+    flow.start(b, "병원이 멀어요")
+    assert b.topics is None                                       # 안 고르면 예전과 같다
 
 
 # ---------------------------------------------------------------- 2. 되묻기

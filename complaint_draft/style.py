@@ -10,6 +10,8 @@ import html
 INK, MUTED, LINE, GREY = "#1F2326", "#4A5157", "#B9BEC2", "#ECEAE6"
 BG, ORANGE, SOFT, BROWN, GREEN = "#FFF8EE", "#F7941D", "#FFE9CC", "#9A4100", "#2F6B2C"
 ROOT_PX = {"작게": 15, "보통": 17, "크게": 20}
+PAGE_DEFAULT_W = 1080             # 본문 폭(누리집처럼 가운데 한 줄)
+WIDE_W = 1320                     # 민원서 화면 폭(초안을 넓게)
 
 esc = html.escape
 
@@ -39,16 +41,33 @@ def mascot(size: int, alt: str = "감귤 캐릭터") -> str:
 CHECK = _img(_CHECK_SVG, 24, "완료")
 
 
-def css(size: str) -> str:
+def css(size: str, page_w: int | None = None) -> str:
+    """page_w: 본문 폭. 민원서 화면은 넓게(WIDE_W)."""
     px = ROOT_PX.get(size, ROOT_PX["크게"])
+    PAGE_W = page_w or PAGE_DEFAULT_W                     # noqa: N806  (아래 CSS 안에서 씀)
     return f"""<style>
 @import url('https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700&display=swap');
 html {{ font-size: {px}px; }}
 html, body, .stApp, .stApp p, .stApp label, .stApp input, .stApp textarea, .stApp button, .stApp li {{
   font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; }}
-.stApp {{ background: {BG}; color: {INK}; }}
-[data-testid="stHeader"] {{ background: transparent; }}
-.block-container {{ max-width: 100%; padding: 1.2rem clamp(20px, 4vw, 64px) 3rem; }}
+.stApp {{ background: {BG}; color: {INK}; overflow-x: hidden; }}
+/* Streamlit 기본 머리·도구 막대·바닥 글은 숨긴다(누리집처럼 우리 머리·바닥만 보이게) */
+[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"], #MainMenu, footer {{ display: none !important; }}
+.block-container {{ max-width: {PAGE_W}px; padding: 0 24px 0; }}
+[data-testid="stMainBlockContainer"] > div > [data-testid="stVerticalBlock"] {{ gap: 1.1rem; }}
+
+/* 누리집 틀: 가로 꽉 찬 띠(머리·제목·바닥). 가운데 글은 본문 폭에 맞춘다 */
+.st-key-hdr {{ position: sticky; top: 0; z-index: 50; width: 100vw !important; max-width: none !important;
+  margin-left: calc(50% - 50vw);
+  background: #FFFFFF; border-bottom: 1px solid {LINE}; box-shadow: 0 2px 10px rgba(31,35,38,0.06);
+  padding: 10px max(24px, calc((100vw - {PAGE_W}px) / 2 + 24px)); }}
+.jj-band {{ width: 100vw; margin-left: calc(50% - 50vw); box-sizing: border-box;
+  padding-left: max(24px, calc((100vw - {PAGE_W}px) / 2 + 24px)); padding-right: max(24px, calc((100vw - {PAGE_W}px) / 2 + 24px)); }}
+.jj-hero {{ background: linear-gradient(135deg, {SOFT} 0%, #FFF3E0 60%, {BG} 100%); border-bottom: 1px solid #F3D9B5;
+  padding-top: 28px; padding-bottom: 26px; }}
+.jj-foot {{ background: #2B2F33; color: #E9E6E1; padding-top: 28px; padding-bottom: 32px; margin-top: 2.5rem; }}
+/* 본문 칸(흰 판) */
+.st-key-card_actions {{ border-top: 1px solid {LINE}; padding-top: 1rem; margin-top: 0.4rem; }}
 .stApp h1 {{ font-size: 1.8rem; line-height: 1.3; padding: 0; }}
 .stApp h2 {{ font-size: 1.4rem; line-height: 1.3; padding: 0; }}
 .stApp h3 {{ font-size: 1.3rem; line-height: 1.3; padding: 0; }}
@@ -71,23 +90,54 @@ button[data-testid="stBaseButton-primary"], button[data-testid="stBaseButton-pri
 .stTextInput [data-testid="stTextInputRootElement"] > div, .stTextArea [data-testid="stTextAreaRootElement"] > div {{ background: transparent; }}
 .stTextArea textarea, .stTextInput input {{ font-size: 1.1rem; line-height: 1.6; color: {INK}; background: transparent;
   border: 0; padding: 0.7rem 1rem; }}
+.stTextArea textarea::placeholder, .stTextInput input::placeholder {{ color: #80878D; opacity: 1; }}
 .stRadio label p {{ font-size: 1.1rem; font-weight: 500; }}
 [data-testid="stForm"] {{ border: 0; padding: 0; }}
 
 /* 카드: st.container(key=...) 에 붙는 st-key-* 로 꾸민다 */
-.st-key-hdr {{ background: #FFFFFF; border-bottom: 2px solid {GREY}; border-radius: 16px; padding: 0.6rem 1.2rem; }}
-.st-key-hdr .stButton > button {{ min-height: 44px; border-radius: 999px; border: 2px solid {LINE}; padding: 0.3rem 0.6rem; white-space: nowrap; }}
-.st-key-hdr .stButton > button p {{ font-size: 1rem; }}
+.st-key-hdr .stButton > button {{ min-height: 40px; border-radius: 999px; border: 1px solid {LINE}; padding: 0.2rem 0.8rem; white-space: nowrap; }}
+.st-key-hdr .stButton > button p {{ font-size: 0.95rem; }}
+.st-key-hdr [data-testid="stButtonGroup"] button {{ min-height: 38px; border-radius: 999px; padding: 0.15rem 0.9rem;
+  margin: 0 3px !important; border: 1px solid {LINE} !important; background: #FFFFFF !important;
+  box-shadow: none !important; outline: none !important; }}   /* 이어 붙은 단추(segmented)가 겹치지 않게, 두꺼운 테두리 없이 */
+.st-key-hdr [data-testid="stButtonGroup"] button[aria-checked="true"] {{ background: {SOFT} !important; border-color: {ORANGE} !important; }}
+.st-key-hdr [data-testid="stButtonGroup"] button:focus-visible {{ outline: 2px solid {INK} !important; outline-offset: 1px; }}
+.st-key-hdr a:hover div {{ text-decoration: underline; }}
+/* 고른 지역 꼬리표: 마우스를 올리면 ✕ 가 보이고, 누르면 지운다 */
+[class*="st-key-rm_place_"] button {{ position: relative; overflow: visible; min-height: 36px; border-radius: 999px;
+  border: 2px solid {BROWN}; background: {SOFT}; padding: 0.1rem 1rem; }}
+[class*="st-key-rm_place_"] button p {{ font-size: 0.95rem; font-weight: 700; }}
+[class*="st-key-rm_place_"] button::after {{ content: "✕"; position: absolute; top: -7px; right: -7px; width: 18px; height: 18px;
+  border-radius: 50%; background: {INK}; color: #FFFFFF; font-size: 10px; font-weight: 700; line-height: 18px; text-align: center;
+  display: none; }}
+[class*="st-key-rm_place_"] button:hover::after, [class*="st-key-rm_place_"] button:focus-visible::after {{ display: block; }}
+[class*="st-key-rm_place_"] button:hover {{ border-color: {INK}; }}
+.st-key-draft_tools .stButton > button {{ min-height: 44px; border-radius: 999px; padding: 0.3rem 1.1rem; }}
+.st-key-draft_tools .stButton > button p {{ font-size: 1rem; }}
+/* 표준어 | 방언 전환: 회색 상자 안에 단추 둘(고른 쪽 주황). 알약 단추 공통 규칙(둥근 모서리)과 섞여 겹쳐 보이지 않게 모두 다시 정한다 */
+.st-key-draft_tools [data-testid="stButtonGroup"] div:has(> button) {{ background: {GREY}; border-radius: 16px; padding: 4px;
+  gap: 4px; display: inline-flex; }}
+.st-key-draft_tools [data-testid="stButtonGroup"] button {{ min-height: 40px; margin: 0 !important; border: 0 !important;
+  border-radius: 12px !important; background: transparent !important; box-shadow: none !important; outline: none !important;
+  padding: 0.2rem 1.1rem; }}
+.st-key-draft_tools [data-testid="stButtonGroup"] button p {{ font-size: 1rem; font-weight: 700; color: {INK}; }}
+.st-key-draft_tools [data-testid="stButtonGroup"] button[aria-checked="true"] {{ background: {ORANGE} !important; }}
+.st-key-draft_tools [data-testid="stButtonGroup"] button:focus-visible {{ outline: 2px solid {INK} !important; outline-offset: 1px; }}
+.jj-note {{ background: #FFFFFF; border: 1px solid {LINE}; border-radius: 16px; padding: 14px 18px; }}
+.st-key-hdr [data-testid="stButtonGroup"] button p {{ font-size: 0.95rem; }}
+.st-key-hdr [data-testid="stMarkdownContainer"] p {{ font-size: 0.9rem; color: {MUTED}; margin: 0; text-align: right; }}
 .st-key-hdr .stButton > button[kind="primary"], .st-key-hdr button[data-testid="stBaseButton-primary"] {{
   background: {SOFT}; border-color: {BROWN}; }}
-.st-key-card_write, .st-key-card_said, .st-key-card_edit {{ background: #FFFFFF; border: 2px solid {LINE}; border-radius: 24px; padding: 1.3rem; }}
+.st-key-card_write, .st-key-card_said, .st-key-card_edit {{ background: #FFFFFF; border: 1px solid {LINE}; border-radius: 18px;
+  padding: 1.4rem 1.5rem; box-shadow: 0 1px 3px rgba(31,35,38,0.05); }}
 .st-key-card_ask {{ background: {SOFT}; border: 2px solid {BROWN}; border-radius: 20px; padding: 1.1rem 1.3rem; }}
 .st-key-card_ask .stTextInput [data-testid="stTextInputRootElement"] {{ background: #FFFFFF; }}
 /* 1단계: 지역·주제 카드, 3단계: 뜻 카드, 5단계: 근거 카드 */
 .st-key-card_place, .st-key-card_topic, [class*="st-key-card_claim_"] {{
-  background: #FFFFFF; border: 2px solid {LINE}; border-radius: 20px; padding: 1rem 1.2rem; }}
-[class*="st-key-card_ev_"] {{ background: #FFFFFF; border: 2px solid {LINE}; border-radius: 20px; padding: 1rem 1.2rem; height: 100%; }}
-[class*="st-key-card_ev_on_"] {{ border-color: {INK}; }}
+  background: #FFFFFF; border: 1px solid {LINE}; border-radius: 18px; padding: 1.2rem 1.4rem; box-shadow: 0 1px 3px rgba(31,35,38,0.05); }}
+[class*="st-key-card_ev_"] {{ background: #FFFFFF; border: 1px solid {LINE}; border-radius: 18px; padding: 1.1rem 1.3rem; height: 100%;
+  box-shadow: 0 1px 3px rgba(31,35,38,0.05); }}
+[class*="st-key-card_ev_on_"] {{ border: 2px solid {ORANGE}; }}
 /* 한 줄에 놓인 카드끼리 높이 맞추기: 열 안의 감싸는 칸들을 모두 늘려 카드가 열 높이를 채우게 한다 */
 .st-key-row_topic [data-testid="stHorizontalBlock"], .st-key-row_confirm [data-testid="stHorizontalBlock"],
 [class*="st-key-row_ev_"] [data-testid="stHorizontalBlock"] {{ align-items: stretch; }}
@@ -117,15 +167,43 @@ button[data-testid="stBaseButton-primary"], button[data-testid="stBaseButton-pri
 .st-key-card_write .stTextArea {{ margin-bottom: 0; }}
 [data-testid="stExpander"] details {{ background: #FFFFFF; border: 2px solid {LINE}; border-radius: 16px; }}
 [data-testid="stExpander"] summary p {{ font-size: 1.1rem; font-weight: 700; }}
+@media (max-width: 640px) {{ .jj-hero-mascot {{ display: none; }} .jj-hero h1 {{ font-size: 1.4rem !important; }} }}
 </style>"""
 
 
-def header() -> str:
-    face = mascot(52)
-    return (f'<div style="display:flex;align-items:center;gap:14px">{face}'
-            f'<div style="display:flex;flex-direction:column;gap:2px">'
-            f'<div style="font-family:\'Jua\',sans-serif;font-size:1.4rem;line-height:1.2;color:{INK}">제주 민원 도우미</div>'
-            f'<div style="font-size:0.78rem;font-weight:500;color:{MUTED}">제주말로 써도 알아듣는 민원서 작성 도우미</div></div></div>')
+def header(home: str = "./") -> str:
+    """머리 왼쪽: 감귤 로고 + 서비스 이름. 누르면 처음 화면으로(새로 시작). home: 돌아갈 주소(글자 크기 등 유지)."""
+    face = mascot(44, "")
+    return (f'<a href="{esc(home)}" target="_self" aria-label="제주 민원 도우미 처음 화면으로" title="처음 화면으로" '
+            f'style="display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit">{face}'
+            f'<div style="display:flex;flex-direction:column;gap:0">'
+            f'<div style="font-family:\'Jua\',sans-serif;font-size:1.35rem;line-height:1.2;color:{INK}">제주 민원 도우미</div>'
+            f'<div style="font-size:0.78rem;font-weight:500;color:{MUTED}">제주말로 말해도 근거가 붙은 민원서를 만들어 드립니다</div>'
+            f'</div></a>')
+
+
+def hero(text: str, sub: str = "", step: int | None = None) -> str:
+    """제목 띠: 지금 단계 이름·설명 + 단계 표시. step 이 None 이면 단계 표시 없이."""
+    sub_html = f'<p style="margin:6px 0 0;font-size:1.05rem;font-weight:500;line-height:1.5;color:{MUTED}">{esc(sub)}</p>' if sub else ""
+    steps = (f'<div style="margin-top:18px;background:#FFFFFF;border:1px solid #F3D9B5;border-radius:999px;'
+             f'padding:8px 18px;display:inline-flex">{stepper(step)}</div>') if step is not None else ""
+    return (f'<section class="jj-band jj-hero"><div style="display:flex;align-items:center;gap:20px">'
+            f'<div style="flex:1 1 auto;min-width:0">'
+            f'<h1 style="margin:0;font-size:1.75rem;font-weight:700;line-height:1.3;color:{INK}">{esc(text)}</h1>{sub_html}{steps}</div>'
+            f'<div class="jj-hero-mascot" style="flex:none">{mascot(84, "")}</div></div></section>')
+
+
+def site_footer(note: str) -> str:
+    """바닥 띠: 안내·자료 출처."""
+    return (f'<div role="contentinfo" class="jj-band jj-foot"><div style="display:flex;flex-wrap:wrap;gap:20px 48px;justify-content:space-between">'
+            f'<div style="display:flex;align-items:center;gap:10px">{mascot(32, "")}'
+            f'<span style="font-family:\'Jua\',sans-serif;font-size:1.15rem;color:#FFFFFF">제주 민원 도우미</span></div>'
+            f'<div style="flex:1 1 420px;display:flex;flex-direction:column;gap:6px;font-size:0.88rem;line-height:1.6">'
+            f'<p style="margin:0;color:#FFFFFF">{esc(note)}</p>'
+            f'<p style="margin:0">근거 자료: 제주데이터허브 · 공공데이터포털 · 제주빅데이터센터 공개 자료로 계산합니다. '
+            f'숫자는 자료의 기준일 현재 값입니다.</p>'
+            f'<p style="margin:0">개인정보(이름·연락처·주소)는 민원서에 넣지 않고 ○○로 가립니다.</p>'
+            f'</div></div></div>')
 
 
 STEPS = ["불편 쓰기", "내용 확인", "민원서 만들기"]   # 큰 틀 3단계 (되묻기·뜻 고르기·최종 확인 = 내용 확인)
@@ -136,21 +214,21 @@ def stepper(now: int) -> str:
     items = []
     for i, name in enumerate(STEPS):
         if i:
-            items.append(f'<li aria-hidden="true" style="width:64px;height:4px;border-radius:2px;background:{ORANGE if i <= now else LINE}"></li>')
+            items.append(f'<li aria-hidden="true" style="width:40px;height:3px;border-radius:2px;background:{ORANGE if i <= now else LINE}"></li>')
         if i < now:
-            dot = f'<span style="width:44px;height:44px;border-radius:50%;background:{GREEN};display:flex;align-items:center;justify-content:center">{CHECK}</span>'
+            dot = f'<span style="width:34px;height:34px;border-radius:50%;background:{GREEN};display:flex;align-items:center;justify-content:center">{CHECK}</span>'
             label = f'<span style="font-size:1.1rem;font-weight:500;color:{MUTED}">{name}</span>'
         elif i == now:
-            dot = (f'<span style="width:44px;height:44px;border-radius:50%;background:{ORANGE};color:{INK};display:flex;align-items:center;'
+            dot = (f'<span style="width:34px;height:34px;border-radius:50%;background:{ORANGE};color:{INK};display:flex;align-items:center;'
                    f'justify-content:center;font-size:1.1rem;font-weight:700">{i + 1}</span>')
             label = f'<span style="font-size:1.1rem;font-weight:700;color:{INK}">{name}</span>'
         else:
-            dot = (f'<span style="width:44px;height:44px;border-radius:50%;background:{GREY};color:{MUTED};display:flex;align-items:center;'
+            dot = (f'<span style="width:34px;height:34px;border-radius:50%;background:{GREY};color:{MUTED};display:flex;align-items:center;'
                    f'justify-content:center;font-size:1.1rem;font-weight:700">{i + 1}</span>')
             label = f'<span style="font-size:1.1rem;font-weight:500;color:{MUTED}">{name}</span>'
         current = ' aria-current="step"' if i == now else ""
-        items.append(f'<li{current} style="display:flex;align-items:center;gap:10px">{dot}{label}</li>')
-    return f'<ol style="list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;align-items:center;gap:14px">{"".join(items)}</ol>'
+        items.append(f'<li{current} style="display:flex;align-items:center;gap:8px">{dot}{label}</li>')
+    return f'<ol style="list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;align-items:center;gap:10px">{"".join(items)}</ol>'
 
 
 def title(text: str, sub: str = "") -> str:
@@ -246,7 +324,8 @@ def understood_card(rows: list[tuple[str, str, bool]]) -> str:
         out.append(f'<div style="background:{BG};border-radius:12px;padding:7px 18px;display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px">'
                    f'<span style="width:100px;font-size:0.95rem;font-weight:700;color:{MUTED}">{esc(name)}</span>'
                    f'<span style="font-size:1.1rem;font-weight:700;line-height:1.45;color:{INK};flex:1 1 200px;white-space:pre-line">{esc(value) if value else "—"}</span>{badge}</div>')
-    return (f'<section style="box-sizing:border-box;height:100%;background:#FFFFFF;border:2px solid {INK};border-radius:20px;padding:20px 24px;'
+    return (f'<section style="box-sizing:border-box;height:100%;background:#FFFFFF;border:1px solid {LINE};border-radius:18px;padding:20px 24px;'
+            f'box-shadow:0 1px 3px rgba(31,35,38,0.05);'
             f'display:flex;flex-direction:column;gap:10px">'
             f'<h2 style="margin:0;font-size:1rem;font-weight:700;color:{BROWN}">이렇게 이해했어요</h2>'
             f'<div style="display:flex;flex-direction:column;gap:8px">{"".join(out)}</div></section>')
@@ -261,6 +340,11 @@ def footnote(text: str, small: bool = False) -> str:
     size, pad = ("0.85rem", "10px 18px") if small else ("1rem", "18px 24px")
     return (f'<p style="margin:0;font-size:{size};font-weight:500;line-height:1.5;color:{INK};background:{GREY};border-radius:14px;'
             f'padding:{pad}">{esc(text)}</p>')
+
+
+def note_card(title: str, text: str) -> str:
+    return (f'<section class="jj-note"><h2 style="margin:0 0 4px;font-size:0.95rem;font-weight:700;color:{INK}">{esc(title)}</h2>'
+            f'<p style="margin:0;font-size:0.9rem;line-height:1.55;color:{MUTED}">{esc(text)}</p></section>')
 
 
 def small_note(text: str) -> str:

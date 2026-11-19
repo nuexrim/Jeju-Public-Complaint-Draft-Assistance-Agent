@@ -42,7 +42,7 @@
         "found_by": "catalog",
         "relation_path": null,
         "chart": null,
-        "caveats": ["간접 지표: 거리·이용 어려움을 시설 수로 봄"]
+        "caveats": ["간접 근거: 거리·이용 어려움을 시설 수로 봄"]
       }
     ],
     "gaps": [],

@@ -1,4 +1,4 @@
-"""범용 틀: 쓸 수 있을 때만 쓰고, 판정은 '부분 지지'까지."""
+"""범용 틀(화면 이름: 자동 집계·참고용): 쓸 수 있을 때만 쓰고, 판정은 '일부만 확인됨'까지."""
 from types import SimpleNamespace
 
 import duckdb
@@ -63,8 +63,8 @@ def test_evaluate_caps_verdict_and_cites_source(db):
     con.close()
     runner = SQLRunner(db, 1000, 10)
     out = T.evaluate(info, "A1", "가읍", runner, EMD, None, "공영주차장이 부족해요")
-    assert out["value"] == 1.0 and out["verdict"] == "partial"             # 순위로는 지지 → 부분 지지로 낮춤
-    assert any("'지지'을(를) '부분 지지'로 낮춤" in c for c in out["caveats"])
+    assert out["value"] == 1.0 and out["verdict"] == "partial"             # 순위로는 확인됨 → 일부만 확인됨으로 낮춤
+    assert any("'자료로 확인됨' 대신 '일부만 확인됨'으로 판정" in c for c in out["caveats"])
     assert out["sources"][0]["url"] == "u10"
     assert out["region_compare"].startswith("읍·면 4곳 중 이곳보다 적은 곳 0곳, 같은 곳 0곳")   # 동(B1)은 빠진다
     none = T.evaluate(info, None, "우리 동네", runner, EMD, None, "공영주차장이 부족해요")

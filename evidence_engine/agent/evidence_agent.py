@@ -114,7 +114,7 @@ class EvidenceAgent:
             self.client.tool_loop(prompt, system=SYSTEM, tools=tools, run_tool=run_tool, max_steps=self.max_steps,
                                   purpose="evidence_agent", max_tokens=self.max_tokens)
         except (PaidCallNotAllowed, CallBudgetExceeded, LLMCallFailed) as exc:
-            return AgentResult(keep=default, note=f"근거 탐색 에이전트를 쓰지 못해 기본 교차 확인으로 대신함 ({type(exc).__name__})")
+            return AgentResult(keep=default, note=f"AI(근거 탐색 에이전트)를 쓰지 못해 함께 볼 자료는 기본 목록으로 고름 ({type(exc).__name__})")
         if finished is None:          # finish 없이 끝남 → 확인한 것 중 앞에서부터
             finished = checked[:MAX_KEEP]
         return AgentResult(keep=finished, checked=checked, used_llm=True)

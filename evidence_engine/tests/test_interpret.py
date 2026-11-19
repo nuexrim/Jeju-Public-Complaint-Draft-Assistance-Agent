@@ -118,7 +118,7 @@ def test_bus_decrease_with_ridership_is_downgraded_and_records_missing_data(engi
     p = run_engine.run(q("q01"), engine=engine)
     c1 = p["evidence"][0]
     assert c1["verdict"] == "partial"
-    assert any(c.startswith("간접 지표: 주장은 '운행 횟수·배차'") for c in c1["caveats"])
+    assert any(c.startswith("간접 근거: 주장은 '운행 횟수·배차'") for c in c1["caveats"])
     concepts = [g["concept"] for g in p["gaps"]]
     assert "버스 운행 횟수·배차 간격" in concepts and "야간·휴일 진료 병원" not in concepts
 
@@ -126,14 +126,14 @@ def test_bus_decrease_with_ridership_is_downgraded_and_records_missing_data(engi
 @needs_db
 def test_elderly_bus_difficulty_is_proxy(engine):
     c2 = run_engine.run(q("q04"), engine=engine)["evidence"][1]
-    assert c2["verdict"] == "partial" and any(c.startswith("간접 지표") for c in c2["caveats"])
+    assert c2["verdict"] == "partial" and any(c.startswith("간접 근거") for c in c2["caveats"])
 
 
 @needs_db
 def test_direct_meaning_is_not_flagged(engine):
     for name in ("q03", "q05", "q06", "q08", "q10"):
         for e in run_engine.run(q(name), engine=engine)["evidence"]:
-            assert not any(c.startswith("간접 지표") for c in e["caveats"]), (name, e["claim_id"])
+            assert not any(c.startswith("간접 근거") for c in e["caveats"]), (name, e["claim_id"])
 
 
 @needs_db
@@ -195,14 +195,14 @@ def test_streetlight_claim_offers_no_data_meaning_first():
 def test_weak_evidence_indicator_is_capped_at_partial(engine):
     e = run_engine.run(_one("CCTV가 부족하다"), engine=engine)["evidence"][0]
     assert e["indicator"].startswith("인구 1만 명당 공공 CCTV") and e["verdict"] in ("partial", "unverifiable")
-    assert e["verdict"] == "unverifiable" or any(c.startswith("약한 근거") for c in e["caveats"]) \
+    assert e["verdict"] == "unverifiable" or any(c.startswith("약한 자료") for c in e["caveats"]) \
         or "중간 수준" in " ".join(e["caveats"])
 
 
 @needs_db
 def test_related_context_is_attached_as_cross_check(engine):
     e = run_engine.run(q("q01"), engine=engine)["evidence"][0]
-    checks = [c for c in e["caveats"] if c.startswith("교차 확인 · 1년 인구 증감률")]
+    checks = [c for c in e["caveats"] if c.startswith("함께 볼 자료 · 1년 인구 증감률")]
     assert len(checks) == 1 and "구좌읍" in checks[0] and "확인 이유" in checks[0]
     assert e["verdict"] == "partial"          # 교차 확인은 판정을 바꾸지 않는다
 

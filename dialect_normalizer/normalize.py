@@ -309,8 +309,16 @@ def _load(use_rag):
             raise ResourceMissing(f"방언 사전이 없어요: {DICT_PATH} (먼저 python preprocess.py)")
         if not INDEX_PATH.exists():
             raise ResourceMissing("예문 색인이 없어요. 먼저 실행하세요:  python normalize.py --build-index")
-        _res["dict"] = DialectDict()
-        _res["index"] = ExampleIndex()
+        # 둘 다 불러온 뒤에만 기억한다. 사전만 기억하고 색인이 실패하면 다음 호출에서 색인 없이(None) 진행해
+        # index.search 에서 AttributeError 로 멈췄다(scikit-learn 이 없을 때, 팀원 연결 시험에서 발견).
+        ddict = DialectDict()
+        try:
+            index = ExampleIndex()
+        except (ImportError, AttributeError, EOFError, ValueError, pickle.UnpicklingError) as e:
+            # 패키지가 없거나(scikit-learn) 색인 파일이 깨졌거나 다른 버전으로 저장됨 → 매번 같은 예외
+            raise ResourceMissing(f"예문 색인을 읽지 못했어요 ({type(e).__name__}). scikit-learn 설치를 확인하고, "
+                                  "그래도 안 되면 python normalize.py --build-index 로 다시 만드세요") from e
+        _res["dict"], _res["index"] = ddict, index
     return _res.get("dict"), _res.get("index")
 
 
