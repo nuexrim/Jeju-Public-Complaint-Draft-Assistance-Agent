@@ -30,6 +30,11 @@ BASE = Path(__file__).resolve().parent
 USAGE_LOG = BASE / "logs" / "usage.csv"
 DEFAULT_MODEL = "claude-haiku-5-5"
 DEFAULT_MAX_TOKENS = 4096
+# 응답을 기다리는 최대 시간(초)과 다시 시도 횟수. SDK 기본값(600초 × 3번)이면 화면이 한 번에 한 사람씩 처리하므로
+# 호출 하나가 멈췄을 때 30분 가까이 모두가 기다린다. 넘으면 오류 → 부르는 쪽이 규칙 구조화·틀 문장으로 넘어간다.
+# 구조화·문장 다듬기 응답은 수백 토큰이라 60초면 넉넉하다. CLAUDE_TIMEOUT_SEC 로 바꿀 수 있다.
+TIMEOUT_SEC = float(os.getenv("CLAUDE_TIMEOUT_SEC") or 60)
+MAX_RETRIES = 1
 
 _cache: dict[str, dict] = {}
 _lock = threading.Lock()
@@ -93,7 +98,7 @@ def _call_claude(system, user, schema, model, max_tokens, purpose):
         raise LLMError("ANTHROPIC_API_KEY 가 없어요. .env 에 넣거나 환경 변수로 설정해 주세요.")
     import anthropic
     if _client is None:
-        _client = anthropic.Anthropic()        # ANTHROPIC_API_KEY 환경변수를 읽음
+        _client = anthropic.Anthropic(timeout=TIMEOUT_SEC, max_retries=MAX_RETRIES)   # 키는 ANTHROPIC_API_KEY 환경변수
 
     kwargs = dict(
         model=model,

@@ -1,10 +1,10 @@
 """재현용 스냅샷: DuckDB 전체를 parquet(zstd)로 내보내고, 그것으로 DB를 다시 만든다.
 
     python data/snapshot.py --export              # data/snapshot/<오늘>/ 에 내보내기 (+ manifest.json)
-    python data/snapshot.py --restore 2026-11-14  # 스냅샷으로 data/jeju.duckdb 재생성 (센터 PC 설치용)
-    python data/snapshot.py --verify 2026-11-14   # manifest 의 해시·행 수와 대조
+    python data/snapshot.py --restore 2026-11-17  # 스냅샷으로 data/jeju.duckdb 재생성 (센터 PC 설치용)
+    python data/snapshot.py --verify 2026-11-17   # manifest 의 해시·행 수와 대조
 
-원본 raw(약 670MB)를 다시 받지 않고도 같은 숫자를 재현하기 위한 것이다(약 25MB).
+원본 raw(약 670MB)를 다시 받지 않고도 같은 숫자를 재현하기 위한 것이다(약 63MB, 미리 받은 표 포함).
 config.yaml 의 snapshot 에 날짜를 적으면 엔진의 최신성 판단 기준일도 그 날짜로 고정된다.
 """
 from __future__ import annotations

@@ -106,6 +106,29 @@ class Agent:
             self._emd_by_code = {r["emd_code"]: r["emd_name"] for r in csv.DictReader(f)}
         self._emd_csv = emd_csv
 
+    def warm_up(self) -> float:
+        """화면을 켤 때 한 번: 근거 엔진(검색 색인·DB·SQL)과 제주어 사전을 미리 불러 첫 사용자가 기다리지 않게 한다.
+        Claude 는 부르지 않는다(유료 호출 없음). 걸린 시간(초)을 돌려준다. 실패해도 화면은 그대로 쓴다(예외를 삼킨다)."""
+        import time
+        started = time.perf_counter()
+        query = {"request_id": "warm-up", "normalized_text": "버스가 줄었다", "complaint_type": "교통",
+                 "claims": [{"id": "c1", "text": "버스가 줄었다"}], "location": {"emd_name": "구좌읍", "emd_code": ""},
+                 "targets": ["버스"]}
+        try:
+            self.meaning_options(query)
+            # 근거 탐색 에이전트가 Claude 로 설정돼 있으면 근거 계산은 건너뛴다(미리 불러오기에 돈을 쓰지 않음)
+            if self.engine is None or not self.engine.agent.active:
+                self.evidence(query)
+        except Exception:                                  # noqa: BLE001
+            pass
+        try:
+            import normalize
+            normalize._load(True)                          # 사전·예문 색인 (없으면 그냥 넘어감)
+        except Exception:                                  # noqa: BLE001
+            pass
+        _llm_errors()                                      # Claude SDK 불러오기(처음 한 번 약 1.7초. 호출은 하지 않음)
+        return time.perf_counter() - started
+
     def close(self) -> None:
         if self.engine is not None:
             self.engine.close()

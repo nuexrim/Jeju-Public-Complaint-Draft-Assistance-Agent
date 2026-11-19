@@ -38,3 +38,6 @@ __pycache__/
 
 # Claude Code 작업 지시서 (로컬 전용)
 CLAUDE.md
+
+# 제출 ZIP (make_submission.py)
+dist/

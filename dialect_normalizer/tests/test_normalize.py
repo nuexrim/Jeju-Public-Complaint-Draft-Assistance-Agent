@@ -71,3 +71,22 @@ def test_index_failure_raises_same_error_every_time(tmp_path, monkeypatch):
         with pytest.raises(N.ResourceMissing):
             N.normalize("고냉이 막 울엄수다")
     assert N._res == {}                               # 반쯤 불러온 상태를 기억하지 않는다
+
+
+def test_claude_client_has_short_timeout(monkeypatch):
+    """Claude 가 응답하지 않아도 오래 멈추지 않게: 응답 대기 60초, 다시 시도 1번 (SDK 기본 600초 × 3번 대신)."""
+    import llm
+    made = {}
+
+    class FakeAnthropic:
+        def __init__(self, **kw):
+            made.update(kw)
+    import anthropic
+    monkeypatch.setattr(anthropic, "Anthropic", FakeAnthropic)
+    monkeypatch.setattr(llm, "_client", None)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-not-a-real-key")
+    try:
+        llm._call_claude("s", "u", {"type": "object"}, "claude-haiku-5-5", 10, "test")
+    except Exception:              # 가짜 클라이언트라 호출 단계에서 실패해도 된다(만들 때 값만 본다)
+        pass
+    assert made == {"timeout": llm.TIMEOUT_SEC, "max_retries": 1} and llm.TIMEOUT_SEC == 60

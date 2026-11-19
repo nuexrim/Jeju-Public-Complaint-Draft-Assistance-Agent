@@ -46,6 +46,14 @@ jobs:
           printf '\n\n\n\n\n\n\n\n\n\n' | python -m complaint_agent --mock-engine --place 구좌읍 \
             --topic 버스·대중교통 --out smoke.json "버스가 줄어서 병원 가기 힘들어요" > smoke_out.txt
           python -c "import json; d = json.load(open('smoke.json', encoding='utf-8')); assert d['places'] == ['구좌읍'] and d['draft']['sections'], d"
+      - name: 설치.bat 실제로 돌려 보기 (Windows만, 스냅샷 없이)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          echo.| 설치.bat
+          if not exist ".venv\Scripts\python.exe" exit /b 1
+          .venv\Scripts\python.exe -c "import streamlit, duckdb, anthropic; print('install ok')"
+          if not exist "evidence_engine\.env" exit /b 1
 
   minimal:
     name: 빠진 게 있는 환경 (scikit-learn·streamlit·사전·DB·키 없음)

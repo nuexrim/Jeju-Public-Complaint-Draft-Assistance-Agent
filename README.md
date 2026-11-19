@@ -39,7 +39,7 @@
 | 카드 개념 태그 | 규칙 태그 동작(615/1,330). LLM 태그·사람 검수는 승인 대기 |
 | 근거 탐색 에이전트 | 코드 동작, 기본 mock이라 호출 없음(대신 지표마다 정해 둔 교차 확인을 붙임). 실제 Claude 호출 시험은 승인 대기 |
 | LLM 보조(SQL 초안 폴백) | 코드 동작, 기본 mock이라 호출 없음. 공급자·키 확정 후 사용 |
-| 재현용 스냅샷 | 동작 (`data/snapshot/2026-11-14`, 약 24MB parquet) |
+| 재현용 스냅샷 | 동작 (`data/snapshot/2026-11-17`, 표 664개 약 63MB parquet. 저장소에는 넣지 않고 제출 ZIP에만) |
 | 제주어 이해·구조화 (`dialect_normalizer/`) | 동작 (사전+예문+Claude 표준어 변환, Claude 구조화, 되묻기 질문). 사전·예문은 AI Hub 원자료로 직접 만들어야 함 |
 | 두 모듈 연결 (`complaint_agent/`) | 동작 (이해 → 되묻기 → 뜻 선택 → 최종 확인 → 근거 패키지, 실패 시 규칙 구조화·엔진 mock) |
 | 민원 초안 생성·UI | 대화·초안 담당이 개발 중 (`handoff` 결과를 입력으로 받음) |
@@ -98,6 +98,12 @@ flowchart LR
     └── tests/                  # pytest, fixtures(구조화 질의 10개)
 ```
 
+
+## 센터 PC에서 실행 (제출본)
+
+비전문가용 설치·실행은 **[실행_매뉴얼.md](실행_매뉴얼.md)** 에 있습니다. 요약: 제출 ZIP을 풀고 `설치.bat` → (평가용 키를 `evidence_engine\.env`에 넣고 `실행.bat`의 `ALLOW_PAID_CALLS=0`을 `1`로) → `실행.bat`.
+화면은 그 PC에서만 열리고(`.streamlit/config.toml`의 `server.address = "localhost"`), 오류 상세는 화면 대신 실행 창에 남습니다.
+근거 DB 스냅샷·데이터셋 카드·법정동 연계정보·제주어 사전은 저장소에 없고 제출 ZIP(`python make_submission.py`)에만 들어갑니다. 사용한 데이터는 [데이터_활용_명세.md](데이터_활용_명세.md).
 
 ## 시작하기
 

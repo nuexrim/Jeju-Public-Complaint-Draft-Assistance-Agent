@@ -12,7 +12,7 @@ paths:                      # evidence_engine/ 기준 상대 경로
   charts_dir: charts
   usage_log: logs/usage.csv
 
-snapshot: "2026-11-14"      # 재현용 스냅샷(data/snapshot/<날짜>). 최신성 판단 기준일도 이 날짜로 고정
+snapshot: "2026-11-17"      # 재현용 스냅샷(data/snapshot/<날짜>). 최신성 판단 기준일도 이 날짜로 고정
 
 thresholds:
   max_missing_ratio: 0.30   # 결측 30% 초과 → caveat

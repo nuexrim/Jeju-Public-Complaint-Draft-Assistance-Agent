@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 import threading
 from pathlib import Path
@@ -43,6 +44,14 @@ st.set_page_config(page_title="제주 민원 도우미", page_icon="🍊", layou
 
 
 SIZES = ["작게", "보통", "크게"]
+
+
+_MD_SPECIAL = re.compile(r"([\\`*_{}\[\]()#+\-.!|~>$<])")
+
+
+def plain(text) -> str:
+    """사용자 글이 섞인 글을 마크다운이 아닌 글자 그대로 보이게(링크·그림·수식 문법을 막음)."""
+    return _MD_SPECIAL.sub(r"\\\1", str(text or ""))
 
 
 def font_size() -> str:
@@ -138,7 +147,7 @@ def show_draft(base: dict) -> None:
         st.warning(w)
     if DEV:
         for n in draft["notices"]:
-            st.caption(f"알림: {n}")
+            st.caption(f"알림: {plain(n)}")
     if draft["pii_masked"]:
         st.caption("개인정보를 ○○로 가렸어요: " + ", ".join(draft["pii_masked"]))
 
@@ -176,14 +185,14 @@ def show_draft(base: dict) -> None:
             st.write("자료와 다르거나 자료로 확인할 수 없어 근거 자료에 넣지 않았어요. 민원 내용에는 하신 말씀이 그대로 남아 있어요.")
             for x in draft["excluded"]:
                 who = f"'{x['claim']}' — " if x["claim"] else ""
-                st.markdown(f"- {who}**{x['reason']}** · {x['label']}")
+                st.markdown(f"- {plain(who)}**{plain(x['reason'])}** · {plain(x['label'])}")
 
     if draft["evidence"]:
         with st.expander("근거 자세히 보기 (주의할 점)"):
             for e in draft["evidence"]:
-                st.markdown(f"**{e['indicator']}** · {e['verdict_ko']} · {e['value_text']}")
+                st.markdown(f"**{plain(e['indicator'])}** · {plain(e['verdict_ko'])} · {plain(e['value_text'])}")
                 for c in e["caveats"]:
-                    st.markdown(f"  - {c}")
+                    st.markdown(f"  - {plain(c)}")
 
     know = "수치는 공개 데이터 기준이며, 말씀하신 곳만 따로 조사한 값은 아닙니다."
     if draft["excluded"]:
@@ -223,7 +232,9 @@ def page_file() -> None:
 def get_agent():
     """Agent 는 앱 전체에서 하나만 만든다(근거 DB 연결을 여러 번 열지 않게). 호출은 잠금으로 한 번에 하나씩."""
     from complaint_agent.pipeline import Agent
-    return Agent(), threading.Lock()
+    agent = Agent()
+    agent.warm_up()          # 근거 엔진·사전을 미리 불러 둔다(첫 민원이 몇 초 더 걸리지 않게, Claude 호출 없음)
+    return agent, threading.Lock()
 
 
 @st.cache_resource
@@ -235,6 +246,21 @@ def topic_names() -> list[str]:
         return structure.topic_names()
     except Exception:                                 # noqa: BLE001  목록을 못 받아도 화면은 열린다
         return TOPIC_FALLBACK
+
+
+def startup_error(e: Exception) -> str:
+    """준비 실패를 원인별로 알린다. 자세한 내용은 실행 창(콘솔) 기록에 남긴다."""
+    import traceback
+    traceback.print_exception(e)
+    name = type(e).__name__
+    if isinstance(e, ImportError):
+        how = "프로그램 설치가 덜 됐어요. '설치.bat'를 다시 실행해 주세요."
+    elif "duckdb" in type(e).__module__ or "lock" in str(e).lower():
+        how = ("근거 DB를 열지 못했어요. 이 프로그램이 다른 창에서 이미 켜져 있다면 그 창을 닫고 다시 실행해 주세요. "
+               "그래도 안 되면 '설치.bat'로 DB를 다시 만들어 주세요.")
+    else:
+        how = "실행 창을 닫았다가 '실행.bat'로 다시 켜 주세요. 그래도 안 되면 '설치.bat'를 다시 실행해 주세요."
+    return f"대화 기능을 준비하지 못했어요. {how} (오류 종류: {name})"
 
 
 def place_info(agent) -> dict | None:
@@ -269,7 +295,7 @@ def show_messages(s: dict, skip: str | None = None) -> None:
     """엔진 알림('알림: ...')은 개발용이라 ?mode=dev 에서만 보인다. 되묻기와 관련된 안내는 늘 보인다."""
     for m in s["messages"]:
         if (DEV or not m.startswith("알림:")) and not (skip and skip in m):
-            st.caption(m)
+            st.caption(plain(m))
 
 
 def place_picker(choices: dict, current: list[str], key: str) -> tuple[list[str], bool]:
@@ -337,7 +363,7 @@ def step_input(agent) -> None:
         st.pills("주제", names, selection_mode="multi", key="in_topics", label_visibility="collapsed")
 
     if getattr(agent, "mock_engine", False):
-        st.html(style.small_note("※ 이 컴퓨터에는 근거 DB가 없어 근거 수치는 형식 예시로만 나옵니다."))
+        st.warning("이 컴퓨터에 근거 DB가 없어 근거 수치는 형식 예시로만 나옵니다. '설치.bat'를 실행하면 DB가 만들어집니다.")
     with st.container(key="card_actions"):
         note, btn = st.columns([3, 1], vertical_alignment="center")
     note.caption(f"지금 자료로 근거를 확인할 수 있는 주제는 {', '.join(names)}이에요. "
@@ -359,9 +385,9 @@ def step_questions(s: dict) -> None:
         st.html(style.ask_head(v["question"], "확인" if v["kind"] in ("dialect", "confirm_emd") else "한 가지만 더 여쭤볼게요"))
         with st.form("f_question"):
             if v["kind"] == "dialect":
-                st.info(v["understood"])
+                st.info(plain(v["understood"]))
                 for a in v["asks"]:
-                    st.write(f"· {a}")
+                    st.markdown(f"· {plain(a)}")
                 text = st.text_input("다르면 바른 문장을 써 주세요 (맞으면 비워 두세요)")
                 if st.form_submit_button("다음으로 →", type="primary", use_container_width=True):
                     call(flow.answer_question, s, text=text)
@@ -506,8 +532,7 @@ def page_talk() -> None:
     try:
         agent, _ = get_agent()
     except Exception as e:                      # noqa: BLE001
-        st.error("대화 기능을 준비하지 못했어요. 저장소 맨 위에서 `pip install -r requirements.txt` 를 먼저 실행해 주세요. "
-                 f"({type(e).__name__}: {e})")
+        st.error(startup_error(e))
         return
 
     s = st.session_state.setdefault("flow", flow.new_state())

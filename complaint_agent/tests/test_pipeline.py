@@ -397,3 +397,11 @@ def test_same_meaning_in_two_claims_appears_once(agent, fake_llm):
     q, _ = agent.choose(query, interp, {"c1": [gap["c1"]], "c2": [gap["c2"], cctv]})
     assert [c["indicator_id"] for c in q["claims"]] == ["gap:streetlight", "cctv_cameras_per_10k_pop"]
     assert len({c["id"] for c in q["claims"]}) == 2
+
+
+def test_warm_up_never_calls_claude(agent, monkeypatch):
+    """미리 불러오기는 유료 호출을 하지 않고, 그 뒤 첫 민원이 빨라진다."""
+    def boom(*a, **k):
+        raise AssertionError("미리 불러오기에서 Claude 를 부르면 안 된다")
+    monkeypatch.setattr(P.S.llm, "call_json", boom)
+    assert agent.warm_up() >= 0
