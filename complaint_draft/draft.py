@@ -355,8 +355,6 @@ def build_draft(handoff: dict, source_text: str | None = None, exclude=None) -> 
         warnings.append(T.RULES_WARNING)
     if has_informal(standard["content"]) or has_informal(standard["request"]):
         warnings.append(T.INFORMAL_WARNING)
-    if not source:
-        warnings.append(T.NO_SOURCE_WARNING)
     notices = [friendly(n) for n in handoff.get("notices") or [] if "mock" not in n]   # mock 안내는 위 경고로 대신한다
 
     draft = {

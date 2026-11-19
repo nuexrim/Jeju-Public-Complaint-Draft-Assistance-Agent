@@ -36,7 +36,7 @@ def test_dialect_uses_only_source_text_never_generated():
 def test_no_source_text_means_every_section_falls_back():
     d = build_draft(load_handoff(SAMPLES / "mixed.json"))
     assert all(s["dialect_source"] == "standard_fallback" and s["dialect"] == s["standard"] for s in d["sections"])
-    assert any("원문" in w for w in d["warnings"])
+    assert not any("원문" in w for w in d["warnings"])      # 방언 보기를 뺐으므로 원문 없음 경고도 없다
 
 
 def test_source_text_argument_overrides_and_is_masked():
@@ -356,3 +356,8 @@ def test_title_without_request_uses_chosen_meaning():
     assert build_draft(h)["submission"]["title"] == "구좌읍 불편 개선 요청: 어르신 수에 비해 의원이 적다"
     h["query"]["claims"] = [{"id": "c1", "text": "버스 배차가 줄었다", "indicator_id": "gap:bus_service"}]
     assert "배차" not in build_draft(h)["submission"]["title"]          # 자료 없는 뜻은 제목에 쓰지 않고 대상으로
+
+
+def test_html_has_no_dialect_toggle():
+    html = render_html(build_draft(load_handoff(SAMPLES / "supported.json")))
+    assert 'data-mode="dia"' not in html and "하신 말씀 그대로" not in html
