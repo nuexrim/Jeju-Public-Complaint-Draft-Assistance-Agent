@@ -9,7 +9,7 @@ name: tests
 
 on:
   push:
-    branches: [main, "feature/**", "refactor/**", "ci/**"]
+    branches: [main, "feature/**", "refactor/**", "ci/**", "release/**"]
   pull_request:
 
 permissions:
