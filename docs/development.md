@@ -63,7 +63,7 @@ python evidence_engine/run_engine.py --query evidence_engine/tests/fixtures/q01.
 ```
 
 - 화면 주소 뒤에 `?mode=dev`를 붙이면 엔진 알림과 `handoff.json` 받기 단추가 표시됨
-- 기본 화면은 어르신용이라 이 정보를 숨김
+- 기본 화면은 도민용이라 이 정보를 숨김
 - 저장소의 `.streamlit/config.toml`은 운영 설정이라 코드가 바뀌어도 화면을 다시 그리지 않음
 - 개발할 때는 명령줄에서 덮어씀
 
@@ -98,7 +98,7 @@ cd dialect_normalizer && python evaluate.py --limit 20   # 제주어 변환 (유
 ## 제출 ZIP 만들기
 
 ```bash
-python make_submission.py                     # dist/제주민원도우미_제출_<날짜>.zip
+python make_submission.py                     # dist/민원똑딱_제출_<날짜>.zip
 python make_submission.py --with-claude-key   # 평가용 키(EVAL_ANTHROPIC_API_KEY)를 ZIP에 포함
 ```
 

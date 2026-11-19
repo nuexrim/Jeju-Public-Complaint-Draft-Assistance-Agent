@@ -111,7 +111,7 @@ def build(con, registry: dict) -> str:
     lines = [
         "# 데이터 활용 명세",
         "",
-        f"제주 민원 도우미가 쓰는 데이터와 오픈소스 목록. `python evidence_engine/data/data_spec.py`로 근거 DB와 "
+        f"민원똑딱이 쓰는 데이터와 오픈소스 목록. `python evidence_engine/data/data_spec.py`로 근거 DB와 "
         f"지표 등록부에서 자동 생성하므로 엔진이 실제로 쓰는 자료와 일치함 (생성일 {date.today().isoformat()})",
         "",
         "원자료는 GitHub 저장소에 넣지 않음. 제출 ZIP에는 근거 DB 스냅샷(가공한 parquet)으로만 포함하며 심사와 "

@@ -1,5 +1,5 @@
 @echo off
-rem 제주 민원 도우미 실행 (Windows). 두 번 눌러 실행하면 브라우저에 화면이 열린다. 끝내려면 이 창을 닫는다.
+rem 민원똑딱 실행 (Windows). 두 번 눌러 실행하면 브라우저에 화면이 열린다. 끝내려면 이 창을 닫는다.
 chcp 65001 > nul
 setlocal
 cd /d "%~dp0"
@@ -16,7 +16,7 @@ if not exist ".venv\Scripts\python.exe" (
   exit /b 1
 )
 set PYTHONUTF8=1
-echo 제주 민원 도우미를 켭니다. 브라우저가 열리지 않으면 http://localhost:8501 로 들어가세요.
+echo 민원똑딱을 켭니다. 브라우저가 열리지 않으면 http://localhost:8501 로 들어가세요.
 echo 끝내려면 이 창을 닫으세요.
 ".venv\Scripts\python.exe" -m streamlit run complaint_draft\app.py
 pause

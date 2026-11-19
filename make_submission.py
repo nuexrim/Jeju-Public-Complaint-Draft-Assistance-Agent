@@ -1,6 +1,6 @@
 """최종 제출 ZIP 만들기: 코드(저장소 파일) + 저장소에 넣지 않는 실행 자료.
 
-    python make_submission.py                       # dist/제주민원도우미_제출_<날짜>.zip
+    python make_submission.py                       # dist/민원똑딱_제출_<날짜>.zip
     python make_submission.py --with-claude-key     # 평가용 Claude 키를 ZIP 안 evidence_engine/.env 에 넣는다
 
 넣는 것
@@ -100,7 +100,7 @@ def build(out: Path, with_key: bool) -> tuple[list[str], list[str]]:
 
 
 def manifest_text(included: list[str], missing: list[str]) -> str:
-    lines = [f"제주 민원 도우미 제출물 구성 ({date.today().isoformat()})", "",
+    lines = [f"민원똑딱 제출물 구성 ({date.today().isoformat()})", "",
              "설치·실행: 실행_매뉴얼.md 를 보세요. (요약: 설치.bat → evidence_engine\\.env 에 키 → 실행.bat)", "",
              "[들어 있는 실행 자료] (원자료·가공 자료라 GitHub 에는 없고 이 ZIP 에만 있습니다. 심사·센터 운영 외 재배포 금지)"]
     lines += [f"  - {x}" for x in included] or ["  - 없음"]
@@ -111,7 +111,7 @@ def manifest_text(included: list[str], missing: list[str]) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--out", type=Path, default=ROOT / "dist" / f"제주민원도우미_제출_{date.today().isoformat()}.zip")
+    ap.add_argument("--out", type=Path, default=ROOT / "dist" / f"민원똑딱_제출_{date.today().isoformat()}.zip")
     ap.add_argument("--with-claude-key", action="store_true", help="평가용 키(EVAL_ANTHROPIC_API_KEY)를 ZIP 에 넣는다")
     args = ap.parse_args(argv)
     included, missing = build(args.out, args.with_claude_key)
