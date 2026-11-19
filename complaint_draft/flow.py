@@ -21,6 +21,7 @@ state 는 dict 하나라 st.session_state 에 그대로 넣을 수 있다. 각 �
 from __future__ import annotations
 
 import copy
+import re
 
 from complaint_draft import writer
 from complaint_draft.draft import build_draft, evidence_choices, friendly, leftover_dialect, mask
@@ -36,7 +37,7 @@ STAGE_LABELS = {"input": "불편 쓰기", "questions": "되묻기", "meanings": 
 
 
 def new_state() -> dict:
-    return {"stage": "input", "said": [], "places": [], "topics": [],
+    return {"stage": "input", "said": [], "places": [], "topics": [], "topic_detail_used": False,
             "result": None, "query": None, "interp": None, "pending": [],
             "q_rounds": 0, "confirm_tries": 0, "summary": "", "messages": [], "stop_reason": "",
             "package": None, "evidence_items": [], "picked": [], "handoff": None, "draft": None}
@@ -110,6 +111,7 @@ def _understand(agent, s: dict, text: str) -> dict:
     s["result"] = r
     s["query"] = None
     s["q_rounds"] = 0
+    s["topic_detail_used"] = False
     _sync_places(s)
     return _after_questions(agent, s)
 
@@ -122,6 +124,15 @@ def _after_questions(agent, s: dict) -> dict:
         if q["field"] == "complaint_type":           # 알리기만 하고 넘어간다
             s["messages"].append(q["question"].replace(" 근거 없이 민원서만 작성할까요?", " 근거 없이 민원서만 작성해요."))
             r["questions"] = [x for x in r["questions"] if x["field"] != "complaint_type"]
+        elif q["field"] == "claims" and s["topics"] and not s["topic_detail_used"]:
+            # '어떤 점이 불편하신지 더 자세히' 는 묻지 않고, 앞에서 고른 주제로 대신 답한다(단계를 줄이려고).
+            # 그래도 불편한 점을 못 뽑으면 그때는 사용자에게 묻는다.
+            s["topic_detail_used"] = True
+            before = len(r.get("notices", []))
+            r = agent.answer(r, detail=f"{', '.join(s['topics'])} 관련 불편이 있다")
+            _note(s, r.get("notices", [])[before:])
+            s["result"] = r
+            _sync_places(s)
         elif q["field"] not in ("dialect", "emd_name", "claims", "user_request"):
             r["questions"] = r["questions"][1:]      # 모르는 질문 종류는 건너뛴다
         else:
@@ -135,6 +146,29 @@ def _after_questions(agent, s: dict) -> dict:
     return _enter_meanings(agent, s)
 
 
+_QUOTED = re.compile(r"'([^']+)'")
+
+
+def merge_asks(asks: list[str]) -> list[str]:
+    """낱말만 다르고 묻는 말이 같은 질문은 한 문장으로 묶는다.
+    예: "'확'은 표준어로도 쓰는 말이라…", "'막'은 표준어로도 쓰는 말이라…" → "'확', '막'은 표준어로도 쓰는 말이라…"
+    (질문 문장은 제주어 변환 모듈의 LLM 이 낱말마다 따로 만든다.) 따옴표 낱말이 없는 질문은 그대로 둔다."""
+    order, groups = [], {}
+    for a in asks:
+        m = _QUOTED.search(a or "")
+        key = (a[:m.start()] + "\0" + a[m.end():]) if m else a
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        if m and m.group(1) not in groups[key]:
+            groups[key].append(m.group(1))
+    out = []
+    for key in order:
+        words = groups[key]
+        out.append(key.replace("\0", ", ".join(f"'{w}'" for w in words)) if words else key)
+    return out
+
+
 def question_view(s: dict) -> dict:
     """지금 물을 질문 하나. kind: dialect | confirm_emd | emd | detail | request_suggest | request
     emd 질문에 choices(place_choices 결과)가 있으면 화면은 목록에서 고르게 한다."""
@@ -144,7 +178,7 @@ def question_view(s: dict) -> dict:
     if field == "dialect":
         return {"kind": "dialect", "question": "이렇게 이해했어요. 맞나요?",
                 "understood": r["query"]["normalized_text"],
-                "asks": [x["question"] for x in r["questions"] if x["field"] == "dialect" and x.get("question")]}
+                "asks": merge_asks([x["question"] for x in r["questions"] if x["field"] == "dialect" and x.get("question")])}
     if field == "emd_name":
         if q.get("confirm"):
             return {"kind": "confirm_emd", "question": q["question"]}

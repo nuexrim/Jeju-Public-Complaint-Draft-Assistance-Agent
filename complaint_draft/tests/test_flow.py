@@ -375,3 +375,24 @@ def test_failed_conversion_keeps_text(monkeypatch):
     monkeypatch.setitem(sys.modules, "normalize", fake)
     monkeypatch.setattr(flow, "leftover_dialect", lambda t: ["놔줍서"])
     assert flow.standardize("의자 놔줍서") == "의자 놔줍서"
+
+
+# ---------------------------------------------------------------- 같은 뜻 질문 묶기 · 주제로 '더 자세히' 대신 답하기
+def test_merge_asks_joins_same_question_for_different_words():
+    q = "은 표준어로도 쓰는 말이라 그대로 두었습니다. 이 문장에서 뜻이 맞는지 확인해 주실 수 있나요?"
+    out = flow.merge_asks([f"'확'{q}", f"'막'{q}", "'놔줍서'은(는) 어떤 뜻인가요?", "따옴표 없는 질문"])
+    assert out == [f"'확', '막'{q}", "'놔줍서'은(는) 어떤 뜻인가요?", "따옴표 없는 질문"]
+
+
+def test_detail_question_is_answered_with_picked_topics():
+    a = FakeAgent(questions=[{"field": "claims", "question": "어떤 점이 불편하신지?"}], status="need_input")
+    s = flow.start(a, "구좌읍이우다", topics=["버스·대중교통", "병원·약국"])
+    assert s["stage"] == "meanings"
+    assert ("answer", {"detail": "버스·대중교통, 병원·약국 관련 불편이 있다"}) in a.calls
+    assert s["said"] == ["구좌읍이우다"]                     # 쓰신 글에는 넣지 않는다
+
+
+def test_detail_question_still_asked_without_topics():
+    a = FakeAgent(questions=[{"field": "claims", "question": "어떤 점이 불편하신지?"}], status="need_input")
+    s = flow.start(a, "구좌읍이우다")
+    assert s["stage"] == "questions" and flow.question_view(s)["kind"] == "detail"

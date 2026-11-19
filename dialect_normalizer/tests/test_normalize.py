@@ -52,6 +52,21 @@ def test_hidden_change_warned():
     assert warn and "앞이" in warn[0]
 
 
+def test_unclear_standard_word_left_unchanged_is_not_asked():
+    """'안'처럼 표준어로 더 자주 쓰는 낱말을 그대로 두고 unclear 로 물으면 질문을 뺀다. 사전에 없는 낱말은 계속 묻는다."""
+    _, ask, _, ign = check("농사도 잘 안 돼요", {"standard": "농사도 잘 안 돼요", "changes": [],
+                                              "unclear": [{"word": "안", "guess": "", "question": "'안'은 표준어로도 쓰는 말이라 그대로 두었습니다. 맞나요?"},
+                                                          {"word": "농사", "guess": "", "question": "'농사'는 어떤 뜻인가요?"}]})
+    assert ask == ["'농사'는 어떤 뜻인가요?"]
+    assert any("질문 생략: '안'" in x for x in ign)
+
+
+def test_strong_dialect_word_left_unchanged_is_still_asked():
+    _, ask, _, _ = check("고냉이 이서", {"standard": "고냉이 있어", "changes": [{"from": "이서", "to": "있어"}],
+                                       "unclear": [{"word": "고냉이", "guess": "고양이", "question": "'고냉이'는 어떤 뜻인가요?"}]})
+    assert "'고냉이'는 어떤 뜻인가요?" in ask
+
+
 def test_index_failure_raises_same_error_every_time(tmp_path, monkeypatch):
     """scikit-learn 이 없어 색인을 못 읽으면 두 번째 호출도 같은 ResourceMissing (전에는 AttributeError 로 멈춤)."""
     import pytest

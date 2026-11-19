@@ -156,7 +156,7 @@ def show_draft(base: dict) -> None:
         edit_form(draft)
     else:
         edited = any(sec.get("edited") for sec in draft["sections"])
-        # 초안 머리 줄: 왼쪽 제목, 오른쪽 [처음 초안으로 되돌리기] [수정하기] [표준어|방언]
+        # 초안 머리 줄: 왼쪽 제목, 오른쪽 [처음 초안으로 되돌리기] [수정하기] (방언 보기는 뺐다: 초안은 표준어만)
         head, tools = st.columns([1, 2], vertical_alignment="center")
         head.html(style.card_head("민원서 초안"))
         with tools.container(key="draft_tools", horizontal=True, horizontal_alignment="right", vertical_alignment="center",
@@ -164,10 +164,8 @@ def show_draft(base: dict) -> None:
             if edited:
                 st.button("처음 초안으로 되돌리기", key=f"reset_{rid}", on_click=reset_edits, args=(rid,))
             st.button("✏️ 수정하기", key=f"edit_{rid}", type="primary", on_click=set_editing, args=(rid, True))
-            view = st.segmented_control("보기", ["표준어", "방언"], default="표준어", key=f"view_{rid}",
-                                        label_visibility="collapsed")
         # 화면 HTML은 사용자 글을 JSON으로만 넣고 textContent 로 그린다(view.html 참고). 높이는 내용에 맞춘다.
-        st.iframe(render_html(draft, font_size(), mode="dia" if view == "방언" else "std", top=False),
+        st.iframe(render_html(draft, font_size(), mode="std", top=False),
                   height="content")
 
     sub = draft["submission"]
@@ -333,10 +331,9 @@ def place_dialog(choices: dict) -> None:
 # ---------------------------------------------------------------- 1. 불편 쓰기
 def step_input(agent) -> None:
     with st.container(key="card_write"):
-        st.html(style.card_head("불편한 점", "평소 말하듯이 쓰시면 됩니다"))
+        st.html(style.card_head("불편한 점 쓰기"))      # 안내 작은 글씨는 빼기로 함
         st.text_area("불편한 점 쓰기", key="in_text", height=150, label_visibility="collapsed",
                      placeholder="예: 우리 동네 버스가 확 줄어부난 할망덜 병원 가기가 막 힘들어마씸.")
-        st.caption("제주말로 쓰셔도 됩니다. 어려운 말로 바꾸지 않으셔도 돼요.")
 
     choices = place_info(agent)
     names = topic_names()
