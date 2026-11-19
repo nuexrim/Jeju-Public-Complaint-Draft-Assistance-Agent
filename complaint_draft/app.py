@@ -40,7 +40,7 @@ ALL_NOTE = "제주 전체를 고르면 지역끼리 비교하는 근거는 나�
 
 DEV = st.query_params.get("mode") == "dev"   # 개발용 정보(엔진 알림, handoff.json)는 ?mode=dev 에서만 보인다
 
-st.set_page_config(page_title="제주 민원 도우미", page_icon="🍊", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="민원똑딱", page_icon="🍊", layout="wide", initial_sidebar_state="collapsed")
 
 
 SIZES = ["작게", "보통", "크게"]
@@ -55,7 +55,7 @@ def plain(text) -> str:
 
 
 def font_size() -> str:
-    return st.session_state.get("font_size_ctl") or "크게"     # 머리의 글자 크기 단추(고른 것이 없으면 크게)
+    return st.session_state.get("font_size_ctl") or "작게"     # 머리의 글자 크기 단추(고른 것이 없으면 작게)
 
 
 def home_url() -> str:
@@ -200,7 +200,7 @@ def show_draft(base: dict) -> None:
 
 # ---------------------------------------------------------------- 예시·파일로 보기
 def page_file() -> None:
-    st.html(style.hero("예시로 민원서 보기", "개발·시연용: 예시나 handoff.json 으로 초안만 봅니다.", step=2))
+    st.html(style.hero("예시로 민원서 보기", "개발·시연용: 예시나 handoff.json 으로 초안만 봅니다.", step=2, flat=True))
     with st.expander("불러올 내용 고르기", expanded=True):
         how = st.radio("어디서 불러올까요?", ["예시", "파일 올리기 (handoff.json)"], horizontal=True)
         handoff = None
@@ -534,7 +534,8 @@ def page_talk() -> None:
 
     s = st.session_state.setdefault("flow", flow.new_state())
     stage = s["stage"]
-    st.html(style.hero(*hero_text(s), step=STEP_OF[stage]))
+    st.html(style.hero(*hero_text(s), step=STEP_OF[stage],
+                       flat=stage in ("draft", "stopped") or bool(st.session_state.get("flow_error"))))
     if st.session_state.get("flow_error"):
         st.error(st.session_state.pop("flow_error"))
 
@@ -563,7 +564,7 @@ def page_talk() -> None:
 
 # ---------------------------------------------------------------- 화면
 if "font_size_ctl" not in st.session_state:          # 처음 화면으로 갈 때(로고) 주소에 남긴 글자 크기
-    st.session_state.font_size_ctl = st.query_params.get("size") if st.query_params.get("size") in SIZES else "크게"
+    st.session_state.font_size_ctl = st.query_params.get("size") if st.query_params.get("size") in SIZES else "작게"
 _wide = st.session_state.get("flow", {}).get("stage") == "draft" or st.query_params.get("mode") == "file"
 st.html(style.css(font_size(), style.WIDE_W if _wide else None))
 show_header()

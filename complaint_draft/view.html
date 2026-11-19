@@ -9,54 +9,56 @@
   :root {
     --ink: #1F2326; --muted: #4A5157; --line: #B9BEC2; --paper: #FFFFFF; --bg: #FFF8EE; --grey: #ECEAE6;
     --orange: #F7941D; --soft: #FFE9CC; --brown: #9A4100; --green: #2F6B2C; --green-soft: #E4F2E1;
+    --surf: #F4F5F7; --border: #ECEEF1; --border-strong: #D5D9DE; --shadow: 0 4px 22px rgba(17,24,39,0.06);
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.65;
+  body { margin: 0; background: #F4F5F7; color: var(--ink); line-height: 1.65;
     font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 1.1rem; }
   button { font: inherit; color: var(--ink); cursor: pointer; }
   button:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
   .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 4px 2px 20px; }
   .top h2 { margin: 0; font-size: 1.35rem; line-height: 1.3; }   /* 큰 제목은 화면 위 제목 띠에 있다 */
-  .notice { margin: 0 2px 20px; padding: 0.7rem 1.2rem; border-radius: 14px; font-size: 1rem; font-weight: 500; background: var(--grey); }
+  .notice { margin: 0 2px 20px; padding: 0.8rem 1.3rem; border-radius: 16px; font-size: 1rem; font-weight: 500; background: #FFFFFF; }
   body.dia .notice { background: var(--soft); color: var(--brown); }
-  .cols { display: flex; flex-wrap: wrap; gap: 28px; align-items: stretch; padding: 0 2px; }   /* 민원서와 오른쪽 칸의 아래를 맞춘다 */
-  article { flex: 1 1 560px; min-width: 280px; background: var(--paper); border: 2px solid var(--line); border-radius: 20px;
+  .cols { display: flex; flex-wrap: wrap; gap: 28px; align-items: stretch; padding: 0 2px 28px; }   /* 민원서와 오른쪽 칸의 아래를 맞춘다 */
+  article { flex: 1 1 560px; min-width: 280px; background: var(--paper); border: 0; border-radius: 24px; box-shadow: var(--shadow);
     padding: clamp(24px, 3.2vw, 44px); display: flex; flex-direction: column; gap: 22px; }
   .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
-  .chip { font-size: 0.95rem; font-weight: 700; color: var(--brown); background: var(--soft); border-radius: 999px; padding: 0.35rem 1rem; }
+  .chip { font-size: 0.95rem; font-weight: 700; color: var(--brown); background: var(--soft); border-radius: 999px; padding: 0.35rem 1.1rem; }
   .to { font-size: 0.95rem; font-weight: 500; color: var(--muted); }
-  .doc-title { margin: 0; font-size: 1.7rem; font-weight: 700; line-height: 1.35; padding-bottom: 20px; border-bottom: 2px solid var(--ink);
+  .doc-title { margin: 0; font-size: 1.75rem; font-weight: 800; line-height: 1.35; padding-bottom: 20px; border-bottom: 2px solid var(--ink);
     display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
   .sec { display: flex; flex-direction: column; gap: 8px; }
   .sec h3 { margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--brown); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
   .text { margin: 0; white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; }
   .badge { font-size: 0.8rem; font-weight: 700; padding: 1px 12px; border-radius: 999px; background: var(--grey); color: var(--muted); }
-  .badge.original { background: var(--soft); color: var(--brown); border: 2px solid var(--brown); }
+  .badge.original { background: var(--soft); color: var(--brown); }
   .badge.edited { background: var(--green-soft); color: var(--green); }
   body.std .dia-only, body.dia .std-only { display: none; }
   aside { flex: 0 1 300px; min-width: 240px; display: flex; flex-direction: column; gap: 16px; font-size: 0.92rem; }  /* 오른쪽은 작게 */
   article#doc { flex: 1 1 560px; }
-  .ev { background: var(--green-soft); border: 2px solid var(--green); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .ev { background: linear-gradient(160deg, #EEF7EC 0%, var(--green-soft) 100%); border: 0; border-radius: 24px; padding: 20px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 14px; }
   .ev h2 { margin: 0; font-size: 1.25rem; color: var(--green); }
-  .ev-card { background: var(--paper); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 4px; }
+  .ev-card { background: var(--paper); border-radius: 18px; padding: 18px; box-shadow: 0 2px 8px rgba(47,107,44,0.08); display: flex; flex-direction: column; gap: 4px; }
   .ev-name { font-size: 0.95rem; font-weight: 700; line-height: 1.45; }
-  .ev-value { font-size: 1.5rem; font-weight: 700; }
+  .ev-value { font-size: 1.6rem; font-weight: 800; color: #C25700; }
   .ev-src { font-size: 0.8rem; color: var(--muted); line-height: 1.5; }
   .ev-partial { font-size: 0.8rem; font-weight: 700; color: var(--brown); }
   .ev-compare { font-size: 0.85rem; line-height: 1.5; }
-  .ev-stale { align-self: flex-start; font-size: 0.8rem; font-weight: 700; border: 2px dashed var(--ink); border-radius: 999px; padding: 0 10px; }
+  .ev-stale { align-self: flex-start; font-size: 0.8rem; font-weight: 700; border: 1.5px dashed var(--ink); border-radius: 999px; padding: 0 10px; }
   .count { margin: -10px 0 0; font-size: 0.9rem; font-weight: 500; color: var(--muted); }
   .count .over { color: #B42318; font-weight: 700; }
   mark.dia-word { background: var(--soft); color: var(--ink); font-weight: 700; border-bottom: 3px solid var(--brown); padding: 0 3px; }
-  .ev.none { background: var(--paper); border-color: var(--line); }
+  .ev.none { background: var(--paper); border: 1px solid var(--border); }
   .ev.none h2 { color: var(--ink); }
   .ev-none-note { margin: 0; font-size: 0.95rem; line-height: 1.55; }
-  .know { background: var(--paper); border: 2px solid var(--line); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 6px; }
+  .know { background: #FFFFFF; box-shadow: var(--shadow); border: 0; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 6px; }
   .know h2 { margin: 0; font-size: 0.95rem; }
   .know p { margin: 0; font-size: 0.9rem; line-height: 1.55; color: var(--muted); }
   .actions { display: flex; flex-direction: column; gap: 12px; margin-top: auto; }   /* 단추는 오른쪽 칸 맨 아래로 */
-  .act { border-radius: 14px; padding: 0.6rem 1rem; min-height: 54px; font-size: 1.05rem; font-weight: 700; background: var(--paper); border: 2px solid var(--ink); }
-  .act.main { background: var(--orange); border-color: var(--orange); }
+  .act { border-radius: 999px; padding: 0.6rem 1rem; min-height: 56px; font-size: 1.05rem; font-weight: 700; background: var(--paper); border: 1.5px solid var(--border-strong); transition: border-color .12s ease, transform .12s ease; }
+  .act:hover:not(:disabled) { border-color: var(--ink); transform: translateY(-1px); }
+  .act.main { background: var(--orange); border-color: var(--orange); box-shadow: 0 8px 20px rgba(247,148,29,0.32); }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .act.done { background: var(--green-soft); border-color: var(--green); }
   .act:disabled { background: var(--grey); border-color: var(--grey); color: #6B7177; cursor: not-allowed; }
