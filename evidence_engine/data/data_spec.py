@@ -25,7 +25,7 @@ KIND = {"hub_file": "제주데이터허브 파일", "hub_api": "제주데이터�
         "external_api": "공공데이터포털 Open API", "external_file": "공공데이터포털 파일(외부)"}
 HUB_TERMS = "제주데이터허브 이용약관. 대회 안내에 따라 제출 ZIP에서 심사와 센터 운영에만 쓰고 외부에 재배포하지 않음"
 TERMS = {"hub_file": HUB_TERMS, "hub_api": HUB_TERMS,
-         "datagokr_file": "공공데이터포털에 표기된 데이터별 이용허락범위 (허브 등록 데이터의 원본 파일)",
+         "datagokr_file": "공공데이터포털 표기 이용허락범위 제한 없음, 무료 (2026-11-19 데이터별 상세 페이지 확인)",
          "external_api": "공공데이터포털 표기 이용허락범위 제한 없음 (2026-11-14 확인)",
          "external_file": "공공데이터포털 표기 이용허락범위 제한 없음 (2026-11-14 확인)"}
 
