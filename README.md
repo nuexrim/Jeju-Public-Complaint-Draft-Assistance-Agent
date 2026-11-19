@@ -152,6 +152,7 @@ flowchart LR
 ### 개발 과정에서 쓴 AI
 
 - 코드 작성과 검토에 Claude Code(Anthropic) 사용
+- 개발 과정 보조에 ChatGPT(OpenAI) 사용
 - 온톨로지와 개념 태그는 LLM 없이 규칙으로 만듦. LLM 보강 코드(`config.yaml`의 `dev_llm`, Claude Sonnet 5.5)는 있지만 이번 제출본에는 쓰지 않음
 - 제주어 변환 평가(`dialect_normalizer/evaluate.py`)에서 Claude Haiku 5.5 호출
 
