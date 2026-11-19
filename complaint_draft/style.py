@@ -154,15 +154,17 @@ button[data-testid="stBaseButton-primary"], button[data-testid="stBaseButton-pri
 [data-testid="stButtonGroup"] button {{ min-height: 44px; border-radius: 999px; border: 2px solid {LINE}; background: #FFFFFF;
   color: {INK}; padding: 0.25rem 1rem; }}
 [data-testid="stButtonGroup"] button p {{ font-size: 1rem; font-weight: 500; }}
-[data-testid="stButtonGroup"] button[kind="pillsActive"], [data-testid="stButtonGroup"] button[data-testid="stBaseButton-pillsActive"],
-[data-testid="stButtonGroup"] button[aria-checked="true"] {{
-  background: {ORANGE}; border-color: {INK}; }}
-[data-testid="stButtonGroup"] button[kind="pillsActive"] p,
-[data-testid="stButtonGroup"] button[data-testid="stBaseButton-pillsActive"] p {{ font-weight: 700; }}
+/* 고른 단추: Streamlit 은 aria-pressed="true" 로 표시한다(기본 주황 글씨는 흰 바탕에서 잘 안 보여서 주황 바탕 + 검은 글씨로) */
+[data-testid="stButtonGroup"] button[aria-pressed="true"] {{ background: {ORANGE} !important; border-color: {INK} !important; color: {INK}; }}
+[data-testid="stButtonGroup"] button[aria-pressed="true"] p {{ font-weight: 700; color: {INK}; }}
 .stPills label p, .stCheckbox label p {{ font-size: 1.05rem; }}
 .stCheckbox label {{ min-height: 44px; align-items: center; }}
 .stCheckbox label p {{ font-weight: 500; }}
+[data-testid="stDialog"] {{ background: transparent !important; }}   /* 창 뒤를 주황으로 덮지 않는다 */
 [data-testid="stDialog"] [role="dialog"] {{ border: 2px solid {INK}; border-radius: 24px; }}
+/* 1단계 글 칸: 제목 굵게, 위아래 여백 같게 */
+.st-key-card_write .stTextArea label p {{ font-size: 1.2rem; font-weight: 700; }}
+.st-key-card_write .stTextArea {{ margin-bottom: 0; }}
 [data-testid="stExpander"] details {{ background: #FFFFFF; border: 2px solid {LINE}; border-radius: 16px; }}
 [data-testid="stExpander"] summary p {{ font-size: 1.1rem; font-weight: 700; }}
 @media (max-width: 640px) {{ .jj-hero-mascot {{ display: none; }} .jj-hero h1 {{ font-size: 1.4rem !important; }} }}
