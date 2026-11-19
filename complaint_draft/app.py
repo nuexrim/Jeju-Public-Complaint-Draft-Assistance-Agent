@@ -6,7 +6,7 @@
                complaint_agent 의 Agent 를 그대로 부른다. 흐름은 complaint_draft/flow.py, 꾸밈은 style.py.
 예시·파일로 보기 : 주소 끝에 ?mode=file 을 붙이면 열린다(예: http://localhost:8501/?mode=file). 개발·시연용.
                예시나 handoff JSON(python -m complaint_agent --out handoff.json "...")으로 초안만 본다.
-개발용 정보     : 주소 끝에 ?mode=dev 를 붙이면 엔진 알림·handoff.json 받기가 보인다. 기본 화면(어르신용)에서는 숨긴다.
+개발용 정보     : 주소 끝에 ?mode=dev 를 붙이면 엔진 알림·handoff.json 받기가 보인다. 기본 화면(도민용)에서는 숨긴다.
 """
 from __future__ import annotations
 

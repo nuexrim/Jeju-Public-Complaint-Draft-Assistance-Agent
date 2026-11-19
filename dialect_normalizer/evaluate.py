@@ -37,7 +37,7 @@ PROC = BASE / "processed"
 RESULTS = BASE / "results"
 TEST_FILES = {"daily": PROC / "test.jsonl", "senior": PROC / "test_senior.jsonl"}
 MODE_NAME = {"zero_shot": "A: LLM만", "rag": "B: 사전+예문+LLM"}
-SET_NAME = {"daily": "일상대화", "senior": "어르신"}
+SET_NAME = {"daily": "일상대화", "senior": "중고령자"}
 PUNCT = "?.,!~…\"'“”‘’()[]"
 WORKERS = 4          # 동시에 보내는 요청 수 (요청 한도 에러가 나면 줄이기)
 

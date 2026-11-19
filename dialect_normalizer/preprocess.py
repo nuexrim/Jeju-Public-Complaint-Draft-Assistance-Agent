@@ -11,7 +11,7 @@
 만들어지는 파일 (processed/ 폴더)
   pairs_train.jsonl  : 방언-표준어 문장 쌍 (source 칸에 daily / senior 표시)
   test.jsonl         : 일상대화 평가셋 (학습 쪽과 대화 파일이 겹치지 않음)
-  test_senior.jsonl  : 어르신 평가셋 (학습 쪽과 화자가 겹치지 않음)
+  test_senior.jsonl  : 중고령자 평가셋 (학습 쪽과 화자가 겹치지 않음)
   dialect_dict.json  : 방언 어절 → {dialect_ratio, seen, cands: 표준어 후보 + 출처별 횟수} (학습 쪽으로만 만듦)
                        dialect_ratio = 방언으로 쓰인 횟수 ÷ 그 어절이 등장한 전체 횟수
                        (예: '안'은 대부분 표준어로 쓰여 비율이 매우 낮음 → 변환 모듈이 약한 근거로 취급)
@@ -30,7 +30,7 @@ TEST_RATIO = 0.1        # 평가용으로 떼어둘 비율 (daily: 대화 파일
 TEST_SIZE = 500         # 평가셋 하나당 문장 수
 MIN_DIALECT_EOJEOL = 2  # 평가 문장 조건: 방언 어절 최소 개수
 DICT_MIN_COUNT = 3      # 사전에 남길 최소 등장 횟수 (전체 합계)
-SENIOR_MIN_COUNT = 2    # 어르신 데이터에서 2번 이상 나온 쌍은 전체 합계가 3 미만이어도 남김
+SENIOR_MIN_COUNT = 2    # 중고령자 데이터에서 2번 이상 나온 쌍은 전체 합계가 3 미만이어도 남김
 SEED = 42
 
 TAG_RE = re.compile(r"\{[^}]*\}")
@@ -244,7 +244,7 @@ def main():
     print("\n===== 결과 =====")
     for k, v in summary.items():
         print(f"{k}: {v}")
-    print("\n===== 어르신 데이터 예시 3개 (방언 → 표준어) =====")
+    print("\n===== 중고령자 데이터 예시 3개 (방언 → 표준어) =====")
     for r in [r for r in train if r["source"] == "senior" and r["n_dialect"] >= 2][:3]:
         print(f"- [{r['domain']}, {r['age']}] {r['dialect']}\n  → {r['standard']}\n  어절: {r['dialect_eojeols']}")
     print("\n===== 방언 비율 확인 (자주 나오는 사전 단어 10개) =====")

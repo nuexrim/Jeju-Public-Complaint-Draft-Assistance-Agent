@@ -38,7 +38,7 @@ PAIRS_PATH = PROC / "pairs_train.jsonl"
 INDEX_PATH = PROC / "example_index.pkl"
 
 # ---------- 설정값 ----------
-INDEX_DAILY_MAX = 150_000        # 예문 색인에 넣을 일상대화 문장 수 (어르신 문장은 전부 넣음)
+INDEX_DAILY_MAX = 150_000        # 예문 색인에 넣을 일상대화 문장 수 (중고령자 문장은 전부 넣음)
 EXAMPLE_MAX_LEN = 200            # 이보다 긴 문장은 예문에서 제외 (프롬프트가 너무 길어지지 않게)
 TOP_K_EXAMPLES = 5               # LLM에게 보여줄 예문 수
 PREFIX_MIN_COVER = 0.5           # 앞부분 일치: 사전 단어가 어절 길이의 50% 이상이어야 인정
@@ -47,7 +47,7 @@ MIN_PROMPT_RATIO = 0.1           # 방언 비율이 이보다 낮은 단어(예:
 STRONG_RATIO = 0.5               # 이 이상이면 '강한 근거', 그 아래는 '표준어로도 자주 쓰임' 표시
 SEED = 42
 PUNCT = "?.,!~…\"'“”‘’()[]"
-SOURCE_NAME = {"daily": "일상대화", "senior": "어르신", "official": "도청"}
+SOURCE_NAME = {"daily": "일상대화", "senior": "중고령자", "official": "도청"}
 
 
 # =====================================================================
@@ -133,7 +133,7 @@ class ExampleIndex:
                 else:
                     senior.append(ex)
         examples = senior + daily
-        print(f"어르신 {len(senior)}개 + 일상대화 {len(daily)}개 = {len(examples)}개로 색인 만드는 중...")
+        print(f"중고령자 {len(senior)}개 + 일상대화 {len(daily)}개 = {len(examples)}개로 색인 만드는 중...")
         vec = TfidfVectorizer(analyzer="char_wb", ngram_range=(2, 3), min_df=2, sublinear_tf=True)
         X = vec.fit_transform([e[0] for e in examples])
         with open(out_path, "wb") as f:
@@ -270,7 +270,7 @@ def check_evidence(text, llm_out, ddict):
         if not w or w not in text or w in changed:      # 입력에 없는 단어, 이미 처리한 단어는 버림
             continue
         # 결과 문장에 그대로 남겨 둔 낱말이 사전에서 '표준어로 더 자주 쓰이는 말'(방언 비율 STRONG_RATIO 미만)이면 묻지 않는다.
-        # 예: '확', '막' — 표준어 뜻으로 읽어도 결과가 같아서, 물어도 어르신께 질문만 늘어난다. (사전에 없는 낱말은 계속 묻는다)
+        # 예: '확', '막' — 표준어 뜻으로 읽어도 결과가 같아서, 물어도 중고령자에게 질문만 늘어난다. (사전에 없는 낱말은 계속 묻는다)
         if w in out_words and ddict:
             hit = ddict.lookup(w)
             if hit and hit["strength"] != "강함":
