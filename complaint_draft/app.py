@@ -275,7 +275,6 @@ def step_input(agent) -> None:
     with st.container(key="card_write"):
         st.text_area("불편한 점 쓰기", key="in_text", height=130,
                      placeholder="예: 우리 동네 버스가 확 줄어부난 할망덜 병원 가기가 막 힘들어마씸.")
-        st.caption("평소 말하듯이 쓰시면 됩니다. 어려운 말로 바꾸지 않으셔도 돼요.")
 
     choices = place_info(agent)
     names, _ = topic_info()
