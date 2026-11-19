@@ -1,155 +1,134 @@
-# 민원서 초안 (`complaint_draft/`)
+# 화면과 민원서 작성 (`complaint_draft/`)
 
-근거 패키지까지 받은 결과(`handoff`)로 **표준어 민원서(제출용)**를 만듭니다. 화면에는 표준어 민원서만 보여 줍니다.
+도민이 쓰는 Streamlit 화면, 단계별 대화 흐름, 근거 패키지를 표준어 민원서로 만드는 부분.
 
 ## 실행
 
-저장소 맨 위에서 실행합니다.
+저장소 맨 위에서 실행.
 
 ```bash
-pip install -r complaint_draft/requirements.txt     # streamlit
-streamlit run complaint_draft/app.py                 # 브라우저가 열림 (예시 3개 내장)
-python -m pytest -q complaint_draft/tests            # 테스트 (네트워크·유료 호출 없음)
+streamlit run complaint_draft/app.py           # http://localhost:8501
+python -m pytest -q complaint_draft/tests      # 테스트 152개, 네트워크와 유료 호출 없이
 ```
 
-화면은 두 가지입니다. 옆 칸(사이드바)은 쓰지 않습니다.
+| 주소 | 화면 |
+| --- | --- |
+| `http://localhost:8501` | 기본 화면. 불편 쓰기부터 민원서까지 한 흐름으로 이어짐 |
+| `http://localhost:8501/?mode=dev` | 기본 화면에 엔진 알림과 `handoff.json` 받기 단추를 추가로 표시 |
+| `http://localhost:8501/?mode=file` | 예시 3개나 `handoff.json` 파일로 초안만 보는 시연용 화면 |
 
-- **기본 화면** (`http://localhost:8501`): 불편 쓰기(지역·주제 고르기) → 되묻기 → 뜻 고르기 → 최종 확인 → 근거 고르기 → 민원서 초안까지 한 화면에서 이어집니다.
-  `complaint_agent` 의 `Agent` 를 그대로 부르므로 루트 `requirements.txt` 설치가 필요합니다.
-  Claude 를 쓰려면 실행하는 셸에서 `ALLOW_PAID_CALLS=1` 을 켭니다(없으면 규칙 구조화). 근거 DB가 없으면 엔진 mock 으로 돌고 복사가 막힙니다.
-- **개발용 정보** (`http://localhost:8501/?mode=dev`): 기본 화면은 어르신용이라 엔진 알림(예: "Claude 구조화를 쓰지 못해…")과 `handoff.json 받기` 단추를 숨깁니다. 주소 끝에 `?mode=dev`를 붙이면 보입니다.
-- **예시·파일로 보기** (`http://localhost:8501/?mode=file`): 개발·시연용. 예시 3개나 handoff 파일(`python -m complaint_agent --out handoff.json "..."`)로 초안만 봅니다.
+- Claude를 쓰려면 실행하는 셸에서 `ALLOW_PAID_CALLS=1` 설정
+- 설정이 없으면 규칙 기반으로 이해하고 기본 문장 틀로 민원서 생성
+- 근거 DB가 없으면 엔진이 형식 확인 모드로 동작하고 복사와 인쇄를 막음
+
+## 화면 구성
+
+단계 표시는 세 묶음으로 구성.
+
+| 묶음 | 화면 |
+| --- | --- |
+| 1. 불편 쓰기 | 글 칸, 지역 고르기(시와 읍면동으로 묶은 선택창, 제주 전체), 주제 고르기(여러 개, 건너뛰기 가능) |
+| 2. 내용 확인 | 되묻기(질문 하나씩) → 뜻 고르기(주장마다 체크, 최대 3개) → 최종 확인 |
+| 3. 민원서 만들기 | 근거 고르기(판정, 값, 비교, 출처, 기준일 카드) → 민원서 초안 |
+
+- 머리: 로고를 누르면 처음 화면으로 이동. 오른쪽에서 글자 크기(작게, 보통, 크게) 변경. 바꾼 크기는 초안 화면에도 적용됨
+- 고른 지역은 태그로 표시. 마우스를 올리면 오른쪽 위에 나오는 작은 x로 삭제 가능
+- 초안 화면은 넓게 펼쳐짐. 왼쪽에 민원서, 오른쪽에 글자 수와 복사, 인쇄, 텍스트 받기 단추 배치
+- 초안 위의 "수정하기"를 누르면 제목, 내용, 요청 사항 수정 가능. 저장, 취소, 처음 초안으로 되돌리기 제공. 근거 자료는 잠금
+- "근거에서 뺀 내용"은 접힌 상태. 펼치면 뺀 근거와 이유 표시
+- 사용자 글은 마크다운이나 HTML로 해석되지 않게 변환해서 넣음. 초안 화면(`view.html`)은 글을 JSON으로만 받아 `textContent`로 그림
+- 색과 글자, 감귤 캐릭터는 `style.py`, 전체 테마는 저장소 맨 위 `.streamlit/config.toml`에 있음
+- 글꼴(Jua, Noto Sans KR)은 Google Fonts에서 받음. 인터넷이 없으면 기본 글꼴로 표시
 
 ## 대화 흐름 (`flow.py`)
 
-`complaint_agent/conversation.py` 의 터미널 흐름과 같은 순서·같은 횟수 제한을, 화면이 한 단계씩 부를 수 있게 나눈 것입니다.
-Streamlit 과 무관한 함수라 다른 화면에서도 쓸 수 있습니다.
+- 화면과 터미널이 함께 쓰는 흐름
+- Streamlit을 쓰지 않는 함수라서 다른 화면에도 연결 가능
+- 상태는 dict 하나라서 `st.session_state`에 그대로 넣음
 
-| 단계(`state["stage"]`) | 보여 줄 것 | 답 넣기 |
+| 단계 (`state["stage"]`) | 보여 줄 것 | 답 넣기 |
 | --- | --- | --- |
 | `input` | 글 칸, 지역(`agent.place_choices()`), 주제(`structure.topic_names()`) | `start(agent, text, places=[...], topics=[...])` |
-| `questions` | `question_view(state)` 질문 하나 (읍면동 질문에 `choices`가 오면 목록에서 고름) | `answer_question(agent, state, text=..., yes=..., places=[...])` |
-| `meanings` | `meaning_view(state)` 주장별 뜻(최대 5개 + 기타), `max_picks` | `submit_meanings(agent, state, {"c1": ["c1-o1", "c1-o3"]})` |
-| `confirm` | `confirm_rows(state)` (지역·주제·민원 종류·문제·바라는 점) | `confirm(agent, state, yes)` — 아니요면 되묻기부터 다시 |
-| `evidence` | `state["evidence_items"]` 근거 카드 (`usable`, `stale`) | `choose_evidence(agent, state, [index, ...])` |
-| `draft` | `state["draft"]`, `state["handoff"]` | `back_to_evidence(state)` 로 근거 다시 고르기 |
+| `questions` | `question_view(state)` 질문 하나 | `answer_question(agent, state, text=..., yes=..., places=[...])` |
+| `meanings` | `meaning_view(state)` 주장별 뜻, `max_picks` | `submit_meanings(agent, state, {"c1": ["c1-o1", "c1-o3"]})` |
+| `confirm` | `confirm_rows(state)` | `confirm(agent, state, yes)` |
+| `evidence` | `state["evidence_items"]` 근거 카드 | `choose_evidence(agent, state, [index, ...])` |
+| `draft` | `state["draft"]`, `state["handoff"]` | `back_to_evidence(state)`로 근거 다시 고르기 |
 | `stopped` | `state["stop_reason"]` | 처음부터 다시 |
 
-- 불편 쓰기에서 고른 읍면동은 `understand()` 바로 다음에 `answer(r, emd_names=[...])` 로 넘깁니다. 고르지 않았으면 엔진이 되묻기에 고르기 목록(`choices`)을 붙여 보냅니다. 고른 장소(`r["places"]`)는 `summary`·`evidence` 에 함께 넘깁니다.
-- 고를 수 있는 장소 수는 엔진의 `place_choices()["max_picks"]` 를 그대로 씁니다. "제주 전체"를 고르면 그것 하나만 넘깁니다.
-- 고른 주제는 `agent.understand(text, topics=[...])` 로 엔진에 넘깁니다. 엔진은 유형이 비었거나 "기타"면 고른 주제의 유형으로 정하고(경로당 → 복지), 문장에 주제가 없을 때 뜻 선택지를 찾는 힌트로 씁니다. 문장에 주제가 있으면 문장을 따릅니다(고른 주제로 막지 않음).
-- 뜻 고르기에서 "기타"만 고르면 직접 쓰기 없이 하신 말씀 그대로 둡니다. 근거 자료가 없는 주제(선택지가 "자료 없음"·"기타"뿐)인 주장은 묻지 않고 넘어갑니다.
-- 최종 확인에서 "아니요"를 누르면 쓰신 글을 다시 이해해 되묻기로 돌아갑니다(고른 지역·주제는 그대로). 엔진이 더 물을 것이 없다고 해도 이해한 문장을 한 번 보여 주고 고칠 기회를 줍니다. 두 번째 "아니요"면 멈춥니다.
-- 근거 고르기에서는 민원서에 넣을 수 있는 근거(`supported`·`partial`이고 값이 있음)만 체크할 수 있고, 처음에는 모두 체크돼 있습니다. 체크를 푼 근거는 초안의 `excluded` 에 "직접 뺀 근거"로 남습니다.
+- 주제를 골랐으면 "더 자세히 말해 주세요" 질문 대신 고른 주제로 채움. 그래도 불편한 점을 찾지 못하면 그때 질문
+- 제주어 뜻 질문은 낱말만 다르고 묻는 말이 같으면 한 문장으로 묶음
+- 최종 확인에서 "아니요"를 누르면 고른 지역과 주제는 유지하고 처음 이해부터 다시 진행. 두 번째 "아니요"면 중단
+- 근거 고르기에서는 넣을 수 있는 근거(자료로 확인됨이나 일부만 확인됨이고 값이 있는 근거)만 체크 가능. 처음에는 모두 체크된 상태
 
-제주어 화면의 원문은 처음 쓴 말과 "더 자세히" 질문에 덧붙인 말을 그대로 씁니다(`state["said"]`).
+## 민원서 만들기 (`draft.py`, `writer.py`)
 
-## 입력
+`build_draft(handoff, source_text=None, exclude=None, write=None)`가 초안 생성.
 
-`complaint_agent` 의 `Agent.handoff()` 결과 그대로입니다 (`query`, `package`, `structured_by`, `notices`, `pii_masked`).
+1. `writer.write_sections`가 Claude에 제목, 민원 내용, 요청 사항을 한 번에 요청. 넘기는 것은 가린 사용자 글, 지역, 고른 주장, 근거 이름이며 숫자는 넘기지 않음
+2. 받은 글을 코드가 검사
+   - 숫자는 사용자 글, 고른 주장, 지역 이름에 있는 것만 허용
+   - 빈 칸 없음
+   - 제목에 장소 포함, 45자 이하
+   - 개인정보 재가림
+3. 검사를 통과하지 못하거나 Claude를 쓸 수 없으면 `templates.py`의 기본 문장 틀로 생성. 결과에 `written_by: "template"`과 안내 문구를 남김
+4. 근거 자료 칸은 엔진의 값과 출처를 그대로 옮김. 표시만 소수점 둘째 자리까지 줄임
 
-제주어 원문은 handoff 에 들어 있지 않습니다. 다음 중 하나로 넘깁니다.
+| 항목 | 처리 |
+| --- | --- |
+| 문체 | 표준어 합니다체. 기본 문장 틀일 때는 `formal.py`가 문장 끝만 규칙으로 변환(힘들어요 → 힘듭니다). 애매한 끝은 그대로 두고 경고 |
+| 근거 자료 | 자료로 확인됨, 일부만 확인됨만 넣음. 일부만 확인된 근거는 그렇게 표시 |
+| 뺀 근거 | 자료와 다름, 자료로 확인 불가, 빈칸, 사용자가 체크를 푼 근거는 `excluded`로 돌려 화면에서 안내 |
+| 오래된 자료 | 기준일이 2년을 넘으면 "오래된 자료"로 표시 |
+| 남은 제주어 | 표준어 글에 남은 제주어 낱말을 사전으로 찾아 밑줄로 표시하고 경고 |
+| 개인정보 | `evidence_engine/package/privacy.py`로 한 번 더 가림 (`○○`) |
+| 형식 확인 모드 | 경고를 띄우고 복사와 텍스트 받기를 막음 (`copy_allowed: false`) |
 
-- `build_draft(handoff, source_text="...")`
-- handoff 에 `"source_text"` 키를 추가 (연결 모듈의 `result["source_text"]`, 이미 가린 원문)
-- 화면의 "원래 하신 말씀" 칸에 입력
+## 제출용 글 (`submission`)
 
-원문은 초안 데이터(`sections[].dialect`)에만 남고 화면에는 보이지 않습니다.
+- 국민신문고와 제주도 누리집 "도지사에게 바란다"의 글 칸은 제목과 내용 두 개
+- 따라서 제출용 글도 두 덩어리로 생성
+- 이름, 연락처, 주소, 처리기관은 창구 화면에서 본인이 입력하고 선택
 
-## 출력 (`build_draft`)
+| 칸 | 만드는 법 |
+| --- | --- |
+| 제목 | "장소 + 핵심 불편 + 요청" 한 줄. 예: `구좌읍 버스 증차 요청` |
+| 내용 | `[발생 장소]` → `[불편 사항]` → `[요청 사항]` → `[근거 자료]` 순서. 넣은 근거가 없으면 `[근거 자료]` 생략 |
+| 처리기관 참고 | 읍면동으로 제주시와 서귀포시를 찾아 안내. 선택은 사용자 몫 |
+
+국민신문고 글자 수 제한(제목 200자, 내용 40,000자)을 화면에 표시하고, 넘으면 경고.
+
+## 출력 예시
 
 ```json
 {
   "request_id": "...",
+  "written_by": "claude",
   "sections": [
-    {"id": "title",    "title": "제목",     "standard": "...", "dialect": "...", "dialect_source": "standard_fallback"},
-    {"id": "content",  "title": "민원 내용", "standard": "...", "dialect": "원문 그대로", "dialect_source": "original"},
-    {"id": "request",  "title": "요청 사항", "standard": "...", "dialect": "...", "dialect_source": "standard_fallback"},
-    {"id": "evidence", "title": "근거 자료", "standard": "...", "dialect": "...", "dialect_source": "standard_fallback"}
+    {"id": "title",    "title": "제목",      "standard": "..."},
+    {"id": "content",  "title": "민원 내용", "standard": "..."},
+    {"id": "request",  "title": "요청 사항", "standard": "..."},
+    {"id": "evidence", "title": "근거 자료", "standard": "..."}
   ],
-  "submission": {"title": "구좌읍 버스 증차 요청", "body": "[발생 장소]\n...\n\n[불편 사항]\n...\n\n[요청 사항]\n...\n\n[근거 자료]\n...",
-                 "title_chars": 12, "body_chars": 551, "title_limit": 200, "body_limit": 40000,
-                 "complaint_type": "교통", "agency": "제주특별자치도 제주시",
-                 "portals": [], "steps": []},
-  "evidence": [{"claim_id": "c1", "verdict": "supported", "indicator": "...", "value": -12.43, "unit": "%",
-                "value_text": "-12.43%", "region_compare": "...", "sources": [], "as_of": "2026-09", "stale": false,
-                "index": 0, "caveats": []}],
-  "excluded": [{"kind": "evidence", "claim_id": "c2", "claim": "...", "label": "...", "reason": "자료와 다름"},
-               {"kind": "user", "claim_id": "c1", "claim": "...", "label": "...", "reason": "직접 뺀 근거"}],
-  "warnings": ["..."], "notices": ["..."], "pii_masked": [], "engine": "hybrid", "copy_allowed": true,
-  "dialect_words": ["할망덜"]
+  "submission": {"title": "...", "body": "[발생 장소]\n...", "title_chars": 12, "body_chars": 551,
+                 "title_limit": 200, "body_limit": 40000, "agency": "제주특별자치도 제주시"},
+  "evidence": [{"claim_id": "c1", "verdict": "partial", "indicator": "...", "value": -11.32, "unit": "%",
+                "sources": [], "as_of": "...", "stale": false}],
+  "excluded": [{"kind": "evidence", "claim_id": "c2", "reason": "자료와 다름"}],
+  "warnings": [], "notices": [], "copy_allowed": true, "dialect_words": []
 }
 ```
-
-## 제출 창구에 맞춘 글 (`submission`)
-
-국민신문고와 제주도 누리집 '도지사에게 바란다'는 글 칸이 **제목**과 **내용** 두 개입니다
-(이름·연락처·주소·처리기관은 창구 화면에서 본인이 직접 넣고 고릅니다). 그래서 제출용 글은 두 덩어리로 만듭니다.
-
-| 칸 | 만드는 법 |
-| --- | --- |
-| 제목 (`submission.title`) | 국민신문고 작성 요령대로 "장소 + 요청" 한 문장. 예: `구좌읍 버스 증차 요청`. 요구사항이 없으면 뜻 고르기에서 고른 주장으로 `구좌읍 불편 개선 요청: 어르신 수에 비해 의원이 적다`(여럿이면 `외 n건`), 고른 뜻이 없으면 `노형동 클린하우스·CCTV 관련 불편 개선 요청` |
-| 내용 (`submission.body`) | `[발생 장소]` → `[불편 사항]` → `[요청 사항]` → `[근거 자료]` 순서로 한 덩어리 (사실 → 요청 → 근거). 넣은 근거가 없으면 `[근거 자료]` 칸은 빼고, 초안 화면·인쇄에서도 보이지 않음 |
-| 처리기관 참고 (`submission.agency`) | 읍면동으로 제주시·서귀포시를 찾아 `제주특별자치도 제주시`처럼 안내. 추천일 뿐이고 고르는 것은 사용자 |
-
-- 화면의 복사 버튼은 `① 제목 복사하기`, `② 내용 복사하기` 두 개입니다.
-- 국민신문고 글자 수 제한(제목 200자, 내용 40,000자)을 화면에 "제목 n / 200자 · 내용 칸 n / 40,000자"로 보여 주고, 넘으면 경고합니다. 만든 제목은 읽기 좋게 60자를 넘으면 줄입니다.
-- 이름·연락처·주소 같은 개인정보는 민원서에 넣지 않습니다.
-
-## 직접 고치기 (`apply_edits`)
-
-화면의 "민원서 고치기"에서 표준어본의 **제목·민원 내용·요청 사항**을 고칠 수 있습니다.
-
-- 근거 자료는 숫자·출처가 바뀌지 않게 잠겨 있습니다(고친 값이 들어와도 무시).
-- 고친 글도 개인정보를 가립니다. 빈 칸으로 두면 원래 글을 씁니다.
-- 제주어 화면의 원문("하신 말씀 그대로")은 바뀌지 않습니다.
-- 고친 섹션에는 "직접 고친 글" 표시가 붙고, 복사되는 제목·내용에도 바로 반영됩니다. "처음 글로 되돌리기"로 되돌립니다.
-
-## 규칙
-
-| 항목 | 처리 |
-| --- | --- |
-| 문장 | LLM 없이 `templates.py` 틀에 handoff 필드를 채움. 문장을 바꾸려면 이 파일만 고침 |
-| 문체 | 표준어본은 격식체(합니다체). `formal.py`가 문장 끝만 규칙으로 바꿈(힘들어요→힘듭니다, 줄었다→줄었습니다, 주세요→주시기 바랍니다). 애매한 끝(-네요, -거든요, 물음)은 그대로 두고 경고를 띄움. 방언 원문과 직접 고친 글은 바꾸지 않음 |
-| 제주어 화면 | 방언을 새로 만들지 않음. `민원 내용`만 원문 그대로(`original`), 나머지는 표준어(`standard_fallback`) |
-| 숫자·출처 | `package.evidence[].value`·`sources`만 옮김. 표시만 소수점 둘째 자리까지 |
-| 근거 자료 | `supported`·`partial`만 넣음. `partial`은 "일부만 확인된 근거" 표시 |
-| 뺀 근거 | `contradicted`·`unverifiable`·`gaps`와 근거 고르기에서 체크를 푼 근거는 `excluded`로 돌려 화면에서 안내 (민원 내용에는 말씀이 그대로 남음) |
-| 오래된 자료 | 출처 기준일(`as_of`)이 2년(24개월)보다 오래되면 근거 카드에 "오래된 자료" 표시 (`stale`) |
-| 남은 제주어 | 표준어본(제목·민원 내용·요청 사항)에 남은 제주어 낱말을 방언 사전(`dialect_normalizer/processed/dialect_dict.json`, 제주어 비율 0.9 이상·20번 이상 나온 낱말)으로 찾아 경고하고 초안에서 밑줄 표시 (`dialect_words`). 사전이 없으면 건너뜀. 고쳐 쓰면 다시 검사 |
-| mock 엔진 | 경고를 띄우고 복사·글로 받기를 막음 (`copy_allowed: false`) |
-| 규칙 구조화 | `structured_by: "rules"`면 내용을 확인하라는 경고 |
-| 개인정보 | 원문도 `evidence_engine/package/privacy.py`로 한 번 더 가림 (자리표시 `○○`) |
-
-## 화면
-
-시안(제주 민원 도우미 화면 디자인)을 옮긴 것입니다. 색·글자 크기·감귤 캐릭터는 `style.py`, 초안 화면은 `view.html`, 전체 색은 저장소 맨 위 `.streamlit/config.toml`에 있습니다.
-
-위쪽 단계 표시는 큰 틀 세 개(불편 쓰기 / 내용 확인 / 민원서 만들기)로 묶었습니다.
-
-| 큰 틀 | 화면 |
-| --- | --- |
-| 1. 불편 쓰기 | 글 칸(가로 전체) + 지역 고르기(단추를 누르면 선택창: 시·읍면/동으로 묶은 목록, 제주 전체, 최대 장소 수) + 주제 고르기(여러 개, 건너뛰기 가능) |
-| 2. 내용 확인 | 되묻기(제주어 뜻 확인·읍면동·바라는 점 등 질문 하나씩) → 뜻 고르기(말씀마다 체크, 최대 개수 안내) → 최종 확인(쓰신 글 / 이렇게 이해했어요, "아니요 / 맞아요") |
-| 3. 민원서 만들기 | 근거 고르기(판정·값·비교·출처·기준일 카드, 오래된 자료 표시) → 민원서 초안(제목·내용 글자 수, 남은 제주어 밑줄, 인쇄·제목/내용 복사) |
-
-- 머리: 글자 크기(작게·보통·크게)와 "처음으로". 글자 크기는 초안 화면에도 같이 적용됩니다.
-- 초안 화면은 표준어 민원서만 보여 줍니다. 예전에 있던 "표준어 / 방언" 전환 단추는 뺐습니다(방언 원문은 초안 데이터의 `sections[].dialect`에 그대로 남아 있어 필요하면 다시 쓸 수 있음).
-- 인쇄·제목/내용 복사는 근거 DB가 있을 때만 동작합니다(예시·mock 결과는 막음).
-- 주제 목록은 근거 엔진이 실제로 자료를 가진 주제(`structure.topic_names()`)입니다.
-- 음성 입력("말로 하기")은 이번 제출물에서 뺐습니다.
-- 글꼴(Jua, Noto Sans KR)은 Google Fonts에서 받습니다. 인터넷이 없으면 컴퓨터 기본 글꼴로 보입니다.
 
 ## 파일
 
 | 파일 | 내용 |
 | --- | --- |
+| `app.py` | Streamlit 화면 |
+| `flow.py` | 대화 흐름 |
 | `draft.py` | `build_draft`, `apply_edits`, `plain_text`, `validate_draft` |
-| `templates.py` | 문장 틀, 판정 표시, 경고 문구 |
-| `formal.py` | 격식체 변환 (`formalize`, `has_informal`) |
-| `view.py`, `view.html` | 초안 화면 HTML (표준어 민원서, 인쇄·제목/내용 복사) |
-| `flow.py` | 대화 흐름 (불편 쓰기 → 되묻기 → 뜻 고르기 → 최종 확인 → 근거 고르기 → 초안) |
-| `app.py` | Streamlit 화면 (기본 화면 / 예시·파일로 보기) |
-| `style.py` | 화면 꾸밈: 색·글자·감귤 캐릭터·단계 표시·카드 |
-| `samples/*.json` | 예시 handoff 3개 (수치·기준일은 실제 계산값 아님) |
-| `tests/` | pytest 108개 (`test_draft.py` 28, `test_flow.py` 13, `test_formal.py` 67) |
+| `writer.py` | Claude 민원서 작성과 결과 검사 (프롬프트 `SYSTEM`) |
+| `templates.py` | 기본 문장 틀, 판정 표시, 경고 문구 |
+| `formal.py` | 합니다체 변환 |
+| `view.py`, `view.html` | 초안 화면 (인쇄, 복사, 텍스트 받기) |
+| `style.py` | 색, 글자, 감귤 캐릭터, 단계 표시, 카드 |
+| `samples/*.json` | 시연용 예시 3개 (수치와 기준일은 실제 계산값이 아님) |

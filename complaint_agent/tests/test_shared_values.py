@@ -55,3 +55,18 @@ def test_run_bat_keeps_paid_calls_off_by_default():
     """실행.bat 의 Claude 스위치는 0 으로 둔다(사람이 직접 1 로 바꾼다)."""
     text = (ROOT / "실행.bat").read_text(encoding="utf-8")
     assert "set ALLOW_PAID_CALLS=0" in text and "set ALLOW_PAID_CALLS=1" not in text
+
+
+def test_open_source_list_matches_requirements():
+    """데이터 활용 명세의 오픈소스 목록(버전)이 실제로 설치하는 requirements 와 같아야 한다."""
+    import re
+
+    from data import data_spec
+    pinned = {}
+    for req in ROOT.glob("*/requirements.txt"):
+        for line in req.read_text(encoding="utf-8").splitlines():
+            m = re.match(r"^([A-Za-z0-9_.\-]+)==(\S+)", line.strip())
+            if m:
+                pinned[m.group(1).lower()] = m.group(2)
+    listed = {name.lower(): ver for name, ver, *_ in data_spec.OPEN_SOURCE}
+    assert listed == pinned
